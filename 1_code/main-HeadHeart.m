@@ -1,0 +1,46 @@
+%% Main modlue for HeadHeart 
+
+% Author: Lisa Paulsen
+% Contact: lisaspaulsen[at]web.de
+% Created on: 1 October 2024
+% Last update: 2 September 2024
+
+%% REQUIRED TOOLBOXES
+% Curve Fitting Toolbox
+% Image Processing Toolbox 
+% Signal Processing Toolbox
+% Statistics and Machine Learning Toolbox
+
+clear all
+close all
+
+%% Directory SetUp
+% set the directory to best fit your path 
+
+data_dir = '/Volumes/LP3/HeadHeart/0_data';
+results_dir = '/Volumes/LP3/HeadHeart/2_results';
+plots_dir = '/Volumes/LP3/HeadHeart/3_plots';
+
+
+%% Analysis SetUp 
+
+% initialize subjects 
+% be aware that for sub 45 and 60 only MEDON is available
+subjects_MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
+subjects_MedON = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
+subjects = subjects_MedOff;
+
+
+%% PRE PROCESSING 
+
+%preprocess_physiological
+
+
+
+
+
+
+
+
+
+
