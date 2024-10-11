@@ -17,10 +17,15 @@ close all
 %% Directory SetUp
 % set the directory to best fit your path 
 
-data_dir = '/Volumes/LP3/HeadHeart/0_data';
-results_dir = '/Volumes/LP3/HeadHeart/2_results';
-plots_dir = '/Volumes/LP3/HeadHeart/3_plots';
+% Lisas Path Mac
+% data_dir = '/Volumes/LP3/HeadHeart/0_data';
+% results_dir = '/Volumes/LP3/HeadHeart/2_results';
+% plots_dir = '/Volumes/LP3/HeadHeart/3_plots';
 
+% Lisas Path Lab on Windows
+data_dir = 'F:\HeadHeart\0_data';
+results_dir = 'F:\HeadHeart\2_results';
+plots_dir = 'F:\HeadHeart\3_plots';
 
 %% Analysis SetUp 
 

@@ -39,17 +39,17 @@ end
 steps = {'Cutting', 'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting', 
 
 % Define whether scaling of the ECG data should be done
-scaling = true;
-if scaling
-    scale_factor = 0.01;
-end
+% scaling = false;
+% if scaling
+%     scale_factor = 0.01;
+% end
     
 % Define power line frequency
 powerline = 50; % Hz
 
 % Define cutoff frequencies for bandfiltering EEG data
-low_frequency = 0.1; % Hz
-high_frequency = 10; % Hz
+low_frequency = 0.5; % Hz
+high_frequency = 100; % Hz
 low_frequency_ica = 1; % Hz
 
 % Define the percentage of bad epochs that should be tolerated
@@ -113,11 +113,13 @@ for sub = 1:numel(subjects)
     fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects));
 
     % Load subject data  
-    subject_data = [data_dir, '/',  rawdata_name, '/', subject, '_MEDOFF_Rest.mat'];
+    % subject_data = [data_dir, '/',  rawdata_name, '/', subject, '_MEDOFF_Rest.mat']; % MAC
+    subject_data = [data_dir, '\',  rawdata_name, '\', subject, '_MEDOFF_Rest.mat']; % Windows
     load(subject_data, 'SmrData');
 
     % Load the ECG Peak data
-    subject_data = [data_dir, '/matfiles-with-peak/justEvs/ECGPeak_', subject, '_MEDOFF_Rest.mat'];
+    %subject_data = [data_dir, '/matfiles-cleaned-peaks/justEvs/ECGPeak_', subject, '_MEDOFF_Rest.mat']; % MAC
+    subject_data = [data_dir, '\matfiles-cleaned-peaks\justEvs\ECGPeak_', subject, '_MEDOFF_Rest.mat']; % Windows
     load(subject_data, 'EvTits', 'EvData');
     % Inject the Event Data into the Data Struct 
     SmrData.EvTits = EvTits;
@@ -142,14 +144,11 @@ for sub = 1:numel(subjects)
         'power_line', powerline, ...
         'low_frequency', low_frequency, ...
         'high_frequency', high_frequency, ...
-        'low_frequency_ica', low_frequency_ica, ...
-        'scaling', scaling, ...
-        'scale_factor', scale_factor, ...
-        'cut_off_seconds', cut_off_seconds, ...
-        'bad_epochs_threshold', bad_epochs_threshold);
+        'cut_off_seconds', cut_off_seconds);
 
     % Save the metadata for the participant in JSON File
-    save_metadata =[subject_preprocessed_folder, '/',  subject, '_preprocessing_metadata_', datestr(datetime('today'), 'yyyy_mm_dd'), '.json'];
+    %save_metadata =[subject_preprocessed_folder, '/',  subject, '_preprocessing_metadata_', datestr(datetime('today'), 'yyyy_mm_dd'), '.json']; % MAC
+    save_metadata =[subject_preprocessed_folder, '\',  subject, '_preprocessing_metadata_', datestr(datetime('today'), 'yyyy_mm_dd'), '.json']; % Windowws
     writestruct(participant_metadata, save_metadata);
     
     % if you want to save it as a .mat file then change the ending in
@@ -325,12 +324,12 @@ if ismember('Preprocessing ECG', steps)
 
        
 
-frq_area = fft(SmrData.WvData(16, 1:10240));
-figure
-plot(SmrData.SR/10240*(0:10240-1),abs(frq_area),"LineWidth",3)
-title("Complex Magnitude of fft Spectrum")
-xlabel("f (Hz)")
-ylabel("|fft(X)|")
+% frq_area = fft(SmrData.WvData(16, 1:10240));
+% figure
+% plot(SmrData.SR/10240*(0:10240-1),abs(frq_area),"LineWidth",3)
+% title("Complex Magnitude of fft Spectrum")
+% xlabel("f (Hz)")
+% ylabel("|fft(X)|")
 
 
 
@@ -358,37 +357,40 @@ if ismember('Preprocessing EEG', steps)
     % Visualize filtering 
     
     if show_plots
-        chan = 9; % select which LFP or EEG Channel you want to look at
+        chan = 11; % select which LFP or EEG Channel you want to look at
 
-        subplot(3,1,1);
-        plot(SmrData.WvDataCropped(chan,1:10000), 'k','LineWidth',1)
+        subplot(2,1,1);
+        plot(SmrData.WvDataCropped(chan,:), 'k','LineWidth',1)
         hold on
-        plot(lfp_data_highpass(chan,1:10000),'r','LineWidth',1)
-        title(['Raw data and notch Filter for sub ', subject]);
+        plot(lfp_data_highpass(chan,:),'r','LineWidth',1)
+        title(['Raw EEG data and High Pass Filter (0.5 Hz) for sub ', subject, "and channel", SmrData.WvTits{chan}]);
         xlabel('Time');
         ylabel('Amplitude');
         legend('raw trace','filtered data')
 
-        subplot(3,1,2);
+        subplot(2,1,2);
         plot(SmrData.WvDataCropped(chan,:), 'k','LineWidth',1)
         hold on
         plot(lfp_data_lowpass(chan,:),'r','LineWidth',1)
-        title(['Raw data and High pass (0.1-100Hz) Filter for sub ', subject]);
+        title(['Raw EEG data and High & Low pass (0.5-100Hz) Filter for sub ', subject, "and channel", SmrData.WvTits{chan}]);
         xlabel('Time');
         ylabel('Amplitude');
         legend('raw trace','filtered data')
 
-        subplot(3,1,3);
-        plot(SmrData.WvDataCropped(chan,:), 'k','LineWidth',1)
-        hold on
-        plot(lfp_data_lowpass_10(chan,:),'r','LineWidth',1)
-        title(['Raw data and High & Low pass (0.1-100Hz) Filter for sub ', subject]);
-        xlabel('Time');
-        ylabel('Amplitude');
-        legend('raw trace','filtered data')
+        % subplot(3,1,3);
+        % plot(SmrData.WvDataCropped(chan,:), 'k','LineWidth',1)
+        % hold on
+        % plot(lfp_data_lowpass_10(chan,:),'r','LineWidth',1)
+        % title(['Raw EEG data and High & Low pass (0.1-100Hz) Filter for sub ', subject, "and channel", SmrData.WvTits{chan}]);
+        % xlabel('Time');
+        % ylabel('Amplitude');
+        % legend('raw trace','filtered data')
     end
 
+    newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
+    save(newFileName, 'EvTits', 'EvData');
 
+    disp(['Processed and saved: ', newFileName]);
 
 
 
