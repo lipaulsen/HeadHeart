@@ -18,19 +18,16 @@ close all
 % set the directory to best fit your path 
 
 % Define if using Windows or Mac
-windows = true; % if true then Windows if false then Mac
+windows = true; 
+% Lisas Path Mac
+% data_dir = '/Volumes/LP3/HeadHeart/0_data';
+% results_dir = '/Volumes/LP3/HeadHeart/2_results';
+% plots_dir = '/Volumes/LP3/HeadHeart/3_plots';
 
-if windows
-    % Lisas Path Lab on Windows
-    data_dir = 'F:\HeadHeart\0_data';
-    results_dir = 'F:\HeadHeart\2_results';
-    plots_dir = 'F:\HeadHeart\3_plots';
-else
-    % Lisas Path Mac
-    data_dir = '/Volumes/LP3/HeadHeart/0_data';
-    results_dir = '/Volumes/LP3/HeadHeart/2_results';
-    plots_dir = '/Volumes/LP3/HeadHeart/3_plots';
-end
+% Lisas Path Lab on Windows
+data_dir = 'F:\HeadHeart\0_data';
+results_dir = 'F:\HeadHeart\2_results';
+plots_dir = 'F:\HeadHeart\3_plots';
 
 %% Analysis SetUp 
 
