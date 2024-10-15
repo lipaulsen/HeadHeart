@@ -1,4 +1,16 @@
-%function [] = preprocess_physiological(subjects, data_dir, results_dir)
+function [] = preprocess_physiological(subjects, data_dir, results_dir)
+%% Main Preprocessing for HeadHeart 
+
+% Author: Lisa Paulsen
+% Contact: lisaspaulsen[at]web.de
+% Created on: 1 October 2024
+% Last update: 15 October 2024
+
+%% REQUIRED TOOLBOXES
+% Image Processing Toolbox 
+% Signal Processing Toolbox
+% Statistics and Machine Learning Toolbox
+
 % This function preprocesses all physiological data (ECG + EEG) from the HeadHeart
 % Project.
 
@@ -330,7 +342,7 @@ for sub = 1:numel(subjects)
             if windows
                 exportgraphics(f3, [subject_preprocessed_folder, '\', subject, '_ECG-Filter(0-30Hz).png'], "Resolution",300) % WINDOWS
             else
-                exportgraphics(f3, [data_dir, '/',  preprocessed_name, '/', subject, '/', subject, '_ECG-Filter(0-30Hz).png'], "Resolution",300) % MAC
+                exportgraphics(f3, [subject_preprocessed_folder, '/', subject, '_ECG-Filter(0-30Hz).png'], "Resolution",300) % MAC
             end
         end
 
@@ -375,9 +387,9 @@ for sub = 1:numel(subjects)
 
             % Save Graphics
             if windows
-                exportgraphics(f4, [data_dir, '\',  preprocessed_name, '\', subject, '\', subject, '_ECG-IBI-HR.png'], "Resolution",300) % WINDOWS
+                exportgraphics(f4, [subject_preprocessed_folder, '\', subject, '_ECG-IBI-HR.png'], "Resolution",300) % WINDOWS
             else
-                exportgraphics(f4, [data_dir, '/',  preprocessed_name, '/', subject, '/', subject, '_ECG-IBI-HR.png'], "Resolution",300) % MAC
+                exportgraphics(f4, [subject_preprocessed_folder, '/', subject, '_ECG-IBI-HR.png'], "Resolution",300) % MAC
             end
         end
 
@@ -402,7 +414,7 @@ for sub = 1:numel(subjects)
 
         % Apply signal cleaning to LFP and EEG data
         % 50 Hz powerline filter and 4th-order two-pass Butterworth filters (0.1 Hz high-pass, 10 Hz low-pass)
-        disp('Cleaning ECG data...');
+        disp('Cleaning EEG & LFP data...');
 
         % 50Hz Line-Noise Removal using the fieldtrip toolbox;
         lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(1:15,:), SmrData.SR);
@@ -446,16 +458,16 @@ for sub = 1:numel(subjects)
 
             % Save Graphics
             if windows
-                exportgraphics(f5, [data_dir, '\',  preprocessed_name, '\', subject, '\', subject, '_ECG-IBI-HR.png'], "Resolution",300) % WINDOWS
+                exportgraphics(f5, [subject_preprocessed_folder, '\', subject, '_EEG_HP-LP-Filter.png'], "Resolution",300) % WINDOWS
             else
-                exportgraphics(f5, [data_dir, '/',  preprocessed_name, '/', subject, '/', subject, '_ECG-IBI-HR.png'], "Resolution",300) % MAC
+                exportgraphics(f5, [subject_preprocessed_folder, '/', subject, '_EEG_HP-LP-Filter.png'], "Resolution",300) % MAC
             end
         end
     end
 
     % Save the preprocessed Data in Smr.Data Struct 
     %newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
-    save_path = [data_dir, '\',  preprocessed_name, '\', subject, '\', subject,  '_preprocessed_MEDOFF_Rest.mat'];
+    save_path = [subject_preprocessed_folder, '\', subject,  '_preprocessed_MEDOFF_Rest.mat'];
     save(save_path, 'SmrData');
 
     disp(['Processed and saved: ', save_path]);

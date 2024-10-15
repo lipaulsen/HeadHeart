@@ -1,4 +1,16 @@
-%function [] = preprocess_physiological(subjects, data_dir, results_dir)
+function [] = preprocess_physiological(subjects, data_dir, results_dir)
+%% Main Preprocessing for HeadHeart 
+
+% Author: Lisa Paulsen
+% Contact: lisaspaulsen[at]web.de
+% Created on: 1 October 2024
+% Last update: 15 October 2024
+
+%% REQUIRED TOOLBOXES
+% Image Processing Toolbox 
+% Signal Processing Toolbox
+% Statistics and Machine Learning Toolbox
+
 % This function preprocesses all physiological data (ECG + EEG) from the HeadHeart
 % Project.
 
@@ -15,12 +27,12 @@
 %    2. PREPROCESS DATA
 %        2a. Cutting data
 %        2b. Format data
-%        2c. Preprocess ECG and PPG data & save to tsv files
-%        2d. Preprocess EEG data & save to fif files
+%        2c. Preprocess ECG data 
+%        2d. Preprocess EEG and LFP data & save everzthing to .mat file
 
 %% ============= SET GLOABAL VARIABLES AND PATHS =========================
-%clear all
-%close all
+% clear all
+% close all
 
 % Define if using Windows or Mac 
 windows = true; % if windows true then windows if false than mac
@@ -31,20 +43,20 @@ show_plots = true;
 % Define if manual data cleaning is to be done
 manual_cleaning = true;
 
-% Only analyze one subject when debug mode is on
-debug = false;
-if debug
-    subjects = subjects(1);
-end
+% % Only analyze one subject when debug mode is on
+% debug = false;
+% if debug
+%     subjects = subjects(1);
+% end
 
 % Define preprocessing steps to perform
 steps = {'Cutting', 'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting',
 
 % Define whether scaling of the ECG data should be done
-% scaling = false;
-% if scaling
-%     scale_factor = 0.01;
-% end
+scaling = false;
+if scaling
+    scale_factor = 0.01;
+end
 
 % Define power line frequency
 powerline = 50; % Hz

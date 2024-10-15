@@ -3,7 +3,7 @@
 % Author: Lisa Paulsen
 % Contact: lisaspaulsen[at]web.de
 % Created on: 1 October 2024
-% Last update: 2 September 2024
+% Last update: 15 October 2024
 
 %% REQUIRED TOOLBOXES
 % Curve Fitting Toolbox
@@ -41,10 +41,19 @@ subjects_MedON = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050',
 subjects = subjects_MedOff;
 
 
-%% PRE PROCESSING 
+%% PREPROCESSING 
+ disp('********** Preprocessing the Data ************');
+preprocess_physiological(subjects, data_dir, results_dir)
 
-%preprocess_physiological
 
+%% TIME FREQUENCY DECOMPOSITION
+
+
+
+%% ERP 
+
+
+ 
 
 
 
