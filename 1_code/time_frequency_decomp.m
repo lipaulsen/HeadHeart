@@ -35,8 +35,8 @@
 % 4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
 
 %% ============= SET GLOABAL VARIABLES AND PATHS =========================
-clear all
-close all
+%clear all
+%close all
 
 % Define if using Windows or Mac 
 windows = true; % if windows true then windows if false than mac
@@ -106,7 +106,115 @@ features_averaging.eeg = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
 ft_defaults; % If using FieldTrip
 
 
+%% ============================ 1. LOAD DATA =============================
+disp("************* STARTING TIME FREQUENCY DECOMPOSITION *************");
 
+% Define which channels should be used
+channels = "";
+
+for sub = 1:numel(subjects)
+
+    % Extract the subject
+    subject = subjects{sub};
+
+    if ismember('Load Data', steps)
+
+        fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+
+        % Load subject data
+        if windows
+            subject_data = fullfile(data_dir, preprocessed_name, ['sub-', subject], [subject, '_preprocessed_MEDOFF_Rest.mat']);
+        else
+            subject_data = [data_dir, '/',  preprocessed_name, '/sub-', subject, "/", subject, '_preprocessed_MEDOFF_Rest.mat']; % MAC
+        end
+        load(subject_data, 'SmrData');
+
+    end
+
+
+
+
+
+%% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
+
+    for c = 1:numel(channels)
+        wavelet = [];
+        channel = channels{c};
+        fprintf('Processing %s %s...\n', subj, channel)
+        
+        % EXTRACT DATA & SAMPLE RATE
+        currData   = SmrData.WvData.(channel);
+
+        SR = WvData.SR;
+        % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
+        %data_flt   = ft_preproc_highpassfilter(currData, SR, 1, 4, 'but', 'twopass'); % twopass
+        
+        % LOAD & REMOVE OUTLIERS IF SELECTED
+        if POST_ICA && ~strcmp(channel, 'EOGh') && ~strcmp(channel, 'EOGv')
+            currOutlier = isnan(currData);
+            currData = currData(~currOutlier);
+        end
+        data_flt   = ft_preproc_highpassfilter(currData, SR, 1, 4, 'but', 'twopass'); % twopass
+
+        if OUTL_REMOVE && ~POST_ICA % outliers are already removed in POST_ICA
+            directory = dir([Paths.SaveDir, '/outliers', '/', recording, subj, '_outliers_*.mat']);
+            if ~isempty(directory)
+               FullFileName = [Paths.SaveDir, '/outliers', '/', directory(end).name];
+               load(FullFileName, 'Outliers');
+               currOutlier  = Outliers.all;
+               data_short   = data_flt(~currOutlier);
+               data_flt     = data_short;
+            end
+        end
+        
+        % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
+        trialtime       = (1:numel(data_flt)) / SR; 
+        DataFT.fsample  = SR;           
+        DataFT.label    = {channel};
+        DataFT.time     = {trialtime};
+        DataFT.trial    = {squeeze(data_flt)};
+        
+        CfgFrq    = prepConfig(freqs, nCyc, trialtime);
+        % RUN TF-DECOMPOSITION
+        data_freq = ft_freqanalysis(CfgFrq,DataFT);
+        
+        % CALCULATE POWER AND PHASE
+        dataPow     = squeeze(abs(data_freq.fourierspctrm)).^2;  % abs() gives you the amplitude, and squared give you the power, if you don't use abs() you'll get a complex number and can extract the phase by using angle()     
+        dataPhase   = squeeze(angle(data_freq.fourierspctrm));   % angle() gives you the phase
+        
+        % REMOVE OUTLIERS FROM POWER AND PHASE
+        if OUTL_REMOVE
+            dataPow_tmp   = nan(size(dataPow,1), numel(currData));
+            dataPhase_tmp = nan(size(dataPow,1), numel(currData));
+            
+            dataPow_tmp(:,~currOutlier) = dataPow;
+            dataPhase_tmp(:,~currOutlier) = dataPhase;
+            
+            dataPow   = dataPow_tmp;
+            dataPhase = dataPhase_tmp;
+        end
+        
+        % DOWNSAMPLE POWER AND PHASE DATA 
+        if  SR ~=  DOWNSAMPLE_SR
+            [fsorig, fsres] = rat(SR / DOWNSAMPLE_SR);      
+            pow_DS   = resample(dataPow', fsres, fsorig)';   
+            phase_DS = resample(dataPhase', fsres, fsorig)';   
+        end
+        
+        % SAVE DATA IN ONE STRUCT
+        wavelet.(channel).pow    = pow_DS;
+        wavelet.(channel).phase  = phase_DS;
+        wavelet.freqs      = freqs;
+        wavelet.SR         = DOWNSAMPLE_SR;
+
+        if ~exist([Paths.SaveDir, '/wavelet_decomp/'])
+            mkdir([Paths.SaveDir, '/wavelet_decomp/'])
+        end
+        % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
+        save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3') 
+    end
+end
+disp('time_freq_decomp() done!');
 
 
 

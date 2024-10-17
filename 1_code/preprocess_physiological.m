@@ -120,7 +120,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 %% ============================ 1. LOAD DATA =================================
 
 for sub = 1:numel(subjects)
-
+   
     % Extract the subject
     subject = subjects{sub};
 
@@ -410,7 +410,7 @@ for sub = 1:numel(subjects)
     if ismember('Preprocessing EEG', steps)
 
         disp('********** Preprocessing LFP and EEG Data **********');
-
+%%%% DC OFFSET????
 
         % Apply signal cleaning to LFP and EEG data
         % 50 Hz powerline filter and 4th-order two-pass Butterworth filters (0.1 Hz high-pass, 10 Hz low-pass)
