@@ -81,6 +81,7 @@ hf_band = [0.15, 0.4];
 % Define parameters for time-frequency analysis of EEG data
 sampling_frequency_eeg = 200;  % Hz EEG data will be downsampled to 100 Hz
 frequencies = 0.5:0.5:50;  % Resolution 0.5 Hz
+cycles = 6;
 
 % Define frequency bands of interest
 bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
@@ -132,9 +133,6 @@ for sub = 1:numel(subjects)
     end
 
 
-
-
-
 %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
 
     for c = 1:numel(channels)
@@ -147,25 +145,7 @@ for sub = 1:numel(subjects)
 
         SR = WvData.SR;
         % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
-        %data_flt   = ft_preproc_highpassfilter(currData, SR, 1, 4, 'but', 'twopass'); % twopass
-        
-        % LOAD & REMOVE OUTLIERS IF SELECTED
-        if POST_ICA && ~strcmp(channel, 'EOGh') && ~strcmp(channel, 'EOGv')
-            currOutlier = isnan(currData);
-            currData = currData(~currOutlier);
-        end
-        data_flt   = ft_preproc_highpassfilter(currData, SR, 1, 4, 'but', 'twopass'); % twopass
-
-        if OUTL_REMOVE && ~POST_ICA % outliers are already removed in POST_ICA
-            directory = dir([Paths.SaveDir, '/outliers', '/', recording, subj, '_outliers_*.mat']);
-            if ~isempty(directory)
-               FullFileName = [Paths.SaveDir, '/outliers', '/', directory(end).name];
-               load(FullFileName, 'Outliers');
-               currOutlier  = Outliers.all;
-               data_short   = data_flt(~currOutlier);
-               data_flt     = data_short;
-            end
-        end
+        data_flt   = ft_preproc_highpassfilter(SmrData.WvDataCleaned(1:15, :), SR, 1, 4, 'but', 'twopass'); % twopass
         
         % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
         trialtime       = (1:numel(data_flt)) / SR; 
@@ -174,7 +154,7 @@ for sub = 1:numel(subjects)
         DataFT.time     = {trialtime};
         DataFT.trial    = {squeeze(data_flt)};
         
-        CfgFrq    = prepConfig(freqs, nCyc, trialtime);
+        CfgFrq    = prepConfig(frequencies, cycles, trialtime);
         % RUN TF-DECOMPOSITION
         data_freq = ft_freqanalysis(CfgFrq,DataFT);
         
