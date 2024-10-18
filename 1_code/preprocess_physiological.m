@@ -64,13 +64,7 @@ powerline = 50; % Hz
 % Define cutoff frequencies for bandfiltering EEG data
 low_frequency = 0.5; % Hz
 high_frequency = 100; % Hz
-low_frequency_ica = 1; % Hz
 
-% Define the percentage of bad epochs that should be tolerated
-bad_epochs_threshold = 30; % percent
-
-% Define the artifact threshold for epochs
-artifact_threshold = 100; % microvolts
 
 % Define if the first and last 2 seconds of the data should be cut off
 % to avoid any potential artifacts at the beginning and end of the experiment
@@ -196,7 +190,7 @@ for sub = 1:numel(subjects)
         % ECG data
 
         % Calculate the time points of the ECG data
-        ecg_timepoints = (0:length(SmrData.WvData)-1) / SmrData.SR; %LOOK AT THIS AGAIN!!!
+        ecg_timepoints = (0:length(SmrData.WvData)-1) / SmrData.SR; % timepoints in sec
 
         % Initialize a new ECG vector with 0s
         SmrData.WvData(20,:) = zeros(1, length(ecg_timepoints));
@@ -205,7 +199,6 @@ for sub = 1:numel(subjects)
         for i = 1:length(SmrData.EvData)
             % Calculate the index corresponding to the R-peak time
             [~, idx] = min(abs(ecg_timepoints - SmrData.EvData(i))); % Find the nearest index
-            %SmrData.WvData(20, idx) = ecg_data_bandpass(idx); % Assign the ECG value at that index
             SmrData.WvData(20, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
             SmrData.WvTits{20,1} = 'RPeaks_data';
         end

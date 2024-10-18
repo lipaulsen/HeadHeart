@@ -51,7 +51,7 @@ preprocess_physiological(subjects, data_dir, results_dir)
 
 
 %% ERP 
-
+erp_calculation(subjects, data_dir, results_dir)
 
  
 
