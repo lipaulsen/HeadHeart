@@ -40,10 +40,11 @@ subjects_MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052'
 subjects_MedON = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
 subjects = subjects_MedOff;
 
+MedFlag = 'MedOff';
 
 %% PREPROCESSING 
  disp('********** Preprocessing the Data ************');
-preprocess_physiological(subjects, data_dir, results_dir)
+preprocess_physiological(subjects, data_dir, results_dir, MedFlag)
 
 
 %% TIME FREQUENCY DECOMPOSITION
@@ -51,7 +52,7 @@ preprocess_physiological(subjects, data_dir, results_dir)
 
 
 %% ERP 
-erp_calculation(subjects, data_dir, results_dir)
+erp_calculation(subjects, data_dir, results_dir, MedFlag)
 
  
 
