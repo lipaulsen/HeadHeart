@@ -138,7 +138,7 @@ for sub = 1:numel(subjects)
     fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects));
 
     % Load subject data
-    subject_data = fullfile(data_dir, rawdata_name, [subject, '_', med_name, '_Rest.mat']); % Windows
+    subject_data = fullfile(data_dir, rawdata_name, [subject, '_MEDOFF_Rest.mat']); % Windows
     load(subject_data, 'SmrData');
 
     % Load the ECG Peak data
@@ -431,7 +431,7 @@ for sub = 1:numel(subjects)
                 legend('raw trace','filtered data')
 
                 % Save Graphics
-                gr5 = fullfile(subject_results_folder, [subject, '_', med_name, '_EEG_HP-LP-Filter.png']);
+                gr5 = fullfile(subject_results_folder, [subject, med_name, '_EEG_HP-LP-Filter.png']);
                 exportgraphics(f5, gr5, "Resolution",300) % WINDOWS
             end
         end

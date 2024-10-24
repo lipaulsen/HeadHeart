@@ -1,11 +1,16 @@
- function [] = erp_calculation(subjects, data_dir, results_dir, MedFlag)
+ %function [] = erp_calculation(subjects, data_dir, results_dir, MedFlag)
+
+% TO DO
+
+%  - Different Basline try out? yes longer 
+
 
 %% Calculating ERPs for HeadHeart
 
 % Author: Lisa Paulsen
 % Contact: lisaspaulsen[at]web.de
 % Created on: 1 October 2024
-% Last update: 15 October 2024
+% Last update: 23 October 2024
 
 %% REQUIRED TOOLBOXES
 % Image Processing Toolbox
@@ -23,9 +28,12 @@
 % Steps:
 % 1. LOAD DATA
 % 2. Calculating ERPs
-%   2a. Calculate HRV features from IBI data
-%
-%   3d. Plot EEG power features
+%   2a. Extract Epochs
+%   2b. Plotting ERPs for all Channels Seperately
+%   2c. Plotting ERPs for all Channels overlapped
+%   2d. Save the ERP Data
+% 3. ERP Statistical Analysis
+%   3d. P
 % 4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
 
 %% ============= SET GLOABAL VARIABLES AND PATHS =========================
@@ -41,12 +49,13 @@ show_plots = true;
 % Define folder variables
 preprocessed_name = 'preproc';  % preprocessed folder (inside derivatives)
 averaged_name = 'avg';  % averaged data folder (inside preprocessed)
-erp_name = 'erp';  % feature extraction folder (inside derivatives)
+erp_name = 'erp';  
+baseline_name = '-400ms';
 
 if contains(MedFlag, 'MedOff')
-    med_name = 'med_off';
+    med_name = 'MedOff';
 else
-    med_name = 'med_on';
+    med_name = 'MedOn';
 end
 
 % Create folders if it does not exist
@@ -99,13 +108,13 @@ for sub = 1:numel(subjects)
 
     %% ============================ 2. ERP  =============================
 
-    fprintf('Extracting ERPs for subject %s', subject);
+    fprintf('Extracting ERPs for subject %s\n', subject);
 
     % Define the SR
     SR = SmrData.SR;
 
     % Define the time window around Heartbeat
-    time_windows = [-0.1 0.8; -0.1 0.6; -0.05 0.4; -0.04 0.1; -0.04 0.04]; % in sec
+    time_windows = [-0.1 0.8;  -0.05 0.4; -0.04 0.1]; % in sec ; -0.1 0.6; -0.04 0.04]
 
     for win = 1:size(time_windows, 1)
 
@@ -116,7 +125,7 @@ for sub = 1:numel(subjects)
         time_wins_samples = round(time_win*SR); % in samples
 
         % Define the baseline window
-        baseline_win = round([-0.2 -0.1]*SR); % 200 to 100ms before rPeak as baseline
+        baseline_win = round([-0.4 -0.1]*SR); % 200 to 100ms before rPeak as baseline
 
         % Extract R-Peak Indicies
         r_peak_indices = find(SmrData.WvDataCleaned(20,:));
@@ -143,16 +152,23 @@ for sub = 1:numel(subjects)
                 ERP_epochs(:, :, peaks) = SmrData.WvDataCleaned(1:15, epoch_start:epoch_end);
             else
                 % Warn if the epoch is outside of the data
-                warning('Trial %d out of bounds, skipping...', peaks);
+                warning('Trial %d out of bounds, skipping...\n', peaks);
             end
 
             % Baseline correction
-            % it takes for every trial the 200ms to 100ms BEFORE the r-peak (so
-            % baseline is 100ms) and uses the average of those baselines of all
+            % it takes for every trial the 400ms to 100ms BEFORE the r-peak (so
+            % baseline is 300ms) and uses the average of those baselines of all
             % trials and then subtract it
             baseline_start = r_peak_idx + baseline_win(1);
-            baseline_end = r_peak_idx + baseline_win(2);% Pre-stimulus baseline of 100ms
-            baseline = mean(SmrData.WvDataCleaned(1:15, baseline_start:baseline_end), 2);  % Mean over baseline period for each channel
+            baseline_end = r_peak_idx + baseline_win(2);% Pre-stimulus baseline
+            if baseline_start > 0 && baseline_end <= size(SmrData.WvDataCleaned, 2)
+                % Extract and store the epoch data for channels
+                baseline = mean(SmrData.WvDataCleaned(1:15, baseline_start:baseline_end), 2); % Mean over baseline period for each channel
+            else
+                % Warn if the epoch is outside of the data
+                warning('Trial %d out of bounds, skipping...\n', peaks);
+
+            end
             ERP_epochs(:, :, peaks) = ERP_epochs(:, :, peaks) - baseline;  % Subtract baseline
 
         end
@@ -166,25 +182,24 @@ for sub = 1:numel(subjects)
 
         %% 2b. Plotting ERPs for all Channels Seperately
 
-        fprintf('Plotting ERPs for subject %s', subject);
-        f1 = figure;
+        fprintf('Plotting ERPs for subject %s\n', subject);
+        f1 = figure; % initialize Figure
         for chan = 1:15
             row = ceil(chan / 5); % Calculate the row number
             col = mod(chan - 1, 5) + 1; % Calculate the column number
             subplot(3, 5, (row - 1) * 5 + col)
-         
+            
+            % Plot the ERP per channel for 1 subj
             plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_average(chan, :));
             hold on
-            xline(0, "--", 'Color', 'k', 'LineWidth', 1);
+            xline(0, "--", 'Color', 'k', 'LineWidth', 1); % vertical line at time-lock
 
-            % Set X-Ticks
+            % Set X-Ticks dynamically to the window size
             if win == 1
                 xTicks = round(time_wins_samples(1) / SR * 1000:100:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-            elseif win < 4
+            elseif win == 2
                 xTicks = round(time_wins_samples(1) / SR * 1000:50:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-            elseif win == 4
-                xTicks = round(time_wins_samples(1) / SR * 1000:25:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-            else
+            else win == 3;
                 xTicks = round(time_wins_samples(1) / SR * 1000:10:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
             end
             set(gca, 'XTick', xTicks);
@@ -194,12 +209,15 @@ for sub = 1:numel(subjects)
             % Set Labels
             xlabel('Time (ms)');
             ylabel('Amplitude (uV)');
-            title(sprintf('ERP - Channel %s', SmrData.WvTits{chan}));
+            title(sprintf('Channel %s', SmrData.WvTits{chan}));
 
         end
+        sgtitle(sprintf('ERP for Subject %s - All Channels', subject)); % Major Title
+        set(f1, 'Position', [100, 100, 1920, 1080]);
 
-        gr1 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_sep-channels_win',  num2str(time_win(1)), '-', num2str(time_win(2)),'s.png']);
-        exportgraphics(f1, gr1, "Resolution",300)
+        gr1 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_sep-channels_win',  ...
+           num2str(time_win(1)), 'till', num2str(time_win(2)),'s_', med_name, '_BSL_', baseline_name,'.png']);
+        exportgraphics(f1, gr1, "Resolution",300);
 
         %% 2c. Plotting ERPs for all Channels overlapped
 
@@ -216,19 +234,15 @@ for sub = 1:numel(subjects)
         if win == 1
             xTicks = round(time_wins_samples(1) / SR * 1000:100:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
             legend('Location','northeast', 'FontSize',6);
-        elseif win < 4
+        elseif win == 2 
             xTicks = round(time_wins_samples(1) / SR * 1000:50:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
             legend('Location','northeast', 'FontSize',6);
-        elseif win == 4
-            xTicks = round(time_wins_samples(1) / SR * 1000:25:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-            legend('Location','northwest', 'FontSize',6);
-        else
+        else win == 3;
             xTicks = round(time_wins_samples(1) / SR * 1000:10:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
             legend('Location','northwest', 'FontSize',6);
         end
         set(gca, 'XTick', xTicks);
         axis tight
-        %legend('Location','northwest', 'FontSize',6);
         xlabel('Time (ms)');
         ylabel('Amplitude (uV)');
         title(sprintf('ERP - EEG for Subject %s', subject));
@@ -244,41 +258,46 @@ for sub = 1:numel(subjects)
         % Set X-Ticks
         if win == 1
             xTicks = round(time_wins_samples(1) / SR * 1000:100:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-             legend('Location','northeast', 'FontSize',6);
-        elseif win < 4
+            legend('Location','northeast', 'FontSize',6);
+        elseif win == 2 
             xTicks = round(time_wins_samples(1) / SR * 1000:50:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-             legend('Location','northeast', 'FontSize',6);
-        elseif win == 4
-            xTicks = round(time_wins_samples(1) / SR * 1000:25:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-             legend('Location','northwest', 'FontSize',6);
-        else
+            legend('Location','northeast', 'FontSize',6);
+        else win == 3;
             xTicks = round(time_wins_samples(1) / SR * 1000:10:time_wins_samples(2) / SR * 1000); % Set x-ticks in ms
-             legend('Location','northwest', 'FontSize',6);
+            legend('Location','northwest', 'FontSize',6);
         end
         set(gca, 'XTick', xTicks);
         axis tight
         % Set Labels
         xlabel('Time (ms)');
         ylabel('Amplitude (uV)');
-        %legend('Location','northwest', 'FontSize',6);
         title(sprintf('ERP - LFP for Subject %s', subject));
 
-        gr2 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_LFP-EEG_win',  num2str(time_win(1)), '-', num2str(time_win(2)),'s.png']);
+        gr2 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_LFP-EEG_win',  num2str(time_win(1)),...
+            'till', num2str(time_win(2)),'s_', med_name, '_BSL_', baseline_name,'.png']);
         exportgraphics(f2, gr2, "Resolution",300)
 
-   
+  
 
-
-    %% 2d. Save Subject ERP Data the Plots
+    %% 2d. Save Subject ERP Data
 
     % Save the matrix as .mat file and the plots as .png
-    fprintf('Saving ERPs and Plots for subject %s', subject);
+    fprintf('Saving ERPs and Plots for subject %s\n', subject);
 
 
-    save_path = fullfile(subject_erp_folder, ['\', subject, '_ERP_win-', num2str(time_win(1)), '-', num2str(time_win(2)),'s.mat']); 
+    save_path = fullfile(subject_erp_folder, ['\', subject, '_ERP_win', num2str(time_win(1)), 'till', ...
+        num2str(time_win(2)),'s-', med_name, '_BSL_', baseline_name,'.mat']); 
     save(save_path, 'ERP_average');
 
     end
+
+
+%% ======================== 3. ERP Stats Analysis  =========================
+
+
+
+
+
 end
 
 
