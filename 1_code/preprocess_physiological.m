@@ -48,7 +48,7 @@ windows = true; % if windows true then windows if false than mac
 
 % Define if plots are to be shown
 % Plots aare only saved if this is true
-show_plots = true;
+show_plots = false;
 
 % Define if manual data cleaning is to be done
 manual_cleaning = true;
@@ -130,7 +130,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 
 %% ============================ 1. LOAD DATA =================================
 
-for sub = 1:numel(subjects)
+for sub = 4:numel(subjects)
 
     % Extract the subject
     subject = subjects{sub};
@@ -379,6 +379,7 @@ for sub = 1:numel(subjects)
                 gr4 = fullfile(subject_results_folder, [subject, '_', med_name, '_ECG-IBI-HR.png']);
                 exportgraphics(f4, gr4, "Resolution",300) % WINDOWS
             end
+
         end
 
         %% _____________________ 2c. Preprocess LFP+EEG Data ___________________________

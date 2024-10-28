@@ -1,0 +1,293 @@
+% function [] = time_frequency_decomp(subjects, data_dir, results_dir, plots_dir)
+
+%% Time Frequency Decomposition for HeadHeart 
+
+% Author: Lisa Paulsen
+% Contact: lisaspaulsen[at]web.de
+% Created on: 1 October 2024
+% Last update: 15 October 2024
+
+%% REQUIRED TOOLBOXES
+% Image Processing Toolbox 
+% Signal Processing Toolbox
+% Statistics and Machine Learning Toolbox
+
+% Extract Features through Time Frequencz Decomposition from EEG and ECG data
+% 
+% Inputs:    
+% Preprocessed data (EEG, LFP, ECG) from .mat file
+% 
+% Outputs:    Features extracted from the data in .mat files
+% - ECG: IBI, HRV, HF-HRV, LF-HRV
+% - EEG & LFP: Power of delta, theta, alpha, beta, gamma bands for all electrodes 
+
+% Steps:
+% 1. LOAD DATA
+% 2. FEATURE EXTRACTION ECG
+%   2a. Calculate HRV features from IBI data
+%   2b. Save HRV features in a tsv file
+%   2c. Plot HRV features
+% 3. FEATURE EXTRACTION EEG
+%   3a. Calculate the power of all EEG frequency bands
+%   3b. Calculate the mean power of the EEG frequency bands for a region of interest (ROI)
+%   3c. Save EEG power features in a tsv file
+%   3d. Plot EEG power features
+% 4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
+
+%% ============= SET GLOABAL VARIABLES AND PATHS =========================
+%clear all
+%close all
+
+% Define if using Windows or Mac 
+windows = true; % if windows true then windows if false than mac
+
+% Define if plots are to be shown
+show_plots = true;
+
+% Define preprocessing steps to perform
+steps = {'Load Data', 'Feature Extraction ECG', 'Feature Extraction EEG'}; 
+
+% Define folder variables 
+preprocessed_name = 'preproc';  % preprocessed folder (inside derivatives)
+averaged_name = 'avg';  % averaged data folder (inside preprocessed)
+feature_name = 'features';  % feature extraction folder (inside derivatives)
+
+
+% Look up if what the medication condition is
+if contains(MedFlag, 'MedOff')
+    med_name = 'MedOff';
+else
+    med_name = 'MedOn';
+end
+
+
+% Create the features data folder if it does not exist
+for i = 1:length(subjects)
+    subject = subjects{i};
+    subject_features_folder = fullfile(data_dir, feature_name, med_name, sprintf('sub-%s', subject));
+    if ~exist(subject_features_folder, 'dir')
+        mkdir(subject_features_folder);
+    end
+
+     % results folder
+    subject_features_results_folder = fullfile(results_dir, feature_name, med_name, sprintf('sub-%s', subject));
+    if ~exist(subject_features_results_folder, 'dir')
+        mkdir(subject_features_results_folder);
+    end
+end
+
+
+avg_features_folder = fullfile(data_dir, feature_name, averaged_name);
+if ~exist(avg_features_folder, 'dir')
+    mkdir(avg_features_folder);
+end
+
+% Define parameters for time-frequency analysis of both ECG and EEG data
+window_length = 2;  % 2s window  % Length of the window for smoothing
+overlap = 0.5;  % 50% overlap    % Overlap of the windows for smoothing
+mirror_length = 180;  % Length of the mirror extension for symmetric padding
+
+% Define parameters for time-frequency analysis of ECG data
+sampling_frequency_ibi = 1;  % Hz IBI and HR data are already sampled at 1 Hz from the preprocessing
+
+% Define low and high frequency bands for HRV analysis
+lf_band = [0.04, 0.15];
+hf_band = [0.15, 0.4];
+
+% Define parameters for time-frequency analysis of EEG data
+sampling_frequency_eeg = 200;  % Hz EEG data will be downsampled to 100 Hz
+frequencies = 0.5:0.5:50;  % Resolution 0.5 Hz
+cycles = 6;
+
+% Define frequency bands of interest
+bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
+               'beta', [13, 30], 'gamma', [30, 45]);
+
+% Create color palette for plots
+% colors.ECG.IBI = "#F0E442";    % Yellow
+% colors.ECG.HRV = "#CC79A7";   % Pink
+% colors.ECG.LF_HRV = "#E69F00";  % Light Orange
+% colors.ECG.HF_HRV = "#D55E00";   % Dark Orange
+% 
+% colors.EEG.delta = "#F0E442";  % Yellow
+% colors.EEG.theta = "#D55E00";    % Dark Orange
+% colors.EEG.alpha = "#CC79A7"; % Pink
+% colors.EEG.beta = "#56B4E9";   % Light Blue
+% colors.EEG.gamma = "#009E73";   % Green
+
+% Features for averaging across participants
+features_averaging.ecg = {'ibi', 'hrv', 'lf-hrv', 'hf-hrv'};
+features_averaging.eeg = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
+
+% Suppress excessive logging if using FieldTrip 
+ft_defaults; % If using FieldTrip
+
+%% ============================== FUNCTIONS ==============================
+
+%function hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length)  
+%RMSSD Root Mean Square of Successive Differences.
+
+% This function comuptes a rolling RMSSD with or without overlap 
+
+%   hrv_rmssd = RMSSD(RR,num) is the root mean square of successive
+%   differences.
+%   cleaned_IBI is a vector containing R-peak to r-peak intervals in seconds.
+%   hrv_rmssd is a column vector with the same length as RR.
+%   If num equals 0, the global measure will be computed.
+%   hrv_rmssd is then a number.
+%   For faster computation on local measures you can specify an overlap.
+%   This is a value between 0 and 1. (default: 1)
+%
+dRR = diff(cleaned_IBI).^2;
+if ceil(length(cleaned_IBI)*(1-overlap))>1
+    j=1;
+    ts = zeros(length(ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)),length(cleaned_IBI));
+    for i=ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)
+        ts(j,1:(1+i-max(1,(i-length(cleaned_IBI)+1)))) = dRR(max(1,(i-length(cleaned_IBI)+1)):i);
+        j=j+1;
+    end
+    samplesize = sum(~isnan(ts),2);
+    hrv_rmssd_tmp = sqrt(sum(ts,2)./(samplesize-1+flag));
+    hrv_rmssd_tmp(samplesize<5) = NaN;
+
+    hrv_rmssd = NaN(length(cleaned_IBI),1);
+    hrv_rmssd(ceil(length(cleaned_IBI)*(1-overlap))+1:ceil(length(cleaned_IBI)*(1-overlap)):length(cleaned_IBI)) = hrv_rmssd_tmp;
+else
+    ts = NaN(length(cleaned_IBI),length(cleaned_IBI));
+    for j=1:length(cleaned_IBI)
+        ts(j+1:end,j) = dRR(1:end-j+1);
+    end
+    samplesize = sum(~isnan(ts),2);
+    hrv_rmssd = sqrt(sum(ts,2)./(samplesize-1+flag));
+    hrv_rmssd(samplesize<5) = NaN;
+end
+
+
+
+%end
+
+%% ============================ 1. LOAD DATA =============================
+disp("************* STARTING Feature Extraction  *************");
+
+% Define which channels should be used
+channels = "";
+
+% Initialize the matrix for all HRV measures
+HRV.rmssd_all = zeros(2, length(subjects));
+HRV.rmssd_tits{1} = {'HRV Average of subj'};
+
+
+for sub = 1:numel(subjects)
+
+    % Extract the subject
+    subject = subjects{sub};
+
+    if ismember('Load Data', steps)
+
+        fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+
+        % Load subject data
+        subject_data = fullfile(data_dir, preprocessed_name, med_name, ['sub-', subject], [subject, '_preprocessed_', med_name, '_Rest.mat']);
+        load(subject_data, 'SmrData');
+
+    end
+
+
+    %% ================================== HRV ================================
+
+    % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
+    disp('Calculating HRV...');
+
+    % Outlier Removal from IBI
+    % Since the outliers were removed by taking away the R-Peaks. Thorugh that the IBI Calucluation is
+    % Skewed when the event was removed the IBi will be unusally
+    % high. So we exclude all the IBI that exceed 1s in length
+    % because those are way bezon the normal range
+    cleaned_IBI = SmrData.ECGcomp(1, SmrData.ECGcomp(1,:) < 1); % outlier removal of above 1 sec
+
+    % Calculate RMSSD HRV (Time-Range)
+    HRV.rmssd_all(1,sub) = sqrt(mean(diff(cleaned_IBI).^2)); % average HRV rmssd over all IBI 
+   
+    % Calculate Rolling RMSSD HRV
+    hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length);
+
+
+%% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
+
+    for c = 1:numel(channels)
+        wavelet = [];
+        channel = channels{c};
+        fprintf('Processing %s %s...\n', subj, channel)
+        
+        % EXTRACT DATA & SAMPLE RATE
+        currData   = SmrData.WvData.(channel);
+
+        SR = WvData.SR;
+        % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
+        data_flt   = ft_preproc_highpassfilter(SmrData.WvDataCleaned(1:15, :), SR, 1, 4, 'but', 'twopass'); % twopass
+        
+        % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
+        trialtime       = (1:numel(data_flt)) / SR; 
+        DataFT.fsample  = SR;           
+        DataFT.label    = {channel};
+        DataFT.time     = {trialtime};
+        DataFT.trial    = {squeeze(data_flt)};
+        
+        CfgFrq    = prepConfig(frequencies, cycles, trialtime);
+        % RUN TF-DECOMPOSITION
+        data_freq = ft_freqanalysis(CfgFrq,DataFT);
+        
+        % CALCULATE POWER AND PHASE
+        dataPow     = squeeze(abs(data_freq.fourierspctrm)).^2;  % abs() gives you the amplitude, and squared give you the power, if you don't use abs() you'll get a complex number and can extract the phase by using angle()     
+        dataPhase   = squeeze(angle(data_freq.fourierspctrm));   % angle() gives you the phase
+        
+        % REMOVE OUTLIERS FROM POWER AND PHASE
+        if OUTL_REMOVE
+            dataPow_tmp   = nan(size(dataPow,1), numel(currData));
+            dataPhase_tmp = nan(size(dataPow,1), numel(currData));
+            
+            dataPow_tmp(:,~currOutlier) = dataPow;
+            dataPhase_tmp(:,~currOutlier) = dataPhase;
+            
+            dataPow   = dataPow_tmp;
+            dataPhase = dataPhase_tmp;
+        end
+        
+        % DOWNSAMPLE POWER AND PHASE DATA 
+        if  SR ~=  DOWNSAMPLE_SR
+            [fsorig, fsres] = rat(SR / DOWNSAMPLE_SR);      
+            pow_DS   = resample(dataPow', fsres, fsorig)';   
+            phase_DS = resample(dataPhase', fsres, fsorig)';   
+        end
+        
+        % SAVE DATA IN ONE STRUCT
+        wavelet.(channel).pow    = pow_DS;
+        wavelet.(channel).phase  = phase_DS;
+        wavelet.freqs      = freqs;
+        wavelet.SR         = DOWNSAMPLE_SR;
+
+        if ~exist([Paths.SaveDir, '/wavelet_decomp/'])
+            mkdir([Paths.SaveDir, '/wavelet_decomp/'])
+        end
+        % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
+        save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3') 
+    end
+
+end
+
+%% =========================== 3. AVERAGES ================================
+
+%% 3a. HRV Averages 
+disp('time_freq_decomp() done!');
+
+
+
+
+
+
+
+
+
+
+
+

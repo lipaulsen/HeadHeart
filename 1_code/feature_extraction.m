@@ -52,14 +52,30 @@ preprocessed_name = 'preproc';  % preprocessed folder (inside derivatives)
 averaged_name = 'avg';  % averaged data folder (inside preprocessed)
 feature_name = 'features';  % feature extraction folder (inside derivatives)
 
+
+% Look up if what the medication condition is
+if contains(MedFlag, 'MedOff')
+    med_name = 'MedOff';
+else
+    med_name = 'MedOn';
+end
+
+
 % Create the features data folder if it does not exist
-for subject = subjects
-    subject_features_folder = fullfile(data_dir, feature_name, ...
-                                       ['sub-', subject{1}]);
+for i = 1:length(subjects)
+    subject = subjects{i};
+    subject_features_folder = fullfile(data_dir, feature_name, med_name, sprintf('sub-%s', subject));
     if ~exist(subject_features_folder, 'dir')
         mkdir(subject_features_folder);
     end
+
+     % results folder
+    subject_features_results_folder = fullfile(results_dir, feature_name, med_name, sprintf('sub-%s', subject));
+    if ~exist(subject_features_results_folder, 'dir')
+        mkdir(subject_features_results_folder);
+    end
 end
+
 
 avg_features_folder = fullfile(data_dir, feature_name, averaged_name);
 if ~exist(avg_features_folder, 'dir')
@@ -67,7 +83,10 @@ if ~exist(avg_features_folder, 'dir')
 end
 
 % Define parameters for time-frequency analysis of both ECG and EEG data
-window_length = 2;  % 2s window  % Length of the window for smoothing
+window_length_hrv = 10;  % 10 samples window  % Length of the window for smoothing
+
+% Define parameters for time-frequency analysis of both ECG and EEG data
+window_length_tfa = 2;  % 2s window  % Length of the window for smoothing
 overlap = 0.5;  % 50% overlap    % Overlap of the windows for smoothing
 mirror_length = 180;  % Length of the mirror extension for symmetric padding
 
@@ -88,16 +107,16 @@ bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
                'beta', [13, 30], 'gamma', [30, 45]);
 
 % Create color palette for plots
-colors.ECG.IBI = "#F0E442";    % Yellow
-colors.ECG.HRV = "#CC79A7";   % Pink
-colors.ECG.LF_HRV = "#E69F00";  % Light Orange
-colors.ECG.HF_HRV = "#D55E00";   % Dark Orange
-
-colors.EEG.delta = "#F0E442";  % Yellow
-colors.EEG.theta = "#D55E00";    % Dark Orange
-colors.EEG.alpha = "#CC79A7"; % Pink
-colors.EEG.beta = "#56B4E9";   % Light Blue
-colors.EEG.gamma = "#009E73";   % Green
+% colors.ECG.IBI = "#F0E442";    % Yellow
+% colors.ECG.HRV = "#CC79A7";   % Pink
+% colors.ECG.LF_HRV = "#E69F00";  % Light Orange
+% colors.ECG.HF_HRV = "#D55E00";   % Dark Orange
+% 
+% colors.EEG.delta = "#F0E442";  % Yellow
+% colors.EEG.theta = "#D55E00";    % Dark Orange
+% colors.EEG.alpha = "#CC79A7"; % Pink
+% colors.EEG.beta = "#56B4E9";   % Light Blue
+% colors.EEG.gamma = "#009E73";   % Green
 
 % Features for averaging across participants
 features_averaging.ecg = {'ibi', 'hrv', 'lf-hrv', 'hf-hrv'};
@@ -106,12 +125,60 @@ features_averaging.eeg = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
 % Suppress excessive logging if using FieldTrip 
 ft_defaults; % If using FieldTrip
 
+%% ============================== FUNCTIONS ==============================
+
+%function hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv)  
+%RMSSD Root Mean Square of Successive Differences.
+
+% This function comuptes a rolling RMSSD with or without overlap 
+
+%   hrv_rmssd = RMSSD(RR,num) is the root mean square of successive
+%   differences.
+%   cleaned_IBI is a vector containing R-peak to r-peak intervals in seconds.
+%   hrv_rmssd is a column vector with the same length as RR.
+%   If num equals 0, the global measure will be computed.
+%   hrv_rmssd is then a number.
+%   For faster computation on local measures you can specify an overlap.
+%   This is a value between 0 and 1. (default: 1)
+%
+dRR = diff(cleaned_IBI).^2;
+if ceil(length(cleaned_IBI)*(1-overlap))>1
+    j=1;
+    ts = zeros(length(ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)),window_length_hrv);
+    for i=ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)
+        ts(j,1:(1+i-max(1,(i-length(cleaned_IBI)+1)))) = dRR(max(1,(i-length(cleaned_IBI)+1)):i);
+        j=j+1;
+    end
+    samplesize = sum(~isnan(ts),2);
+    hrv_rmssd_tmp = sqrt(sum(ts,2)./(samplesize-1+flag));
+    hrv_rmssd_tmp(samplesize<5) = NaN;
+
+    hrv_rmssd = NaN(length(cleaned_IBI),1);
+    hrv_rmssd(ceil(length(cleaned_IBI)*(1-overlap))+1:ceil(length(cleaned_IBI)*(1-overlap)):length(cleaned_IBI)) = hrv_rmssd_tmp;
+else
+    ts = NaN(length(cleaned_IBI),length(cleaned_IBI));
+    for j=1:length(cleaned_IBI)
+        ts(j+1:end,j) = dRR(1:end-j+1);
+    end
+    samplesize = sum(~isnan(ts),2);
+    hrv_rmssd = sqrt(sum(ts,2)./(samplesize-1+flag));
+    hrv_rmssd(samplesize<5) = NaN;
+end
+
+
+
+%end
 
 %% ============================ 1. LOAD DATA =============================
-disp("************* STARTING TIME FREQUENCY DECOMPOSITION *************");
+disp("************* STARTING Feature Extraction  *************");
 
 % Define which channels should be used
 channels = "";
+
+% Initialize the matrix for all HRV measures
+HRV.rmssd_all = zeros(2, length(subjects));
+HRV.rmssd_tits{1} = {'HRV Average of subj'};
+
 
 for sub = 1:numel(subjects)
 
@@ -123,14 +190,29 @@ for sub = 1:numel(subjects)
         fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
 
         % Load subject data
-        if windows
-            subject_data = fullfile(data_dir, preprocessed_name, ['sub-', subject], [subject, '_preprocessed_MEDOFF_Rest.mat']);
-        else
-            subject_data = [data_dir, '/',  preprocessed_name, '/sub-', subject, "/", subject, '_preprocessed_MEDOFF_Rest.mat']; % MAC
-        end
+        subject_data = fullfile(data_dir, preprocessed_name, med_name, ['sub-', subject], [subject, '_preprocessed_', med_name, '_Rest.mat']);
         load(subject_data, 'SmrData');
 
     end
+
+
+    %% ================================== HRV ================================
+
+    % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
+    disp('Calculating HRV...');
+
+    % Outlier Removal from IBI
+    % Since the outliers were removed by taking away the R-Peaks. Thorugh that the IBI Calucluation is
+    % Skewed when the event was removed the IBi will be unusally
+    % high. So we exclude all the IBI that exceed 1s in length
+    % because those are way bezon the normal range
+    cleaned_IBI = SmrData.ECGcomp(1, SmrData.ECGcomp(1,:) < 1); % outlier removal of above 1 sec
+
+    % Calculate RMSSD HRV (Time-Range)
+    HRV.rmssd_all(1,sub) = sqrt(mean(diff(cleaned_IBI).^2)); % average HRV rmssd over all IBI 
+   
+    % Calculate Rolling RMSSD HRV
+    hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv);
 
 
 %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
@@ -193,7 +275,12 @@ for sub = 1:numel(subjects)
         % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
         save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3') 
     end
+
 end
+
+%% =========================== 3. AVERAGES ================================
+
+%% 3a. HRV Averages 
 disp('time_freq_decomp() done!');
 
 

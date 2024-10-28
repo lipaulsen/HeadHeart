@@ -61,25 +61,23 @@ end
 % Create folders if it does not exist
 for subject = subjects
     % Create the  erp data folder if it does not exist
-    subject_erp_folder = fullfile(data_dir, erp_name, ...
-        ['sub-', subject{1}]);
+    subject_erp_folder = fullfile(data_dir, erp_name,med_name, ...
+        sprintf(['sub-', subject{1}]));
     if ~exist(subject_erp_folder, 'dir')
         mkdir(subject_erp_folder);
     end
     % Create the  erp results data folder if it does not exist
-    subject_erp_results_folder = fullfile(results_dir, erp_name, ...
-        ['sub-', subject{1}]);
-    if ~exist(subject_erp_folder, 'dir')
-        mkdir(subject_erp_folder);
+    subject_erp_results_folder = fullfile(results_dir, erp_name, med_name,...
+        sprintf(['sub-', subject{1}]));
+    if ~exist(subject_erp_results_folder, 'dir')
+        mkdir(subject_erp_results_folder);
     end
-
-    
 end
 
 
 
 %% ============================ 1. LOAD DATA =============================
-disp("************* STARTING TIME FREQUENCY DECOMPOSITION *************");
+disp("************* STARTING  ERP CALCULATION *************");
 
 % Create a overall matrix to store the ERPs for all participants
 %ERP_avg_all = zeros(1,numel(subjects));
@@ -94,14 +92,14 @@ for sub = 1:numel(subjects)
     fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects));
 
     % Load subject data
-    subject_data = fullfile(data_dir, preprocessed_name, ['sub-', subject], [subject, '_preprocessed_MEDOFF_Rest.mat']);
+    subject_data = fullfile(data_dir, preprocessed_name, med_name, ['sub-', subject], [subject, '_preprocessed_', med_name, '_Rest.mat']);
     load(subject_data, 'SmrData');
 
     % Define the path to subject preprocessed folder
-    subject_erp_folder = fullfile(data_dir, erp_name, sprintf('sub-%s', subject));
+    subject_erp_folder = fullfile(data_dir, erp_name, med_name, sprintf('sub-%s', subject));
 
     % Define the path to subject preprocessed folder
-    subject_erp_results_folder = fullfile(results_dir, erp_name, sprintf('sub-%s', subject));
+    subject_erp_results_folder = fullfile(results_dir, erp_name, med_name, sprintf('sub-%s', subject));
 
 
 
@@ -212,7 +210,7 @@ for sub = 1:numel(subjects)
             title(sprintf('Channel %s', SmrData.WvTits{chan}));
 
         end
-        sgtitle(sprintf('ERP for Subject %s - All Channels', subject)); % Major Title
+        sgtitle(sprintf('ERP for Subject %s - All Channels with %s', subject, med_name)); % Major Title
         set(f1, 'Position', [100, 100, 1920, 1080]);
 
         gr1 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_sep-channels_win',  ...
@@ -245,7 +243,7 @@ for sub = 1:numel(subjects)
         axis tight
         xlabel('Time (ms)');
         ylabel('Amplitude (uV)');
-        title(sprintf('ERP - EEG for Subject %s', subject));
+        title(sprintf('ERP - EEG for Subject %s %s', subject, med_name));
 
         subplot(2,1,2)
         for chan = 8:15
@@ -271,7 +269,7 @@ for sub = 1:numel(subjects)
         % Set Labels
         xlabel('Time (ms)');
         ylabel('Amplitude (uV)');
-        title(sprintf('ERP - LFP for Subject %s', subject));
+        title(sprintf('ERP - LFP for Subject %s %s', subject, med_name));
 
         gr2 = fullfile(subject_erp_results_folder, ['\', subject, '_ERP_LFP-EEG_win',  num2str(time_win(1)),...
             'till', num2str(time_win(2)),'s_', med_name, '_BSL_', baseline_name,'.png']);
