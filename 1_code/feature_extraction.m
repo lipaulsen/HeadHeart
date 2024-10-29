@@ -127,6 +127,8 @@ ft_defaults; % If using FieldTrip
 
 %% ============================== FUNCTIONS ==============================
 
+
+%% HRV RMSSD 
 %function hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv)  
 %RMSSD Root Mean Square of Successive Differences.
 
@@ -142,29 +144,55 @@ ft_defaults; % If using FieldTrip
 %   This is a value between 0 and 1. (default: 1)
 %
 dRR = diff(cleaned_IBI).^2;
-if ceil(length(cleaned_IBI)*(1-overlap))>1
+if ceil(window_length_hrv*(1-overlap))>1
     j=1;
-    ts = zeros(length(ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)),window_length_hrv);
-    for i=ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)
-        ts(j,1:(1+i-max(1,(i-length(cleaned_IBI)+1)))) = dRR(max(1,(i-length(cleaned_IBI)+1)):i);
+    % Inititalize empty matrix for the windows with overlap
+    averaged_window = NaN(length(ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)),window_length_hrv);
+    % loop through all windows and assign the IBI data to the windows
+    for i=ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)
+        averaged_window(j,1:(1+i-max(1,(i-window_length_hrv+1)))) = dRR(max(1,(i-window_length_hrv+1)):i);
         j=j+1;
     end
-    samplesize = sum(~isnan(ts),2);
-    hrv_rmssd_tmp = sqrt(sum(ts,2)./(samplesize-1+flag));
-    hrv_rmssd_tmp(samplesize<5) = NaN;
 
-    hrv_rmssd = NaN(length(cleaned_IBI),1);
-    hrv_rmssd(ceil(length(cleaned_IBI)*(1-overlap))+1:ceil(length(cleaned_IBI)*(1-overlap)):length(cleaned_IBI)) = hrv_rmssd_tmp;
+    samplesize = sum(~isnan(averaged_window),2);
+    hrv_rmssd_tmp = sqrt(sum(averaged_window,2)./(samplesize-1+1));  % the +1 at the end is for normalization 
+    
+    hrv_rmssd_rol = NaN(length(cleaned_IBI),1);
+    hrv_rmssd_rol(ceil(window_length_hrv*(1-overlap))+1:ceil(window_length_hrv*(1-overlap)):length(cleaned_IBI)) = hrv_rmssd_tmp;
+    hrv_rmssd_rol_interp = fillmissing(hrv_rmssd_rol, 'linear');
+
 else
-    ts = NaN(length(cleaned_IBI),length(cleaned_IBI));
-    for j=1:length(cleaned_IBI)
-        ts(j+1:end,j) = dRR(1:end-j+1);
+    averaged_window = NaN(length(cleaned_IBI),window_length_hrv);
+    for j=1:window_length_hrv
+        averaged_window(j+1:end,j) = dRR(1:end-j+1);
     end
-    samplesize = sum(~isnan(ts),2);
-    hrv_rmssd = sqrt(sum(ts,2)./(samplesize-1+flag));
-    hrv_rmssd(samplesize<5) = NaN;
+    samplesize = sum(~isnan(averaged_window),2);
+    hrv_rmssd = sqrt(sum(averaged_window,2)./(samplesize-1+1)); % the +1 at the end is for normalization 
 end
 
+
+
+% Define window size (e.g., 5 IBIs) and 50% overlap
+window_size = 5; 
+step_size = ceil(window_size / 2); % Set step size to half the window size for 50% overlap
+
+% Initialize arrays to store rolling SDNN and RMSSD values
+rolling_sdnn = [];
+rolling_rmssd = [];
+
+% Loop through IBI data with the defined step size
+for i = 1:step_size:(length(cleaned_IBI) - window_size + 1)
+    % Get the windowed IBIs
+    window_IBIs = cleaned_IBI(i:(i + window_size - 1));
+
+    % Calculate RMSSD for the current window
+    rolling_rmssd(end+1) = sqrt(mean(diff(window_IBIs).^2));
+end
+
+% Display the results
+disp('Rolling RMSSD values with 50% overlap:');
+disp(rolling_rmssd);
+mean(rolling_rmssd)
 
 
 %end
@@ -209,8 +237,9 @@ for sub = 1:numel(subjects)
     cleaned_IBI = SmrData.ECGcomp(1, SmrData.ECGcomp(1,:) < 1); % outlier removal of above 1 sec
 
     % Calculate RMSSD HRV (Time-Range)
-    HRV.rmssd_all(1,sub) = sqrt(mean(diff(cleaned_IBI).^2)); % average HRV rmssd over all IBI 
-   
+    HRV.rmssd_all(1,sub) = sqrt(mean(diff(cleaned_IBI).^2));% average HRV rmssd over all IBI 
+    hrv_rmssd_nonmean = sqrt(diff(cleaned_IBI).^2);
+
     % Calculate Rolling RMSSD HRV
     hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv);
 
