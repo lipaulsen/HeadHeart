@@ -1,13 +1,5 @@
 %function [] = preprocess_physiological(subjects, data_dir, results_dir)
 
-% TO DO
-
-% - med mit in saving
-% med loading
-
-
-
-
 %% Main Preprocessing for HeadHeart
 
 % Author: Lisa Paulsen
@@ -130,7 +122,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 
 %% ============================ 1. LOAD DATA =================================
 
-for sub = 4:numel(subjects)
+for sub = 1:numel(subjects)
 
     % Extract the subject
     subject = subjects{sub};
@@ -144,11 +136,10 @@ for sub = 4:numel(subjects)
     % Load the ECG Peak data
     subject_data = fullfile(data_dir, 'matfiles-cleaned-peaks', med_name, 'justEvs',...
         ['ECGPeak_', subject,'_', med_name, '_Rest.mat']);
-    load(subject_data, 'EvTits', 'EvData');
+    load(subject_data, 'EvData');
 
     % Inject the Event Data into the Data Struct
-    SmrData.EvTits = EvTits;
-    SmrData.EvData = EvData';
+    SmrData.EvData = EvData;
 
     % Define the path to subject preprocessed folder
     subject_preprocessed_folder = fullfile(data_dir, preprocessed_name,  med_name, sprintf('sub-%s', subject));
@@ -200,12 +191,19 @@ for sub = 4:numel(subjects)
         % Initialize a new ECG vector with 0s
         SmrData.WvData(20,:) = zeros(1, length(ecg_timepoints));
 
-        % Loop through R-peak times to fill alignedECG
-        for i = 1:length(SmrData.EvData)
+        % Loop through the cleaned R-peak times 
+        for i = 1:length(SmrData.EvData.EvECGP_Cl)
             % Calculate the index corresponding to the R-peak time
-            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData(i))); % Find the nearest index
+            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECGP_Cl(i))); % Find the nearest index
             SmrData.WvData(20, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
             SmrData.WvTits{20,1} = 'RPeaks_data';
+        end
+        
+         % Loop through the all R-peak times (This is done for HRV)
+        for i = 1:length(SmrData.EvData.EvECG)
+            % Calculate the index corresponding to the R-peak time
+            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECG(i))); % Find the nearest index
+            SmrData.EvData.EvECG_Data(1, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
         end
 
         % Cut off of Data
@@ -339,20 +337,34 @@ for sub = 4:numel(subjects)
             % Calculate the IBI (inter-beat interval) from filtered ECG signal
             disp('Calculating IBI and HR...');
 
+            %% This is the IBI Calculation for the cleaned ECG Data 
             % Since the data has been cut (including the ECG Peaks) I need to
             % extract the current ECG Peaks from the cropped data
 
             % Find all non-zero Values
             peakIndices = find(SmrData.WvDataCleaned(20, :) ~= 0);
-            SmrData.ECGPeak(1,:) = ecg_timepoints(peakIndices);
+            SmrData.ECG.ECGPeak(1,:) = ecg_timepoints(peakIndices); % in sec
 
-
-            SmrData.ECGcomp(1,:) = diff(SmrData.ECGPeak(1,:)); % extract time differences in s between R-Peaks
-            SmrData.ECGcompTits{1,:} = 'IBI';
+            % Calcualte the IBI
+            SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECG.ECGPeak(1,:)); % extract time differences in s between R-Peaks
+            SmrData.ECG.ECGcompTits{1,:} = 'IBI';
 
             % Calculate Heart Rate from ECG
-            SmrData.ECGcomp(2,:) = 60 ./ SmrData.ECGcomp(1,:);
-            SmrData.ECGcompTits{2,:} = 'HR';
+            SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECG.ECGcomp(1,:);
+            SmrData.ECG.ECGcompTits{2,:} = 'HR';
+
+            %% This is the IBI Calculation for the raw ECG Data (for HRV)
+         
+            % Calcualte the IBI
+            SmrData.EvData.ECGcomp(1,:) = diff(SmrData.EvData.EvECG(1,:)); % extract time differences in s between R-Peaks
+            SmrData.EvData.ECGcompTits{1,:} = 'IBI';
+
+            % Calculate Heart Rate from ECG
+            SmrData.EvData.ECGcomp(2,:) = 60 ./ SmrData.EvData.ECGcomp(1,:);
+            SmrData.EvData.ECGcompTits{2,:} = 'HR';
+
+            %% This is not continues with the cleaned ECG Data
+
 
             if show_plots
                 %max_time = numel(SmrData.WvDataCleaned(20,:))

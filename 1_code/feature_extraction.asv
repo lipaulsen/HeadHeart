@@ -42,6 +42,7 @@
 windows = true; % if windows true then windows if false than mac
 
 % Define if plots are to be shown
+save_plots = true;
 show_plots = true;
 
 % Define preprocessing steps to perform
@@ -107,8 +108,8 @@ bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
                'beta', [13, 30], 'gamma', [30, 45]);
 
 % Create color palette for plots
-% colors.ECG.IBI = "#F0E442";    % Yellow
-% colors.ECG.HRV = "#CC79A7";   % Pink
+colors.ECG.IBI = [0.9569,    0.9451,    0.8706];    % Creme
+colors.ECG.HRV = [0.8784,    0.4784,    0.3725];   % Pink
 % colors.ECG.LF_HRV = "#E69F00";  % Light Orange
 % colors.ECG.HF_HRV = "#D55E00";   % Dark Orange
 % 
@@ -117,6 +118,14 @@ bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
 % colors.EEG.alpha = "#CC79A7"; % Pink
 % colors.EEG.beta = "#56B4E9";   % Light Blue
 % colors.EEG.gamma = "#009E73";   % Green
+% colors = [
+%     244, 241, 222; % Dark blue
+%     224, 122, 95; % Green
+%     61, 64, 91; % Red-orange
+%     129, 178, 154; % Gray
+%     242, 204, 143; % Purple
+% ];
+% colors = colors / 255;
 
 % Features for averaging across participants
 features_averaging.ecg = {'ibi', 'hrv', 'lf-hrv', 'hf-hrv'};
@@ -128,74 +137,6 @@ ft_defaults; % If using FieldTrip
 %% ============================== FUNCTIONS ==============================
 
 
-%% HRV RMSSD 
-%function hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv)  
-%RMSSD Root Mean Square of Successive Differences.
-
-% This function comuptes a rolling RMSSD with or without overlap 
-
-%   hrv_rmssd = RMSSD(RR,num) is the root mean square of successive
-%   differences.
-%   cleaned_IBI is a vector containing R-peak to r-peak intervals in seconds.
-%   hrv_rmssd is a column vector with the same length as RR.
-%   If num equals 0, the global measure will be computed.
-%   hrv_rmssd is then a number.
-%   For faster computation on local measures you can specify an overlap.
-%   This is a value between 0 and 1. (default: 1)
-%
-dRR = diff(cleaned_IBI).^2;
-if ceil(window_length_hrv*(1-overlap))>1
-    j=1;
-    % Inititalize empty matrix for the windows with overlap
-    averaged_window = NaN(length(ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)),window_length_hrv);
-    % loop through all windows and assign the IBI data to the windows
-    for i=ceil(window_length_hrv*(1-overlap)):ceil(window_length_hrv*(1-overlap)):length(dRR)
-        averaged_window(j,1:(1+i-max(1,(i-window_length_hrv+1)))) = dRR(max(1,(i-window_length_hrv+1)):i);
-        j=j+1;
-    end
-
-    samplesize = sum(~isnan(averaged_window),2);
-    hrv_rmssd_tmp = sqrt(sum(averaged_window,2)./(samplesize-1+1));  % the +1 at the end is for normalization 
-    
-    hrv_rmssd_rol = NaN(length(cleaned_IBI),1);
-    hrv_rmssd_rol(ceil(window_length_hrv*(1-overlap))+1:ceil(window_length_hrv*(1-overlap)):length(cleaned_IBI)) = hrv_rmssd_tmp;
-    hrv_rmssd_rol_interp = fillmissing(hrv_rmssd_rol, 'linear');
-
-else
-    averaged_window = NaN(length(cleaned_IBI),window_length_hrv);
-    for j=1:window_length_hrv
-        averaged_window(j+1:end,j) = dRR(1:end-j+1);
-    end
-    samplesize = sum(~isnan(averaged_window),2);
-    hrv_rmssd = sqrt(sum(averaged_window,2)./(samplesize-1+1)); % the +1 at the end is for normalization 
-end
-
-
-
-% Define window size (e.g., 5 IBIs) and 50% overlap
-window_size = 5; 
-step_size = ceil(window_size / 2); % Set step size to half the window size for 50% overlap
-
-% Initialize arrays to store rolling SDNN and RMSSD values
-rolling_sdnn = [];
-rolling_rmssd = [];
-
-% Loop through IBI data with the defined step size
-for i = 1:step_size:(length(cleaned_IBI) - window_size + 1)
-    % Get the windowed IBIs
-    window_IBIs = cleaned_IBI(i:(i + window_size - 1));
-
-    % Calculate RMSSD for the current window
-    rolling_rmssd(end+1) = sqrt(mean(diff(window_IBIs).^2));
-end
-
-% Display the results
-disp('Rolling RMSSD values with 50% overlap:');
-disp(rolling_rmssd);
-mean(rolling_rmssd)
-
-
-%end
 
 %% ============================ 1. LOAD DATA =============================
 disp("************* STARTING Feature Extraction  *************");
@@ -203,8 +144,15 @@ disp("************* STARTING Feature Extraction  *************");
 % Define which channels should be used
 channels = "";
 
+% Define the path to subject feature folder
+subject_feature_folder = fullfile(data_dir, feature_name,  med_name, sprintf('sub-%s', subject));
+
+% Define the path to subject results folder
+subject_results_folder = fullfile(results_dir, feature_name,  med_name, sprintf('sub-%s', subject));
+
+
 % Initialize the matrix for all HRV measures
-HRV.rmssd_all = zeros(2, length(subjects));
+HRV.rmssd_all = zeros(1, length(subjects)); % Why this is 2?
 HRV.rmssd_tits{1} = {'HRV Average of subj'};
 
 
@@ -222,92 +170,142 @@ for sub = 1:numel(subjects)
         load(subject_data, 'SmrData');
 
     end
-
+    
+    SR = SmrData.SR;
 
     %% ================================== HRV ================================
 
     % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
     disp('Calculating HRV...');
 
-    % Outlier Removal from IBI
-    % Since the outliers were removed by taking away the R-Peaks. Thorugh that the IBI Calucluation is
-    % Skewed when the event was removed the IBi will be unusally
-    % high. So we exclude all the IBI that exceed 1s in length
-    % because those are way bezon the normal range
-    cleaned_IBI = SmrData.ECGcomp(1, SmrData.ECGcomp(1,:) < 1); % outlier removal of above 1 sec
-
+    % For HRV we will use the Raw ECG Signal (not the cleaned one)
+    IBI = SmrData.EvData.ECGcomp(1,:);
     % Calculate RMSSD HRV (Time-Range)
-    HRV.rmssd_all(1,sub) = sqrt(mean(diff(cleaned_IBI).^2));% average HRV rmssd over all IBI 
-    hrv_rmssd_nonmean = sqrt(diff(cleaned_IBI).^2);
+    HRV.rmssd_all(1,sub) = sqrt(mean(diff(IBI).^2));% average HRV rmssd over all IBI 
 
-    % Calculate Rolling RMSSD HRV
-    hrv_rmssd = RMSSD(cleaned_IBI,overlap, window_length_hrv);
+    % Calculate Rolling RMSSD HRV 
+    % RMSSD = Root Mean Square of Successive Differences.
+    % comuptes a rolling RMSSD without overlap
+
+    dRR = diff(IBI).^2;
+    averaged_window = NaN(length(IBI),window_length_hrv);
+    for j=1:window_length_hrv
+        averaged_window(j+1:end,j) = dRR(1:end-j+1);
+    end
+    samplesize = sum(~isnan(averaged_window),2);
+    hrv_rmssd = sqrt(sum(averaged_window,2)./(samplesize-1+1)); % the +1 at the end is for normalization
+
+    if show_plots
+        sample_time = max(SmrData.EvData.EvECG(:, end)) / length(hrv_rmssd);
+
+        f1 = figure;
+        plot(hrv_rmssd.*1000, 'Color', colors.ECG.HRV) 
+        yline(HRV.rmssd_all(1, sub)*1000, "--k", 'HRV Avg', 'LabelHorizontalAlignment', 'right');
+        xticks([0:50:SmrData.EvData.EvECG(:, end)]);
+        % Define x-ticks across the entire sample range
+        new_xticks = 0:40:length(hrv_rmssd); 
+
+        % Convert x-ticks to seconds
+        new_xtick_labels = new_xticks * time_per_sample;
+        xlim([0, length(hrv_rmssd)]); 
+        set(gca, 'XTick', new_xticks, 'XTickLabel', new_xtick_labels);
+        xlabel('Recording Length (in sec)');
+        ylabel('HRV Length (in ms)');
+        title(strcat(med_name, ' HRV (RMSSD) of sub ', num2str(subject), ' avg HRV: ', num2str(round(HRV.rmssd_all(1, sub) * 1000, 2)), ' ms'))
+
+
+    end
+
+    if save_plots
+        % Save Graphics
+        gr1 = fullfile(subject_results_folder, [subject, '_', med_name, 'HRV-RMSSD.png']);
+        exportgraphics(f1, gr1, "Resolution",300)
+    end
+
 
 
 %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
 
-    for c = 1:numel(channels)
-        wavelet = [];
-        channel = channels{c};
-        fprintf('Processing %s %s...\n', subj, channel)
-        
-        % EXTRACT DATA & SAMPLE RATE
-        currData   = SmrData.WvData.(channel);
+    % for c = 1:numel(channels)
+    %     wavelet = [];
+    %     channel = channels{c};
+    %     fprintf('Processing %s %s...\n', subj, channel)
+    % 
+    %     % EXTRACT DATA & SAMPLE RATE
+    %     currData   = SmrData.WvData.(channel);
+    % 
+    %     SR = WvData.SR;
+    %     % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
+    %     data_flt   = ft_preproc_highpassfilter(SmrData.WvDataCleaned(1:15, :), SR, 1, 4, 'but', 'twopass'); % twopass
+    % 
+    %     % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
+    %     trialtime       = (1:numel(data_flt)) / SR; 
+    %     DataFT.fsample  = SR;           
+    %     DataFT.label    = {channel};
+    %     DataFT.time     = {trialtime};
+    %     DataFT.trial    = {squeeze(data_flt)};
+    % 
+    %     CfgFrq    = prepConfig(frequencies, cycles, trialtime);
+    %     % RUN TF-DECOMPOSITION
+    %     data_freq = ft_freqanalysis(CfgFrq,DataFT);
+    % 
+    %     % CALCULATE POWER AND PHASE
+    %     dataPow     = squeeze(abs(data_freq.fourierspctrm)).^2;  % abs() gives you the amplitude, and squared give you the power, if you don't use abs() you'll get a complex number and can extract the phase by using angle()     
+    %     dataPhase   = squeeze(angle(data_freq.fourierspctrm));   % angle() gives you the phase
+    % 
+    %     % REMOVE OUTLIERS FROM POWER AND PHASE
+    %     if OUTL_REMOVE
+    %         dataPow_tmp   = nan(size(dataPow,1), numel(currData));
+    %         dataPhase_tmp = nan(size(dataPow,1), numel(currData));
+    % 
+    %         dataPow_tmp(:,~currOutlier) = dataPow;
+    %         dataPhase_tmp(:,~currOutlier) = dataPhase;
+    % 
+    %         dataPow   = dataPow_tmp;
+    %         dataPhase = dataPhase_tmp;
+    %     end
+    % 
+    %     % DOWNSAMPLE POWER AND PHASE DATA 
+    %     if  SR ~=  DOWNSAMPLE_SR
+    %         [fsorig, fsres] = rat(SR / DOWNSAMPLE_SR);      
+    %         pow_DS   = resample(dataPow', fsres, fsorig)';   
+    %         phase_DS = resample(dataPhase', fsres, fsorig)';   
+    %     end
+    % 
+    %     % SAVE DATA IN ONE STRUCT
+    %     wavelet.(channel).pow    = pow_DS;
+    %     wavelet.(channel).phase  = phase_DS;
+    %     wavelet.freqs      = freqs;
+    %     wavelet.SR         = DOWNSAMPLE_SR;
+    % 
+    %     if ~exist([Paths.SaveDir, '/wavelet_decomp/'])
+    %         mkdir([Paths.SaveDir, '/wavelet_decomp/'])
+    %     end
+    %     % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
+    %     save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3') 
+    % end
 
-        SR = WvData.SR;
-        % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
-        data_flt   = ft_preproc_highpassfilter(SmrData.WvDataCleaned(1:15, :), SR, 1, 4, 'but', 'twopass'); % twopass
-        
-        % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
-        trialtime       = (1:numel(data_flt)) / SR; 
-        DataFT.fsample  = SR;           
-        DataFT.label    = {channel};
-        DataFT.time     = {trialtime};
-        DataFT.trial    = {squeeze(data_flt)};
-        
-        CfgFrq    = prepConfig(frequencies, cycles, trialtime);
-        % RUN TF-DECOMPOSITION
-        data_freq = ft_freqanalysis(CfgFrq,DataFT);
-        
-        % CALCULATE POWER AND PHASE
-        dataPow     = squeeze(abs(data_freq.fourierspctrm)).^2;  % abs() gives you the amplitude, and squared give you the power, if you don't use abs() you'll get a complex number and can extract the phase by using angle()     
-        dataPhase   = squeeze(angle(data_freq.fourierspctrm));   % angle() gives you the phase
-        
-        % REMOVE OUTLIERS FROM POWER AND PHASE
-        if OUTL_REMOVE
-            dataPow_tmp   = nan(size(dataPow,1), numel(currData));
-            dataPhase_tmp = nan(size(dataPow,1), numel(currData));
-            
-            dataPow_tmp(:,~currOutlier) = dataPow;
-            dataPhase_tmp(:,~currOutlier) = dataPhase;
-            
-            dataPow   = dataPow_tmp;
-            dataPhase = dataPhase_tmp;
-        end
-        
-        % DOWNSAMPLE POWER AND PHASE DATA 
-        if  SR ~=  DOWNSAMPLE_SR
-            [fsorig, fsres] = rat(SR / DOWNSAMPLE_SR);      
-            pow_DS   = resample(dataPow', fsres, fsorig)';   
-            phase_DS = resample(dataPhase', fsres, fsorig)';   
-        end
-        
-        % SAVE DATA IN ONE STRUCT
-        wavelet.(channel).pow    = pow_DS;
-        wavelet.(channel).phase  = phase_DS;
-        wavelet.freqs      = freqs;
-        wavelet.SR         = DOWNSAMPLE_SR;
 
-        if ~exist([Paths.SaveDir, '/wavelet_decomp/'])
-            mkdir([Paths.SaveDir, '/wavelet_decomp/'])
-        end
-        % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
-        save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3') 
-    end
+%% =========================== SAVING DATA ===============================
+save_path = fullfile(subject_feature_folder, [subject,  '_feature_', med_name ,'_Rest.mat']);
+save(save_path, 'SmrData');
 
 end
 
 %% =========================== 3. AVERAGES ================================
+
+%% HRV AVERAGE
+
+HRV.mean = mean(HRV.rmssd_all);
+HRV.median = median(HRV.rmssd_all);
+HRV.mode = mode(HRV.rmssd_all);
+
+save_path = fullfile(avg_features_folder, ['Averages_', num2str(length(subjects)),'_subjects_', med_name, '_Rest.mat']);
+save(save_path, 'SmrData');
+
+
+
+
 
 %% 3a. HRV Averages 
 disp('time_freq_decomp() done!');

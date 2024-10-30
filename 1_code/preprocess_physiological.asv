@@ -1,12 +1,4 @@
 %function [] = preprocess_physiological(subjects, data_dir, results_dir)
-ba
-% TO DO
-
-% - med mit in saving
-% med loading
-
-
-
 
 %% Main Preprocessing for HeadHeart
 
@@ -130,7 +122,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 
 %% ============================ 1. LOAD DATA =================================
 
-for sub = 4:numel(subjects)
+for sub = 1:numel(subjects)
 
     % Extract the subject
     subject = subjects{sub};
@@ -144,11 +136,10 @@ for sub = 4:numel(subjects)
     % Load the ECG Peak data
     subject_data = fullfile(data_dir, 'matfiles-cleaned-peaks', med_name, 'justEvs',...
         ['ECGPeak_', subject,'_', med_name, '_Rest.mat']);
-    load(subject_data, 'EvTits', 'EvData');
+    load(subject_data, 'EvData');
 
     % Inject the Event Data into the Data Struct
-    SmrData.EvTits = EvTits;
-    SmrData.EvData = EvData';
+    SmrData.EvData = EvData;
 
     % Define the path to subject preprocessed folder
     subject_preprocessed_folder = fullfile(data_dir, preprocessed_name,  med_name, sprintf('sub-%s', subject));
@@ -200,12 +191,19 @@ for sub = 4:numel(subjects)
         % Initialize a new ECG vector with 0s
         SmrData.WvData(20,:) = zeros(1, length(ecg_timepoints));
 
-        % Loop through R-peak times to fill alignedECG
-        for i = 1:length(SmrData.EvData)
+        % Loop through the cleaned R-peak times 
+        for i = 1:length(SmrData.EvData.EvECGP_Cl)
             % Calculate the index corresponding to the R-peak time
-            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData(i))); % Find the nearest index
+            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECGP_Cl(i))); % Find the nearest index
             SmrData.WvData(20, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
             SmrData.WvTits{20,1} = 'RPeaks_data';
+        end
+        
+         % Loop through the all R-peak times (This is done for HRV)
+        for i = 1:length(SmrData.EvData.EvECG)
+            % Calculate the index corresponding to the R-peak time
+            [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECG(i))); % Find the nearest index
+            SmrData.EvData.EvECG_Data(1, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
         end
 
         % Cut off of Data
@@ -339,20 +337,37 @@ for sub = 4:numel(subjects)
             % Calculate the IBI (inter-beat interval) from filtered ECG signal
             disp('Calculating IBI and HR...');
 
+            %% This is the IBI Calculation for the cleaned ECG Data 
             % Since the data has been cut (including the ECG Peaks) I need to
             % extract the current ECG Peaks from the cropped data
 
             % Find all non-zero Values
             peakIndices = find(SmrData.WvDataCleaned(20, :) ~= 0);
-            SmrData.ECGPeak(1,:) = ecg_timepoints(peakIndices);
+            SmrData.ECG.ECGPeak(1,:) = ecg_timepoints(peakIndices); % in sec
 
-
-            SmrData.ECGcomp(1,:) = diff(SmrData.ECGPeak(1,:)); % extract time differences in s between R-Peaks
-            SmrData.ECGcompTits{1,:} = 'IBI';
+            % Calcualte the IBI
+            SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECG.ECGPeak(1,:)); % extract time differences in s between R-Peaks
+            SmrData.ECG.ECGcompTits{1,:} = 'IBI';
 
             % Calculate Heart Rate from ECG
-            SmrData.ECGcomp(2,:) = 60 ./ SmrData.ECGcomp(1,:);
-            SmrData.ECGcompTits{2,:} = 'HR';
+            SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECG.ECGcomp(1,:);
+            SmrData.ECG.ECGcompTits{2,:} = 'HR';
+
+            %% This is the IBI Calculation for the raw ECG Data (for HRV)
+            % Find all non-zero Values
+            peakIndices_rawECG = find(SmrData.EvData.EvECG_Data(1, :) ~= 0);
+            SmrData.EvData.EvECG_Data(1,:) = ecg_timepoints(peakIndices); % the variable is in sec
+
+            % Calcualte the IBI
+            SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECGPeak(1,:)); % extract time differences in s between R-Peaks
+            SmrData.ECG.ECGcompTits{1,:} = 'IBI';
+
+            % Calculate Heart Rate from ECG
+            SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECGcomp(1,:);
+            SmrData.ECG.ECGcompTits{2,:} = 'HR';
+
+            %% This is not continues with the cleaned ECG Data
+
 
             if show_plots
                 %max_time = numel(SmrData.WvDataCleaned(20,:))
@@ -379,86 +394,6 @@ for sub = 4:numel(subjects)
                 gr4 = fullfile(subject_results_folder, [subject, '_', med_name, '_ECG-IBI-HR.png']);
                 exportgraphics(f4, gr4, "Resolution",300) % WINDOWS
             end
-
-            % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
-            disp('Calculating HRV...');
-            
-            % Outlier Removal from IBI 
-            % Since the outliers were removed by taking away the R-Peaks. Thorugh that the IBI Calucluation is 
-            % Skewed when the event was removed the IBi will be unusally
-            % high. So we exclude all the IBI that exceed 1s in length
-            % because those are way bezon the normal range
-            
-            cleaned_IBI = SmrData.ECGcomp(1, SmrData.ECGcomp(1,:) < 1); % outlier removal of above 1 sec
-            sdnn = std(cleaned_IBI);
-            rmsdd = sqrt(mean(diff(cleaned_IBI).^2));
-
-            % Define window size (e.g., 5 IBIs) and step size
-            window_size = 10;
-            step_size = 1;
-
-            % Initialize arrays to store rolling SDNN and RMSSD values
-            rolling_sdnn = [];
-            rolling_rmssd = [];
-
-            for i = 1:step_size:(length(cleaned_IBI) - window_size + 1)
-                % Get the windowed IBIs
-                window_IBIs = cleaned_IBI(i:(i + window_size - 1));
-
-                % Calculate SDNN for the current window
-                rolling_sdnn(end+1) = std(window_IBIs);
-
-                % Calculate RMSSD for the current window
-                rolling_rmssd(end+1) = sqrt(mean(diff(window_IBIs).^2));
-            end
-
-           function hrv_rmssd = RMSSD(RR,length(cleaned_IBI),flag,overlap)  
-%RMSSD Root Mean Square of Successive Differences.
-%   hrv_rmssd = RMSSD(RR,num) is the root mean square of successive
-%   differences.
-%   RR is a vector containing RR intervals in seconds.
-%   num specifies the number of successive values for which the local
-%   RMSSD will be retrospectively computed.
-%   hrv_rmssd is a column vector with the same length as RR. hrv_rmssd has
-%   NaN values at those positions for which the sample size is smaller 5.
-%   If num equals 0, the global measure will be computed.
-%   hrv_rmssd is then a number.
-%   For faster computation on local measures you can specify an overlap.
-%   This is a value between 0 and 1. (default: 1)
-%
-%   hrv_rmssd = RMSSD(RR,num,flag), where flag is 0 or 1 to specify
-%   normalization by n-1 or n. (default: 1)
-%
-%   Example: If RR = repmat([1 .9],1,5),
-%      then HRV.RMSSD(RR,6) is [NaN;NaN;NaN;NaN;NaN;0.1;0.1;0.1;0.1;0.1]
-%      and HRV.RMSSD(RR,0,1) is 0.1000 and HRV.RMSSD(RR,0,0) is 0.1061.
-
-   
-    dRR = diff(cleaned_IBI).^2; 
-    overlap = 0.5;
-        if ceil(length(cleaned_IBI)*(1-overlap))>1
-            j=1;
-            ts = NaN(length(ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)),length(cleaned_IBI));
-            for i=ceil(length(cleaned_IBI)*(1-overlap)):ceil(length(cleaned_IBI)*(1-overlap)):length(dRR)
-                ts(j,1:(1+i-max(1,(i-length(cleaned_IBI)+1)))) = dRR(max(1,(i-length(cleaned_IBI)+1)):i);
-                j=j+1;
-            end 
-            samplesize = sum(~isnan(ts),2);
-            hrv_rmssd_tmp = sqrt(sum(ts,2)./(samplesize-1+flag)); 
-            hrv_rmssd_tmp(samplesize<5) = NaN;
-            
-            hrv_rmssd = NaN(length(RR),1);  
-            hrv_rmssd(ceil(length(cleaned_IBI)*(1-overlap))+1:ceil(length(cleaned_IBI)*(1-overlap)):length(RR)) = hrv_rmssd_tmp;  
-        else
-            ts = NaN(length(RR),length(cleaned_IBI));
-            for j=1:length(cleaned_IBI)
-                ts(j+1:end,j) = dRR(1:end-j+1);
-            end    
-            samplesize = sum(~isnan(ts),2);
-            hrv_rmssd = sqrt(sum(ts,2)./(samplesize-1+flag));
-            hrv_rmssd(samplesize<5) = NaN;
-        end
-
 
         end
 
