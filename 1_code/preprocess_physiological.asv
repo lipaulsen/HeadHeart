@@ -122,7 +122,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 
 %% ============================ 1. LOAD DATA =================================
 
-for sub = 1:numel(subjects)
+for sub = [1,5,7,8]%1:numel(subjects)
 
     % Extract the subject
     subject = subjects{sub};
@@ -354,17 +354,14 @@ for sub = 1:numel(subjects)
             SmrData.ECG.ECGcompTits{2,:} = 'HR';
 
             %% This is the IBI Calculation for the raw ECG Data (for HRV)
-            % Find all non-zero Values
-            peakIndices_rawECG = find(SmrData.EvData.EvECG_Data(1, :) ~= 0);
-            SmrData.EvData.EvECG_Data(1,:) = ecg_timepoints(peakIndices); % the variable is in sec
-
+         
             % Calcualte the IBI
-            SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECGPeak(1,:)); % extract time differences in s between R-Peaks
-            SmrData.ECG.ECGcompTits{1,:} = 'IBI';
+            SmrData.EvData.ECGcomp(1,:) = diff(SmrData.EvData.EvECG(1,:)); % extract time differences in s between R-Peaks
+            SmrData.EvData.ECGcompTits{1,:} = 'IBI';
 
             % Calculate Heart Rate from ECG
-            SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECGcomp(1,:);
-            SmrData.ECG.ECGcompTits{2,:} = 'HR';
+            SmrData.EvData.ECGcomp(2,:) = 60 ./ SmrData.EvData.ECGcomp(1,:);
+            SmrData.EvData.ECGcompTits{2,:} = 'HR';
 
             %% This is not continues with the cleaned ECG Data
 

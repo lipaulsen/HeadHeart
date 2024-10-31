@@ -1,4 +1,4 @@
-% function [] = time_frequency_decomp(subjects, data_dir, results_dir, plots_dir)
+% function [] = time_frequency_decomp(subjects, data_dir, results_dir)
 
 %% Time Frequency Decomposition for HeadHeart 
 
@@ -38,12 +38,8 @@
 %clear all
 %close all
 
-% Define if using Windows or Mac 
-windows = true; % if windows true then windows if false than mac
-
 % Define if plots are to be shown
-save_plots = true;
-show_plots = true;
+show_plots = false;
 
 % Define preprocessing steps to perform
 steps = {'Load Data', 'Feature Extraction ECG', 'Feature Extraction EEG'}; 
@@ -110,22 +106,15 @@ bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
 % Create color palette for plots
 colors.ECG.IBI = [0.9569,    0.9451,    0.8706];    % Creme
 colors.ECG.HRV = [0.8784,    0.4784,    0.3725];   % Pink
-% colors.ECG.LF_HRV = "#E69F00";  % Light Orange
-% colors.ECG.HF_HRV = "#D55E00";   % Dark Orange
+colors.ECG.LF_HRV = [0.2392    0.2510    0.3569];  % Light Orange
+colors.ECG.HF_HRV = [0.5059    0.6980    0.6039];   % Dark Orange
 % 
-% colors.EEG.delta = "#F0E442";  % Yellow
+colors.EEG.delta = [ 0.9490    0.8000    0.5608];  % Yellow
 % colors.EEG.theta = "#D55E00";    % Dark Orange
 % colors.EEG.alpha = "#CC79A7"; % Pink
 % colors.EEG.beta = "#56B4E9";   % Light Blue
 % colors.EEG.gamma = "#009E73";   % Green
-% colors = [
-%     244, 241, 222; % Dark blue
-%     224, 122, 95; % Green
-%     61, 64, 91; % Red-orange
-%     129, 178, 154; % Gray
-%     242, 204, 143; % Purple
-% ];
-% colors = colors / 255;
+
 
 % Features for averaging across participants
 features_averaging.ecg = {'ibi', 'hrv', 'lf-hrv', 'hf-hrv'};
@@ -144,15 +133,10 @@ disp("************* STARTING Feature Extraction  *************");
 % Define which channels should be used
 channels = "";
 
-% Define the path to subject feature folder
-subject_feature_folder = fullfile(data_dir, feature_name,  med_name, sprintf('sub-%s', subject));
-
-% Define the path to subject results folder
-subject_results_folder = fullfile(results_dir, feature_name,  med_name, sprintf('sub-%s', subject));
-
+subjects = {'SG041', 'SG043',  'SG047', 'SG050', 'SG052', 'SG056'}; % this is wihtout the 2 patients with arythmia
 
 % Initialize the matrix for all HRV measures
-HRV.rmssd_all = zeros(1, length(subjects)); % Why this is 2?
+HRV.rmssd_avg = zeros(1, length(subjects)); % Why this is 2?
 HRV.rmssd_tits{1} = {'HRV Average of subj'};
 
 
@@ -173,6 +157,13 @@ for sub = 1:numel(subjects)
     
     SR = SmrData.SR;
 
+    % Define the path to subject feature folder
+    subject_feature_folder = fullfile(data_dir, feature_name,  med_name, sprintf('sub-%s', subject));
+
+    % Define the path to subject results folder
+    subject_results_folder = fullfile(results_dir, feature_name,  med_name, sprintf('sub-%s', subject));
+
+
     %% ================================== HRV ================================
 
     % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
@@ -181,7 +172,8 @@ for sub = 1:numel(subjects)
     % For HRV we will use the Raw ECG Signal (not the cleaned one)
     IBI = SmrData.EvData.ECGcomp(1,:);
     % Calculate RMSSD HRV (Time-Range)
-    HRV.rmssd_all(1,sub) = sqrt(mean(diff(IBI).^2));% average HRV rmssd over all IBI 
+    HRV.rmssd_avg(1,sub) = sqrt(mean(diff(IBI).^2));% average HRV rmssd over all IBI 
+ 
 
     % Calculate Rolling RMSSD HRV 
     % RMSSD = Root Mean Square of Successive Differences.
@@ -199,24 +191,25 @@ for sub = 1:numel(subjects)
         sample_time = max(SmrData.EvData.EvECG(:, end)) / length(hrv_rmssd);
         f1 = figure;
         plot(hrv_rmssd.*1000, 'Color', colors.ECG.HRV) 
-        yline(HRV.rmssd_all(1, sub)*1000, "--k", 'HRV Avg', 'LabelHorizontalAlignment', 'right');
+        yline(HRV.rmssd_avg(1, sub)*1000, "--k", 'HRV Avg', 'LabelHorizontalAlignment', 'right');
         new_xticks = 0:50:length(hrv_rmssd); 
         new_xtick_labels = round(new_xticks * sample_time/5)*5;
         xlim([0, length(hrv_rmssd)]); 
         set(gca, 'XTick', new_xticks, 'XTickLabel', new_xtick_labels);
         xlabel('Recording Length (in sec)');
         ylabel('HRV Length (in ms)');
-        title(strcat(med_name, ' HRV (RMSSD) of sub ', num2str(subject), ' avg HRV: ', num2str(round(HRV.rmssd_all(1, sub) * 1000, 2)), ' ms'))
+        title(strcat(med_name, ' HRV (RMSSD) of sub ', num2str(subject), ' avg HRV: ', num2str(round(HRV.rmssd_avg(1, sub) * 1000, 2)), ' ms'))
 
-
+        % saving
+        gr1 = fullfile(subject_results_folder, [subject, '_', med_name, 'HRV-RMSSD_win_', num2str(window_length_hrv),' sample.png']);
+        try
+            exportgraphics(f1, gr1, "Resolution", 300);
+        catch ME
+            warning("Failed to save the plot: %s", ME.message);
+        end
+       
+        %exportgraphics(f1, gr1, "Resolution",300);
     end
-
-    if save_plots
-        % Save Graphics
-        gr1 = fullfile(subject_results_folder, [subject, '_', med_name, 'HRV-RMSSD.png']);
-        exportgraphics(f1, gr1, "Resolution",300)
-    end
-
 
 
 %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
@@ -289,18 +282,28 @@ end
 
 %% =========================== 3. AVERAGES ================================
 
-%% HRV AVERAGE
+%% HRV AVERAGE / DESCRIPTIVE STATS
 
-HRV.mean = mean(HRV.rmssd_all);
-HRV.median = median(HRV.rmssd_all);
-HRV.mode = mode(HRV.rmssd_all);
+% Extractiung Mean, Median, Mode and Standard Deviation for the RMSSD HRV For all Participants 
+HRV.mean = mean(HRV.rmssd_avg); % Mean   
+HRV.std = std(HRV.rmssd_avg); % STD
+HRV.median = median(HRV.rmssd_avg); % Median
+HRV.mode = mode(HRV.rmssd_avg); % Mode
+HRV.variance = var(HRV.rmssd_avg); % Variance
+HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
+ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
+HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI 
+
+% figure
+% errorbar(HRV.mean, 1,  HRV.CI, 'horizontal', 'o')
+% ylim([0.5 1.5]); % Keep y-axis focused on the single point
+% yticks([]); % Remove y-axis ticks for a cleaner look
+% xlim([x_axis_min - 0.1*ci_95, x_axis_max + 0.1*ci_95]); % Adjust x-axis limits to center the point
+% ylabel('Mean RMSSD HRV');
+% title('Mean RMSSD HRV with 95% Confidence Interval');
 
 save_path = fullfile(avg_features_folder, ['Averages_', num2str(length(subjects)),'_subjects_', med_name, '_Rest.mat']);
 save(save_path, 'HRV');
-
-
-
-
 
 %% 3a. HRV Averages 
 disp('time_freq_decomp() done!');

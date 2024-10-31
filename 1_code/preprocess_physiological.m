@@ -122,7 +122,7 @@ colors.others = {'#FFFFFF', '#6C6C6C', '#000000'};  % White, gray, and black
 
 %% ============================ 1. LOAD DATA =================================
 
-for sub = 1:numel(subjects)
+for sub = [6,8,10]%1:numel(subjects)
 
     % Extract the subject
     subject = subjects{sub};

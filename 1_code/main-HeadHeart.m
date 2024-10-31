@@ -37,10 +37,10 @@ end
 % initialize subjects 
 % be aware that for sub 45 and 60 only MEDON is available
 subjects_MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
-subjects_MedON = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
-subjects = subjects_MedOff;
+subjects_MedOn = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
+subjects = subjects_MedOn;
 
-MedFlag = 'MedOff'; % MedOn or MedOff
+MedFlag = 'MedOn'; % MedOn or MedOff
 
 %% PREPROCESSING 
  disp('********** Preprocessing the Data ************');
