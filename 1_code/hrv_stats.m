@@ -43,7 +43,6 @@ show_plots = true;
 
 
 % Define folder variables 
-preprocessed_name = 'preproc';  % preprocessed folder (inside derivatives)
 averaged_name = 'avg';  % averaged data folder (inside preprocessed)
 feature_name = 'features';  % feature extraction folder (inside derivatives)
 
@@ -51,13 +50,6 @@ feature_name = 'features';  % feature extraction folder (inside derivatives)
 n_sub_medon = 6;
 n_sub_medoff = 6;
 
-
-% Look up if what the medication condition is
-if contains(MedFlag, 'MedOff')
-    med_name = 'MedOff';
-else
-    med_name = 'MedOn';
-end
 
 %% ============================ 1. LOAD DATA =============================
 disp("************* STARTING Feature Extraction  *************");
@@ -81,29 +73,33 @@ plot(HRV_MedOn.rmssd_avg, 'k')
 hold on
 plot(HRV_MedOff.rmssd_avg, 'b')
 legend('MedOn', 'MedOff')
-
+label(['HRV RMSSD: t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p ='  num2str(p)])
 
 [h, p, ci, stats] = ttest2(HRV_MedOn.rmssd_avg, HRV_MedOff.rmssd_avg, 'Tail','left', Vartype='equal')
-sprintf(['t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p ='  num2str(p)])
+cohens_d = mean(HRV_MedOn.rmssd_avg-HRV_MedOff.rmssd_avg)/std(HRV_MedOn.rmssd_avg-HRV_MedOff.rmssd_avg)
+sprintf(['t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p='  num2str(p) ', d=' num2str(cohens_d)])
 
 f1 = figure;
-data= [HRV_MedOn.rmssd_avg', HRV_MedOff.rmssd_avg']*1000;
+data = [HRV_MedOn.rmssd_avg', HRV_MedOff.rmssd_avg']*1000;
 face=[240/256, 130/256, 0; 30/256, 160/256, 200/256;];
-violin(data,'facecolor',face,'facealpha',0.5,'mc',[])
-ylabel('HRV Length (in ms)')
+violin(data,'facecolor',face,'facealpha',0.5,'mc',[]);
+ylabel('HRV Length (in ms)');
+title(['HRV RMSSD: t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p='  num2str(p) ', d=' num2str(cohens_d)])
+set(gca, 'XTick', []);
 
 for i = 1:size(data, 2)  % Loop through each group
     x = repmat(i, size(data, 1), 1);  % X positions for the data points
-    scatter(x, data(:,i), 'filled','MarkerFaceColor',face(i,:));  % Scatter plot of the data points
+    scatter(x, data(:,i), 'filled','MarkerFaceColor',face(i,:),  'HandleVisibility', 'off');% Scatter plot of the data points  
 end 
 
+
 for j = 1:size(data, 1)  % Loop through each individual
-    plot(1:size(data, 2), data(j,:), ':ok');  % Line plot connecting data points across groups
+    plot(1:size(data, 2), data(j,:), ':ok', 'HandleVisibility', 'off');  % Line plot connecting data points across groups
 end
 
-gr1 = fullfile(data_dir, feature_name, averaged_name, ['ViolinPlot_HRV_', num2str(length(subjects)),'_subjects_MedOnvs.MedOff.png']);
+gr1 = fullfile(results_dir, feature_name, ['ViolinPlot_HRV_', num2str(length(subjects)),'_subjects_MedOnvs.MedOff.pdf']);
 try
-    exportgraphics(f1, gr1, "Resolution", 300);
+    exportgraphics(f1, gr1, "Resolution", 300, "padding", "figure");
 catch ME
     warning("Failed to save the plot: %s", ME.message);
 end

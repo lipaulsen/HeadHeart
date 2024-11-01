@@ -38,7 +38,8 @@ end
 % be aware that for sub 45 and 60 only MEDON is available
 subjects_MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
 subjects_MedOn = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
-subjects = subjects_MedOn;
+subjects = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
+%subjects = subjects_MedOn;
 
 MedFlag = 'MedOn'; % MedOn or MedOff
 
