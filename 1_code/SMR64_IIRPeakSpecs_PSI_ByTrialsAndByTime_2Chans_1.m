@@ -7,8 +7,8 @@ FilesDir="C:\UsersData\Lisa\Lucia_StnLFPs_ECG_Lisa\SMR\";
 
 Lucia_Data_ECG={
 'All\';
-"SG041_MED_OFF_Rest_2021_09_10.smr";
-"SG041_MEDON_Rest_2021_09_10.smr";
+% "SG041_MED_OFF_Rest_2021_09_10.smr";
+% "SG041_MEDON_Rest_2021_09_10.smr";
 % "SG043_2021_10_01_MedOFF_Rest_Recording.smr";
 % "SG043_2021_10_01_MedON_Rest_Recording.smr";
 % "SG044_2021_10_28_MEDON_RestRec.smr";
@@ -21,10 +21,10 @@ Lucia_Data_ECG={
 % "SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
 % "SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
 % "SG052_2022_05_13_MEDOFF_RESTing.smr";
-% "SG052_2022_05_16_MEDON_RESTing.smr";
-% "SG056_12_08_2022_MEDOFF_Resting.smr";
-% "SG056_12_08_2022_MEDON_Resting.smr";
-% "SG060_28_10_2022_MEDON_resting.smr";
+%"SG052_2022_05_16_MEDON_RESTing.smr";
+"SG056_12_08_2022_MEDOFF_Resting.smr";
+"SG056_12_08_2022_MEDON_Resting.smr";
+"SG060_28_10_2022_MEDON_resting.smr";
  };
 %%------------------------------------------------------------------------
 
@@ -385,7 +385,10 @@ stZscoreSpc=-1;
     
     plotinfo.stMapsLines=stMapsLinesCoh; % 1- plot Maps, other - plot Lines
     plotinfo.FigSize=[1013 532 866 428]; % 45 611 918 484];
-    plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);
+    u = plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);
+    
+    gr1= fullfile('F:\HeadHeart\2_results\itc', [xFileName{1} '_ITC.png']);
+    exportgraphics(u,gr1, 'Resolution', 300)
     %
     %plotinfo.stMapsLines=2; % 1- plot Maps, other - plot Lines
     %plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);    
