@@ -7,20 +7,20 @@ FilesDir="C:\UsersData\Lisa\Lucia_StnLFPs_ECG_Lisa\SMR\";
 
 Lucia_Data_ECG={
 'All\';
-% "SG041_MED_OFF_Rest_2021_09_10.smr";
-% "SG041_MEDON_Rest_2021_09_10.smr";
-% "SG043_2021_10_01_MedOFF_Rest_Recording.smr";
-% "SG043_2021_10_01_MedON_Rest_Recording.smr";
-% "SG044_2021_10_28_MEDON_RestRec.smr";
-% "SG044_2021_10_28_Rest_OFFmed.smr";
-% "SG045_2021_10_29_MEDON_Resting.smr";
-% "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
-% "SG046_2021_11_27_MedON_rest_recordings.smr";
-% "SG047_2021_11_26_MedOFF_Rest_Recording.smr";
-% "SG047_2021_11_26_MedON_Rest_Recording.smr";
-% "SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
-% "SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
-% "SG052_2022_05_13_MEDOFF_RESTing.smr";
+"SG041_MED_OFF_Rest_2021_09_10.smr";
+"SG041_MEDON_Rest_2021_09_10.smr";
+"SG043_2021_10_01_MedOFF_Rest_Recording.smr";
+"SG043_2021_10_01_MedON_Rest_Recording.smr";
+"SG044_2021_10_28_MEDON_RestRec.smr";
+"SG044_2021_10_28_Rest_OFFmed.smr";
+"SG045_2021_10_29_MEDON_Resting.smr";
+"SG046_2021_11_25_MEDOFF_Rest_recording.smr";
+"SG046_2021_11_27_MedON_rest_recordings.smr";
+"SG047_2021_11_26_MedOFF_Rest_Recording.smr";
+"SG047_2021_11_26_MedON_Rest_Recording.smr";
+"SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
+"SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
+"SG052_2022_05_13_MEDOFF_RESTing.smr";
 %"SG052_2022_05_16_MEDON_RESTing.smr";
 "SG056_12_08_2022_MEDOFF_Resting.smr";
 "SG056_12_08_2022_MEDON_Resting.smr";
@@ -39,7 +39,7 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"};
 %EegLfpChTts= {"ECG"; "R1"};
 % EegLfpChTts= {"ECG"; "R2"};
 % EegLfpChTts= {"ECG"; "R3"};
-% EegLfpChTts= {"ECG"; "R4"};
+ %EegLfpChTts= {"ECG"; "R4"};
 % EegLfpChTts= {"ECG"; "L1"};
 % EegLfpChTts= {"ECG"; "L2"};
  EegLfpChTts= {"ECG"; "L3"};
@@ -67,31 +67,31 @@ stShuffle=-3; % 1 Shuffle 1st chan
 
 
 NewSR=300;
-stfr=1;   enfr=90; dfr=1;
+stfr=0.2;   enfr=30; dfr=0.2;
 Frqs=stfr:dfr:enfr;
 if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
-tWidth   = 3;
-tOffset  = 1.5;
+tWidth   = 1.5;
+tOffset  = 0.4;
 tSmtEvWv = 0.1;
 stZscoreWave=1;
 
 DcRemHpFlt=0.1;  % global dc remove
-Fhp=1;  % high pass filter
+Fhp=0.1;  % high pass filter
 Flp=-80;  % high pass filter
 
 stIIRPeakSpec=1;  % 1-IIRPeak, other Wavlet
 FltPassDir='onepass'; % onepass  twopass
 
-BandWidth=3; % BandWidth in Hz; 
-Qfac     =3; % Attenuation in db(-Qfac)    
-WaveletnCyc=10;
+BandWidth=2; % BandWidth in Hz; 
+Qfac     =2; % Attenuation in db(-Qfac)    
+WaveletnCyc=6;
 WaveletgWidth=3;
         
-tSmSpc=0.1;
-tSmPsi =0.1;
-tCircMean=0.1; % for By TRials calc
-tCohTm=0.2; 
+tSmSpc=0.05;
+tSmPsi =0.05;
+tCircMean=0.05; % for By TRials calc
+tCohTm=0.05; 
 tCohStep=0.05;
 
 stMapsLinesEPs =1;  % = 1 Plots Maps, Other - Lines
@@ -314,6 +314,7 @@ stMapsLinesEPs=1;
     CohTimTtl=sprintf("%s, tCoh= %5.2f, tStep=%5.2f",CohTimTtl,tCohTm,tCohStep);
     [FrsTmPsiTime,FrsTmPhaTime,TmAxisCoh]=Get_PSI_ByTime(Ch1EvsFrsTmPha,Ch2EvsFrsTmPha,SR,TmAxis,tCohTm,tCohStep);
     disp("Get_PSI_ByTime is OK");
+
 %%
     clear plotinfo;
     plotinfo.fName=xFileName+", EvCh:"+EvChansTtl;
@@ -384,10 +385,10 @@ stZscoreSpc=-1;
     plotinfo.FrqMean=2;
     
     plotinfo.stMapsLines=stMapsLinesCoh; % 1- plot Maps, other - plot Lines
-    plotinfo.FigSize=[1013 532 866 428]; % 45 611 918 484];
+    plotinfo.FigSize=[1013 66 866 894]; % 45 611 918 484];
     u = plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);
     
-    gr1= fullfile('F:\HeadHeart\2_results\itc', [xFileName{1} '_ITC.png']);
+    gr1 = fullfile('F:\HeadHeart\2_results\itc' ,strjoin({char(xFileName{1}), '_ITC_', char(EegLfpChTts{1}), 'vs.', char(EegLfpChTts{2}), '.png'}, ''));
     exportgraphics(u,gr1, 'Resolution', 300)
     %
     %plotinfo.stMapsLines=2; % 1- plot Maps, other - plot Lines

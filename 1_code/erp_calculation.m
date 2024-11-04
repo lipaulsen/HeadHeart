@@ -174,7 +174,7 @@ for med = 1:2
 
 
             % Average over all trials
-            ERP_average = mean(ERP_epochs, 3);  % Averaging across the 3rd dimension (trials)
+            ERP_avg.data = mean(ERP_epochs, 3);  % Averaging across the 3rd dimension (trials)
 
             % Save the ERP for the current subject
             ERP.(med_name).(subject) = 
@@ -189,7 +189,7 @@ for med = 1:2
                 subplot(3, 5, (row - 1) * 5 + col)
 
                 % Plot the ERP per channel for 1 subj
-                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_average(chan, :));
+                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_avg.data(chan, :));
                 hold on
                 xline(0, "--", 'Color', 'k', 'LineWidth', 1); % vertical line at time-lock
 
@@ -226,7 +226,7 @@ for med = 1:2
             for chan = 1:7
                 hold on;
                 % Plot the averaged HEP for the current channel
-                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_average(chan, :), 'Color', colors(chan, :), 'DisplayName', SmrData.WvTits{chan});
+                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_avg.data(chan, :), 'Color', colors(chan, :), 'DisplayName', SmrData.WvTits{chan});
             end
             xline(0, 'k--', 'LineWidth', 1.5); % Dashed vertical line at time = 0
             % Set X-Ticks
@@ -250,7 +250,7 @@ for med = 1:2
             for chan = 8:15
                 hold on;
                 % Plot the averaged HEP for the current channel
-                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_average(chan, :), 'Color', colors(chan, :), 'DisplayName', SmrData.WvTits{chan});
+                plot((time_wins_samples(1):time_wins_samples(2)) / SR * 1000, ERP_avg.data(chan, :), 'Color', colors(chan, :), 'DisplayName', SmrData.WvTits{chan});
 
             end
             xline(0, 'k--', 'LineWidth', 1.5); % Dashed vertical line at time = 0
@@ -282,11 +282,12 @@ for med = 1:2
 
             % Save the matrix as .mat file and the plots as .png
             fprintf('Saving ERPs and Plots for subject %s\n', subject);
-
+            ERP_avg.time_win = time_win;
+            ERP_avg.bsl = baseline_win;
 
             save_path = fullfile(subject_erp_folder, ['\', subject, '_ERP_win', num2str(time_win(1)), 'till', ...
                 num2str(time_win(2)),'s-', med_name, '_BSL_', baseline_name,'.mat']);
-            save(save_path, 'ERP_average');
+            save(save_path, 'ERP_avg');
 
         end
     end
