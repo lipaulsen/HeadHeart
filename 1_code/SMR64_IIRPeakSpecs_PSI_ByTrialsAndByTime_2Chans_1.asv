@@ -32,10 +32,6 @@ Lucia_Data_ECG={
  SG43, R1
  SG44, L1 and R3,
  SG46, L4,
- SG47 R4, L3
- Sg50 L3,R3
- SG52 R2
- SG56 L4, R1
  ]
 %%------------------------------------------------------------------------
 
@@ -53,9 +49,16 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"}; 
 % channel is the one the ITC will be calculated and plotted for. The second
 % channel will be disregarded in the ITC.
 
-
+%EegLfpChTts= {"ECG"; "R1"};
+% EegLfpChTts= {"ECG"; "R2"};
+% EegLfpChTts= {"ECG"; "R3"};
+ %EegLfpChTts= {"ECG"; "R4"};
+% EegLfpChTts= {"ECG"; "L1"};
+% EegLfpChTts= {"ECG"; "L2"};
  EegLfpChTts= {"L3"; "ECG"};
-
+% EegLfpChTts= {"ECG"; "L4"};
+%EegLfpChTts= {"R2"; "C3"};
+%EegLfpChTts= {"ECG"; "R2"};
 %%
 nSubs=length(FileNames)-1;
 
