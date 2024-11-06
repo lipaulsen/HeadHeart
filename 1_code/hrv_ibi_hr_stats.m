@@ -47,38 +47,46 @@ averaged_name = 'avg';  % averaged data folder (inside preprocessed)
 feature_name = 'features';  % feature extraction folder (inside derivatives)
 
 % Initialize how many subjects you will be looking at 
-n_sub_medon = 6;
-n_sub_medoff = 6;
+n_sub_medon = 1;
+n_sub_medoff = 1;
 
 
 %% ============================ 1. LOAD DATA =============================
-disp("************* STARTING Feature Extraction  *************");
+disp("************* Starting HRV IBI and HR Stats *************");
 
 
-fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+%fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
 
 % Load Med On
-subject_data = fullfile(data_dir, feature_name, averaged_name, ['Averages_', num2str(n_sub_medon), '_subjects_MedOn_Rest.mat']);
-load(subject_data, 'HRV');
-% give new name
-HRV_MedOn = HRV;
+subject_data = fullfile(data_dir, feature_name, averaged_name, ['Averages_HRV-IBI-HR_Rest.mat']);
+load(subject_data, 'HRV', 'IBI', 'HR');
 
-% Load Med Off
-subject_data = fullfile(data_dir, feature_name, averaged_name, ['Averages_', num2str(n_sub_medoff), '_subjects_MedOff_Rest.mat']);
-load(subject_data, 'HRV');
-% give new name
-HRV_MedOff = HRV;
+% plot(HRV_MedOn.rmssd_avg, 'k')
+% hold on
+% plot(HRV_MedOff.rmssd_avg, 'b')
+% legend('MedOn', 'MedOff')
+% label(['HRV RMSSD: t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p ='  num2str(p)])
 
-plot(HRV_MedOn.rmssd_avg, 'k')
-hold on
-plot(HRV_MedOff.rmssd_avg, 'b')
-legend('MedOn', 'MedOff')
-label(['HRV RMSSD: t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p ='  num2str(p)])
-
-[h, p, ci, stats] = ttest2(HRV_MedOn.rmssd_avg, HRV_MedOff.rmssd_avg, 'Tail','left', Vartype='equal')
-cohens_d = mean(HRV_MedOn.rmssd_avg-HRV_MedOff.rmssd_avg)/std(HRV_MedOn.rmssd_avg-HRV_MedOff.rmssd_avg)
+%% Stats
+% Paired TTest MedOn vs. Med Off HRV
+[h_hrv, p_hrv, ci_hrv, stats_hrv] = ttest2(HRV.rmssd_avg.MedOn, HRV.rmssd_avg.MedOff, 'Tail','left' , Vartype='equal');
+%cohens_d = mean(HRV.rmssd_avg.MedOn-HRV.rmssd_avg.MedOff)/std(HRV.rmssd_avg.MedOn-HRV.rmssd_avg.MedOff);
+sprintf(['t(' num2str(stats_hrv.df) ')=' num2str(stats_hrv.tstat) ', p='  num2str(p_hrv) ]) %', d=' num2str(cohens_d)])
+ 
+% Paired TTest MedOn vs. Med Off IBI
+[h_ibi, p_ibi, ci_ibi, stats_ibi] = ttest2(IBI.MedOn, IBI.MedOff, 'Tail', 'both', Vartype='equal');
+cohens_d = mean(IBI.MedOn-IBI.MedOff)/std(IBI.MedOn-IBI.MedOff);
 sprintf(['t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p='  num2str(p) ', d=' num2str(cohens_d)])
 
+% Paired TTest MedOn vs. Med Off HR
+[h_hr, p_hr, ci_hr, stats_hr] = ttest2(HR.MedOn, HR.MedOff, 'Tail', 'both', Vartype='equal');
+cohens_d = mean(HR.MedOn-HR.MedOff)/std(HR.MedOn-HR.MedOff);
+sprintf(['t(' num2str(stats.df) ')=' num2str(stats.tstat) ', p='  num2str(p) ', d=' num2str(cohens_d)])
+
+
+
+%% Plot 
+% Plot the HRV 
 f1 = figure;
 data = [HRV_MedOn.rmssd_avg', HRV_MedOff.rmssd_avg']*1000;
 face=[240/256, 130/256, 0; 30/256, 160/256, 200/256;];
@@ -97,6 +105,7 @@ for j = 1:size(data, 1)  % Loop through each individual
     plot(1:size(data, 2), data(j,:), ':ok', 'HandleVisibility', 'off');  % Line plot connecting data points across groups
 end
 
+% Save the Plot
 gr1 = fullfile(results_dir, feature_name, ['ViolinPlot_HRV_', num2str(length(subjects)),'_subjects_MedOnvs.MedOff.pdf']);
 try
     exportgraphics(f1, gr1, "Resolution", 300, "padding", "figure");

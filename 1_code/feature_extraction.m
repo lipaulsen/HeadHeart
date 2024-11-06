@@ -18,13 +18,13 @@
 % Preprocessed data (EEG, LFP, ECG) from .mat file
 %
 % Outputs:    Features extracted from the data in .mat files
-% - ECG: IBI.data(sub, :), HRV, HF-HRV, LF-HRV
+% - ECG: IBI(sub, :), HRV, HF-HRV, LF-HRV
 % - EEG & LFP: Power of delta, theta, alpha, beta, gamma bands for all electrodes
 
 % Steps:
 % 1. LOAD DATA
 % 2. FEATURE EXTRACTION ECG
-%   2a. Calculate HRV features from IBI.data(sub, :) data
+%   2a. Calculate HRV features from IBI(sub, :) data
 %   2b. Save HRV features in a tsv file
 %   2c. Plot HRV features
 % 3. FEATURE EXTRACTION EEG
@@ -114,7 +114,7 @@ colors.EEG.delta = [ 0.9490    0.8000    0.5608];  % Yellow
 
 
 % Features for averaging across participants
-features_averaging.ecg = {'IBI.data(sub, :)', 'hrv', 'lf-hrv', 'hf-hrv'};
+features_averaging.ecg = {'IBI(sub, :)', 'hrv', 'lf-hrv', 'hf-hrv'};
 features_averaging.eeg = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
 
 % Suppress excessive logging if using FieldTrip
@@ -136,11 +136,11 @@ channels = "";
 HRV.rmssd_avg = []; %
 HRV.rmssd_tits{1} = {'HRV Average of subj'};
 
-IBI.data = [];
+IBI = [];
 
-HR.hr_avg = [];
+HR = [];
 
-for fn = 2 % MedOn
+for fn = 1:2 % MedOn
     subfname = subfnames{fn};
     for sub = 1:numel(subjects.(subfname))
         % Extract the subject
@@ -171,18 +171,20 @@ for fn = 2 % MedOn
         disp('Calculating HRV...');
 
         % For HRV we will use the Raw ECG Signal (not the cleaned one)
-        IBI.data.(subfname)(sub, :) = SmrData.EvData.ECGcomp(1,:);
+        IBI.(subfname){sub, :} = SmrData.EvData.ECGcomp(1,:);
+        HR.(subfname){sub, :} = SmrData.EvData.ECGcomp(2,:);
+
 
         % Calculate RMSSD HRV (Time-Range)
-        HRV.rmssd_avg.(subfname)(1,sub) = sqrt(mean(diff(IBI.data.(subfname)(sub, :)).^2));% average HRV rmssd over all IBI
+        HRV.rmssd_avg.(subfname)(1,sub) = sqrt(mean(diff(IBI.(subfname){sub, :}).^2));% average HRV rmssd over all IBI
 
 
         % Calculate Rolling RMSSD HRV
         % RMSSD = Root Mean Square of Successive Differences.
         % comuptes a rolling RMSSD without overlap
 
-        dRR = diff(IBI.data.(subfname)(sub, :)).^2;
-        averaged_window = NaN(length(IBI.data.(subfname)(sub, :)),window_length_hrv);
+        dRR = diff(IBI.(subfname){sub, :}).^2;
+        averaged_window = NaN(length(IBI.(subfname){sub, :}),window_length_hrv);
         for j=1:window_length_hrv
             averaged_window(j+1:end,j) = dRR(1:end-j+1);
         end
@@ -285,18 +287,19 @@ end
 %% HRV AVERAGE / DESCRIPTIVE STATS
 
 % Extractiung Mean, Median, Mode and Standard Deviation for the RMSSD HRV For all Participants
-for fn = 1:numel(fieldnames(HRV.rmssd_avg))
-
-HRV.mean = mean(HRV.rmssd_avg.; % Mean
-HRV.std = std(HRV.rmssd_avg.(fn)); % STD
-HRV.median = median(HRV.rmssd_avg); % Median
-HRV.mode = mode(HRV.rmssd_avg); % Mode
-HRV.variance = var(HRV.rmssd_avg); % Variance
-%HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
-%ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
-%HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI
-end 
-% figure
+% for fn = 1:2 % Med On and Med Off
+%     subfname = subfnames{fn};
+%     HRV.mean = mean(HRV.rmssd_avg.(subfname)); % Mean
+%     HRV.std = std(HRV.rmssd_avg.(subfname)); % STD
+%     HRV.median = median(HRV.rmssd_avg.(subfname)); % Median
+%     HRV.mode = mode(HRV.rmssd_avg).(subfname); % Mode
+%     HRV.variance = var(HRV.rmssd_avg).(subfname); % Variance
+%     %HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
+%     %ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
+%     %HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI
+% 
+% end
+% % figure
 % errorbar(HRV.mean, 1,  HRV.CI, 'horizontal', 'o')
 % ylim([0.5 1.5]); % Keep y-axis focused on the single point
 % yticks([]); % Remove y-axis ticks for a cleaner look
@@ -304,11 +307,11 @@ end
 % ylabel('Mean RMSSD HRV');
 % title('Mean RMSSD HRV with 95% Confidence Interval');
 
-save_path = fullfile(avg_features_folder, ['Averages_', num2str(length(subjects)),'_subjects_', med_name, '_Rest.mat']); % med_name needs an alternative here 
-save(save_path, 'HRV', 'IBI.data(sub, :)', 'HR');
+save_path = fullfile(avg_features_folder, ['Averages_HRV-IBI-HR_Rest.mat']); % med_name needs an alternative here 
+save(save_path, 'HRV', 'IBI', 'HR');
 
 %% 3a. HRV Averages
-disp('time_freq_decomp() done!');
+disp('feature extraction done!');
 
 
 
