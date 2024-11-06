@@ -106,7 +106,7 @@ for fn = 1:2
         % Extract the subject
         subject = subjects.(subfname){sub};
 
-        fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects.(subfname)));
+        fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects));
 
         % Load subject data
         subject_data = fullfile(data_dir, rawdata_name, [subject, '_', subfname, '_Rest.mat']);
@@ -443,5 +443,3 @@ for fn = 1:2
 
     end
 end
-
-disp('PREPROCESSING DONE!');

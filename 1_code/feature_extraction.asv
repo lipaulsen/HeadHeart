@@ -286,16 +286,16 @@ end
 
 % Extractiung Mean, Median, Mode and Standard Deviation for the RMSSD HRV For all Participants
 for fn = 1:numel(fieldnames(HRV.rmssd_avg))
-
-HRV.mean = mean(HRV.rmssd_avg.; % Mean
-HRV.std = std(HRV.rmssd_avg.(fn)); % STD
-HRV.median = median(HRV.rmssd_avg); % Median
-HRV.mode = mode(HRV.rmssd_avg); % Mode
-HRV.variance = var(HRV.rmssd_avg); % Variance
-%HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
-%ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
-%HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI
-end 
+    subfname = subfnames{fn};
+    HRV.mean = mean(HRV.rmssd_avg.; % Mean
+    HRV.std = std(HRV.rmssd_avg.(fn)); % STD
+    HRV.median = median(HRV.rmssd_avg); % Median
+    HRV.mode = mode(HRV.rmssd_avg); % Mode
+    HRV.variance = var(HRV.rmssd_avg); % Variance
+    %HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
+    %ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
+    %HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI
+end
 % figure
 % errorbar(HRV.mean, 1,  HRV.CI, 'horizontal', 'o')
 % ylim([0.5 1.5]); % Keep y-axis focused on the single point
