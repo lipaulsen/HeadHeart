@@ -371,7 +371,7 @@ stMapsLinesEPs=1;
     % Calculate IBI
     IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
     % Calc the Perm Stats for PSI by Trials across trial
-    [PItc, PItcFdr] = ITC_permutation_test(FrsTmPsiTrial, IBI, nperm, Frqs, TmAxis, SR);
+    [PItc, PItcFdr] = ITC_permutation_test(FrsTmPsiTrial, ChDta, IBI, nperm, Frqs, TmAxis, SR);
 
     numTrls = size(reshapedMat,1);
 
