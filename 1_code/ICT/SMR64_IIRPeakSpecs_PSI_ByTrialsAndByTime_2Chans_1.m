@@ -368,8 +368,9 @@ stMapsLinesEPs=1;
     CohItcTtl="ITC Trials";
     if tCircMean  > 0  CohItcTtl=sprintf("%s, tMean=%5.2f",CohItcTtl,tCircMean); end
 
-    [FrsTmItc]=Get_PSI_ByTrials_ITC(Ch1EvsFrsTmPha,SR,tCircMean);
-    fprintf("Get_ICT_ByTrials for %s is OK \n", (ChsTtl{1}))
+    [FrsTmItc1]=Get_PSI_ByTrials_ITC(Ch1EvsFrsTmPha,SR,tCircMean);
+    [FrsTmItc2]=Get_PSI_ByTrials_ITC(Ch2EvsFrsTmPha,SR,tCircMean);
+    fprintf("Get_ICT_ByTrials for %s and %s is OK \n", (ChsTtl{1}), (ChsTtl{2}))
 
 %%
     clear plotinfo;
@@ -426,7 +427,8 @@ stZscoreSpc=-1;
 
     % Intro the ITC for plotting
     plotinfo.CohItcTtl=CohItcTtl;
-    plotinfo.CohTrsItc=FrsTmItc;
+    plotinfo.CohTrsItc1=FrsTmItc1;
+    plotinfo.CohTrsItc2=FrsTmItc2;
     plotinfo.CohItcAxis=TmAxis;
    
     
