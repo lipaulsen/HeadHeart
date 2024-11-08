@@ -114,11 +114,10 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
     plot(Frqs, ChsEvsFrsPds(1, :), 'b', 'LineWidth', 1);
     hold on;
     if DataInfo.Title2 ~= "ECG"
-        plot(Frqs, ChsEvsFrsPds(2, :), 'k', 'LineWidth', 1); 
+        plot(Frqs, ChsEvsFrsPds(2, :), 'k', 'LineWidth', 2); 
         txt=sprintf('PSD for %s and %s', DataInfo.Title1,  DataInfo.Title2);
     end
     xlabel('Frequency (Hz)'); ylabel('Power (Magnitude^2)');
-     if numel(findall(gca,'type','line')) == 2; legend(DataInfo.Title1, DataInfo.Title2); else; legend(DataInfo.Title1);end
     title(txt);
     hold off;
 
@@ -130,24 +129,24 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
     yyaxis left
     ave1=mean(Ch1EvsData,1);
     plot(DataInfo.TmAxis,ave1,'k','LineWidth',1); hold on;
+    ylim([min(ave1), max(ave1)]);
     set(gca, 'YColor', 'k');
     ylabel('Amplitude (in Uv)');
-    txt=sprintf('%s ERP n=%d and %s Average', DataInfo.Title1,  nEvs,  DataInfo.EcgTitle);
     if DataInfo.Title2 ~= "ECG"
         ave3=mean(Ch2EvsData,1);
-        plot(DataInfo.TmAxis,ave3,'-b','LineWidth',1);
+        plot(DataInfo.TmAxis,ave3,'b','LineWidth',1);
+        ylim([min(ave3), max(ave3)]);
         txt=sprintf('%s and %s ERP n=%d and %s Average', DataInfo.Title1, DataInfo.Title2,  nEvs,  DataInfo.EcgTitle);
     end
-    if min(ave1) && max(ave1) > min(ave3) && max(ave3); ylim([min(ave1), max(ave1)]); else; ylim([min(ave3), max(ave3)]); end
+    if max(ave1) & mac(a)
     % plot the avg ECG 
     yyaxis right
     ave2=mean(DataInfo.EvEcgData,1);
     plot(DataInfo.TmAxis,ave2,'r','LineWidth',1);
     ylim([min(ave2), max(ave2)]);
     xline(0, "--k", 'LineWidth', 2);
-    if numel(findall(gca,'type','line')) == 3; legend(DataInfo.Title1, DataInfo.Title2, 'ECG'); else; legend(DataInfo.Title1, 'ECG');end
     set(gca, 'YColor', 'r');
-    
+    txt=sprintf('%s ERP n=%d and %s Average', DataInfo.Title1,  nEvs,  DataInfo.EcgTitle);
     % if the second channel is not ECG then plot the ERP too
   
     xlim([DataInfo.TmAxis(1) DataInfo.TmAxis(end)]);

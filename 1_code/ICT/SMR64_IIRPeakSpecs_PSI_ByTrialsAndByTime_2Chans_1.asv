@@ -54,7 +54,7 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"}; 
 % channel will be disregarded in the ITC.
 
 
- EegLfpChTts= {"L3"; 'C3'};
+ EegLfpChTts= {'L3'; 'C3'};
 
 %%
 nSubs=length(FileNames)-1;
@@ -76,8 +76,8 @@ stShuffle=-3; % 1 Shuffle 1st chan
              % Other: NOT shuffle
 
 
-NewSR=300;
-stfr=0.2;   enfr=30; dfr=0.2;
+NewSR=30;
+stfr=0.2;   enfr=20; dfr=0.2;
 Frqs=stfr:dfr:enfr;
 if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
@@ -87,8 +87,8 @@ tSmtEvWv = 0.1;
 stZscoreWave=1;
 
 DcRemHpFlt=0.1;  % global dc remove
-Fhp=0.1;  % high pass filter
-Flp=-80;  % high pass filter
+Fhp=0.5;  % high pass filter
+Flp=1.5;  % low pass filter
 
 stIIRPeakSpec=1;  % 1-IIRPeak, other Wavlet
 FltPassDir='onepass'; % onepass  twopass
@@ -97,6 +97,8 @@ BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)    
 WaveletnCyc=6;
 WaveletgWidth=3;
+
+permstats = false; % if false then don't calculate them
         
 tSmSpc=0.05;
 tSmPsi =0.05;
@@ -368,12 +370,6 @@ stMapsLinesEPs=1;
     [FrsTmPsiTime,FrsTmPhaTime,TmAxisCoh]=Get_PSI_ByTime(Ch1EvsFrsTmPha,Ch2EvsFrsTmPha,SR,TmAxis,tCohTm,tCohStep);
     disp("Get_PSI_ByTime is OK");
 
-    % Calculate IBI
-    IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
-    % Calc the Perm Stats for PSI by Trials across trial
-    [PItc, PItcFdr] = ITC_permutation_test(FrsTmPsiTrial, ChDta, IBI, nperm, Frqs, TmAxis, SR);
-
-    numTrls = size(reshapedMat,1);
 
 %% Calc Itc for one Channel by Trials 
     CohItcTtl="ITC Trials";
@@ -382,9 +378,20 @@ stMapsLinesEPs=1;
     [FrsTmItc1]=Get_PSI_ByTrials_ITC(Ch1EvsFrsTmPha,SR,tCircMean);
     [FrsTmItc2]=Get_PSI_ByTrials_ITC(Ch2EvsFrsTmPha,SR,tCircMean);
     fprintf("Get_ICT_ByTrials for %s and %s is OK \n", (ChsTtl{1}), (ChsTtl{2}))
+    
+    if permstats
+        % Calculate IBI
+        IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
+        % Calc the Perm Stats for PSI by Trials across trial
+        [PItc1] = ITC_permutation_test(FrsTmItc1, ChDta, IBI, nperm, Frqs, TmAxis, SR);
+        [PItc2] = ITC_permutation_test(FrsTmItc2, ChDta, IBI, nperm, Frqs, TmAxis, SR);
 
-    % Calc the Perm Stats for this 
-
+        % Save these values to load in since this takes ages
+        PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
+        save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
+        save(save_path, 'PItc');
+    end
+   
 
 %%
     clear plotinfo;
