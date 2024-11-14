@@ -18,7 +18,7 @@ close all
 % set the directory to best fit your path 
 
 % Define if using Windows or Mac
-windows = false; % if true then Windows if false then Mac
+windows = true; % if true then Windows if false then Mac
 
 if windows
     % Lisas Path Lab on Windows
@@ -39,7 +39,8 @@ end
 subjects.MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
 subjects.MedOn = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
 subjects.all = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
-subjects.goodHeart = {'SG041', 'SG043', 'SG045', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
+subjects.goodHeartMOn = {'SG041', 'SG043', 'SG045', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
+subjects.goodHeartMOff = {'SG041', 'SG043', 'SG047', 'SG050', 'SG052', 'SG056'};
 %subjects = subjects_MedOn;
 
 MedFlag = {'MedOn', 'MedOff'}; % MedOn or MedOff

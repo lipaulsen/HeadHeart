@@ -1,4 +1,4 @@
-function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = getSignifClusters(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA)
+function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = getSignifClusters_ITC(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA)
     % GETSIGNIFCLUSTERS Find significant clusters (in original data) based on 
     % clusters obtained by a permutation procedure
     % (based on Maris & Oostenveld (2007) J Neurosci Meth 164:177-190)
@@ -35,14 +35,16 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
     numPerms = size(p_perm, 1);
 
     % get all pre-cluster thresholds in the orignal sample
-    [clusLabel, numClus] = getPosAndNegClusters(p_sig, zscores, THRESH_SUPRACLUSTER);
+    [clusLabel, numClus] = getUnidirectionalClusters(p_sig, zscores, THRESH_SUPRACLUSTER); % Identify all supra-threshold clusters
+    
+    %[clusLabel, numClus] = getPosAndNegClusters(p_sig, zscores, THRESH_SUPRACLUSTER);
 
     clus_Z_Stat   = zeros(1, numClus);
     clus_clusSize = zeros(1, numClus);
     % for each supra-threshold cluster, sum up the z-scores or the number
     % of pixels in this cluster
     for c = 1:numClus
-        clus_Z_Stat(c)   = sum(abs(zscores(clusLabel == c))); % abs() for two-tailed testing
+        clus_Z_Stat(c)   = sum(zscores(clusLabel == c)); % abs() for two-tailed testing
         clus_clusSize(c) = sum(clusLabel(:) == c);
     end
 
@@ -56,13 +58,13 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
     % parfor (i=1:size(p_perm, 1) , pool.NumWorkers)
     for i = 1:size(p_perm, 1)
         if mod(i, 500) == 0; fprintf(['   ' num2str(i)]);  end
-        [clusLabel_perm, numClus_perm] = getPosAndNegClusters(squeeze(p_perm(i,:,:)), squeeze(zscores_perm(i,:,:)), THRESH_SUPRACLUSTER);
+        [clusLabel_perm, numClus_perm] = getUnidirectionalClusters(squeeze(p_perm(i,:,:)), squeeze(zscores_perm(i,:,:)), THRESH_SUPRACLUSTER);
         
         permClus_clusSize = zeros(1, numClus_perm);
         permClus_Z_Stat   = zeros(1, numClus_perm);
         % get the summed cluster stats
         for c = 1:numClus_perm
-            permClus_Z_Stat(c)   = sum(abs(zscores_perm(i, clusLabel_perm == c))); % abs() for two-tailed testing
+            permClus_Z_Stat(c)   = sum(zscores_perm(i, clusLabel_perm == c)); % abs() for two-tailed testing but I have unidirectional data so no abs()
             permClus_clusSize(c) = sum(clusLabel_perm(:) == c);
         end
         
@@ -119,8 +121,8 @@ function [clusLabel, numClus] = getPosAndNegClusters(p_sig, zscores, THRESH_SUPR
     % numClus   - Number of clusters
 
     % threshold the data
-    %p_subThreshold = p_sig < THRESH_SUPRACLUSTER;
-    zscores_thresh = zscores.*p_sig;
+    p_subThreshold = p_sig < THRESH_SUPRACLUSTER;
+    zscores_thresh = zscores.*p_subThreshold;
     % find the negative and positive clusters separately
     [clusNegative, numClus1] = bwlabeln(zscores_thresh < 0);
     [clusPositive, numClus2] = bwlabeln(zscores_thresh > 0);
@@ -128,4 +130,25 @@ function [clusLabel, numClus] = getPosAndNegClusters(p_sig, zscores, THRESH_SUPR
     clus_tmp(clusPositive == 0) = 0;   % and make sure to set old 0s back to 0s
     clusLabel = clusNegative + clus_tmp;
     numClus = numClus1 + numClus2;
+end
+
+function [clusLabel, numClus] = getUnidirectionalClusters(p_sig, zscores, THRESH_SUPRACLUSTER)
+    % GETUNIDIRECTIONALCLUSTERS Find significant clusters based on z-scores
+    % for unidirectional data.
+    % INPUTS
+    % p_sig             - significance matrix (FREQ x TIME)
+    % zscores           - z-scores (e.g., ITC or other measure) for cluster detection
+    % THRESH_SUPRACLUSTER - significance threshold to determine supra-threshold clusters (default 0.05)
+    %
+    % OUTPUTS
+    % clusLabel         - Cluster labels (each cluster is labeled as an integer number starting at 1)
+    % numClus           - Number of clusters
+
+    % threshold the data
+    %p_subThreshold = p_sig < THRESH_SUPRACLUSTER; % Apply significance threshold
+    zscores_thresh = zscores .* p_sig ; % Mask the z-scores based on significance
+    
+    % Find the supra-threshold clusters (all positive values for unidirectional data)
+    [clusLabel, numClus] = bwlabeln(zscores_thresh > 0); % Only positive clusters are of interest
+
 end

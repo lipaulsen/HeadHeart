@@ -109,7 +109,7 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
 % 
     %% Plot PSD 
     txt=sprintf('PSD for %s', DataInfo.Title1);
-    subplot(5,1,1);
+    subplot(7,1,1);
     ChsEvsFrsPds = squeeze(mean(mean(DataInfo.ChsEvsFrsTmSpc.^2, 2), 4)); % Average over Time and Events 
     plot(Frqs, ChsEvsFrsPds(1, :), 'b', 'LineWidth', 1);
     hold on;
@@ -125,7 +125,7 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
 
     %% Plot the ERP and Average ECG 
 
-    subplot(5,1,2);
+    subplot(7,1,2);
     % here comes the ERP Code
     yyaxis left
     ave1=mean(Ch1EvsData,1);
@@ -155,66 +155,74 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
     hold off;
 %%
 % 
-   % %subplot(2,3,1); 
-   % subplot(2,2,1);
-   % txt=sprintf('%s, %s, %s=%d',DataInfo.Title1,SpecsTtl,DataInfo.EvTitle,nEvs);
-   % xpow=DataInfo.PowData1;
-   % if stMapsLines == 1
-   %     imagesc(DataInfo.TmAxis,Frqs,xpow); axis xy; 
-   %     colormap(DataInfo.ColorMap);
-   %     if stPowColorAxis > 0; clim([PowMin PowMax]); end
-   %     colorbar;
-   % else
-   %     hold on;
-   %     for il=1:nLns
-   %         nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
-   %         nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
-   %         dx=mean(xpow(nst:nen,:),1);
-   %         plot(DataInfo.TmAxis,dx,LinesClx(il));
-   %     end
-   %     legend(LinesTtl); legend("boxoff");
-   %     if stPowColorAxis > 0; ylim([PowMin PowMax]); end
-   %     xlim([DataInfo.TmAxis(1) DataInfo.TmAxis(end)]);
-   %     grid on;
-   % end
-   % title(txt); 
+   %subplot(2,3,1); 
+   subplot(7,1,6);
+   txt=sprintf('%s, %s, %s=%d',DataInfo.Title1,SpecsTtl,DataInfo.EvTitle,nEvs);
+   xpow=DataInfo.PowData1;
+   if stMapsLines == 1
+       imagesc(DataInfo.TmAxis,Frqs,xpow); axis xy; 
+       colormap(DataInfo.ColorMap);
+       if stPowColorAxis > 0; clim([PowMin PowMax]); end
+       colorbar;
+       xline(0, "--k", 'LineWidth', 2);
+   else
+       hold on;
+       for il=1:nLns
+           nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
+           nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
+           dx=mean(xpow(nst:nen,:),1);
+           plot(DataInfo.TmAxis,dx,LinesClx(il));
+       end
+       legend(LinesTtl); legend("boxoff");
+       if stPowColorAxis > 0; ylim([PowMin PowMax]); end
+       xlim([DataInfo.TmAxis(1) DataInfo.TmAxis(end)]);
+       grid on;
+   end
+   title(txt); 
 
    % subplot(2,3,4); 
-   % subplot(3,1,1);
-   % txt=sprintf('%s, %s, %s=%d',DataInfo.Title2,SpecsTtl,DataInfo.EvTitle,nEvs);
-   % xpow=DataInfo.PowData2;
-   % if stMapsLines == 1
-   %     imagesc(DataInfo.TmAxis,Frqs,xpow); axis xy; 
-   %     colormap(DataInfo.ColorMap);
-   %     if stPowColorAxis > 0; clim([PowMin PowMax]); end
-   %     colorbar;
-   %     xline(0, "--k", 'LineWidth', 2);
-   % else
-   %     hold on;
-   %     for il=1:nLns
-   %         nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
-   %         nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
-   %         dx=mean(xpow(nst:nen,:),1);
-   %         plot(DataInfo.TmAxis,dx,LinesClx(il));
-   %     end
-   %     legend(LinesTtl); legend("boxoff");
-   %     if stPowColorAxis > 0; ylim([PowMin PowMax]); end
-   %     xlim([DataInfo.TmAxis(1) DataInfo.TmAxis(end)]);
-   %     grid on;
-   % end
-   % title(txt);
+   subplot(7,1,7);
+   txt=sprintf('%s, %s, %s=%d',DataInfo.Title2,SpecsTtl,DataInfo.EvTitle,nEvs);
+   xpow=DataInfo.PowData2;
+   if stMapsLines == 1
+       imagesc(DataInfo.TmAxis,Frqs,xpow); axis xy; 
+       colormap(DataInfo.ColorMap);
+       if stPowColorAxis > 0; clim([PowMin PowMax]); end
+       colorbar;
+       xline(0, "--k", 'LineWidth', 2);
+   else
+       hold on;
+       for il=1:nLns
+           nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
+           nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
+           dx=mean(xpow(nst:nen,:),1);
+           plot(DataInfo.TmAxis,dx,LinesClx(il));
+       end
+       legend(LinesTtl); legend("boxoff");
+       if stPowColorAxis > 0; ylim([PowMin PowMax]); end
+       xlim([DataInfo.TmAxis(1) DataInfo.TmAxis(end)]);
+       grid on;
+   end
+   title(txt);
 
    %% Plot Trial ITC Data
    xttl=DataInfo.CohItcTtl;
    xaxi=DataInfo.CohItcAxis;
 
    % subplot(2,3,2);
-   subplot(5,1,3);
+   subplot(7,1,3);
    txt=sprintf('%s, %s',DataInfo.Title1,xttl);
-   xdta=DataInfo.CohTrsItc1;
+   xdta=DataInfo.CohTrsItc1; 
+   if DataInfo.permstats
+       if sum(DataInfo.Itc1_clusPos_Z_Stat(:)) > 0
+           contour(DataInfo.Itc1_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 0.9);
+           imagesc(xaxi,Frqs,DataInfo.Itc1_clusPos_Z_Stat);axis xy;
+       end
+   end
    if stMapsLines == 1
        imagesc(xaxi,Frqs,xdta); axis xy;
-       colormap(DataInfo.ColorMap);
+       colormap(DataInfo.ColorMap)
+      
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);
        end
@@ -238,12 +246,17 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
 
 %% Plot ITC for 2nd Channel
 
-   subplot(5,1,4);
+   subplot(7,1,4);
    txt=sprintf('%s, %s',DataInfo.Title2,xttl);
    xdta=DataInfo.CohTrsItc2;
    if stMapsLines == 1
        imagesc(xaxi,Frqs,xdta); axis xy;
        colormap(DataInfo.ColorMap);
+       if DataInfo.permstats  
+           if sum(DataInfo.Itc2_clusPos_Z_Stat(:)) > 0
+               contour(DataInfo.Itc2_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 1.1);
+           end
+       end
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);
        end
@@ -270,12 +283,18 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    xaxi=DataInfo.CohTrsAxis;
 
    % subplot(2,3,2);
-   subplot(5,1,5);
+   subplot(7,1,5);
    txt=sprintf('%s-%s, %s',DataInfo.Title1,DataInfo.Title2,xttl);
    xdta=DataInfo.CohTrsPsi;
    if stMapsLines == 1
        imagesc(xaxi,Frqs,xdta); axis xy;
        colormap(DataInfo.ColorMap);
+       if DataInfo.permstats  
+           if sum(DataInfo.Itc2_clusPos_Z_Stat(:)) > 0
+               contour(DataInfo.Ccc_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 1.1);
+               imagesc(xaxi,Frqs,DataInfo.Ccc_clusPos_Z_Stat);axis xy;
+           end
+       end
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);
        end
@@ -297,37 +316,37 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    xlabel('Time (in s)'); ylabel('Frequency (in Hz)');
    title(txt);
 
+   % 
+   % %subplot(2,3,3); 
+   % subplot(6,1,6);
+   % txt=sprintf('%s-%s, PhasDf  Trials',DataInfo.Title1,DataInfo.Title2);
+   % xdta=DataInfo.CohTrsPha;
+   % if stMapsLines == 1
+   %     imagesc(xaxi,Frqs,xdta); axis xy; 
+   %     colormap(DataInfo.ColorMap);
+   %     clim([-180 180]);
+   %     colorbar;
+   % else
+   %     hold on;
+   %     for il=1:nLns
+   %         nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
+   %         nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
+   %         dx=mean(xdta(nst:nen,:),1);
+   %         plot(xaxi,dx,LinesClx(il));
+   %     end
+   %     legend(LinesTtl); legend("boxoff");
+   %     ylim([-180 180]);
+   %     xlim([xaxi(1) xaxi(end)]);
+   %     grid on;
+   % end
+   % title(txt);   
 
-   %subplot(2,3,3); 
-%    subplot(2,2,3);
-%    txt=sprintf('%s-%s, PhasDf  Trials',DataInfo.Title1,DataInfo.Title2);
-%    xdta=DataInfo.CohTrsPha;
-%    if stMapsLines == 1
-%        imagesc(xaxi,Frqs,xdta); axis xy; 
-%        colormap(DataInfo.ColorMap);
-%        clim([-180 180]);
-%        colorbar;
-%    else
-%        hold on;
-%        for il=1:nLns
-%            nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
-%            nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
-%            dx=mean(xdta(nst:nen,:),1);
-%            plot(xaxi,dx,LinesClx(il));
-%        end
-%        legend(LinesTtl); legend("boxoff");
-%        ylim([-180 180]);
-%        xlim([xaxi(1) xaxi(end)]);
-%        grid on;
-%    end
-%    title(txt);   
-% 
 % %  Time PSI Data
 %    xttl=DataInfo.CohTimTtl;
 %    xaxi=DataInfo.CohTimAxis;
 % 
 %    %subplot(2,3,5);
-%    subplot(3,1,3);
+%    subplot(7,1,7);
 %    txt=sprintf('%s-%s, %s',DataInfo.Title1,DataInfo.Title2,xttl);
 %    xdta=DataInfo.CohTimPsi; 
 %    if stMapsLines == 1
@@ -353,27 +372,27 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
 %    end
 %    title(txt); 
 %    xlabel(FigTtl);
-   % 
-   % subplot(2,3,6); 
-   % txt=sprintf('%s-%s, PhasDf  Time',DataInfo.Title1,DataInfo.Title2);
-   % xdta=DataInfo.CohTimPha;
-   % if stMapsLines == 1
-   %     imagesc(xaxi,Frqs,xdta); axis xy; 
-   %     colormap(DataInfo.ColorMap);
-   %     clim([-180 180]);
-   %     colorbar;
-   % else
-   %     hold on;
-   %     for il=1:nLns
-   %         nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
-   %         nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
-   %         dx=mean(xdta(nst:nen,:),1);
-   %         plot(xaxi,dx,LinesClx(il));
-   %     end
-   %     legend(LinesTtl); legend("boxoff");
-   %     ylim([-180 180]);
-   %     xlim([xaxi(1) xaxi(end)]);
-   %     grid on;
-   % end
-   % title(txt); 
-   
+% 
+%    subplot(2,3,6); 
+%    txt=sprintf('%s-%s, PhasDf  Time',DataInfo.Title1,DataInfo.Title2);
+%    xdta=DataInfo.CohTimPha;
+%    if stMapsLines == 1
+%        imagesc(xaxi,Frqs,xdta); axis xy; 
+%        colormap(DataInfo.ColorMap);
+%        clim([-180 180]);
+%        colorbar;
+%    else
+%        hold on;
+%        for il=1:nLns
+%            nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
+%            nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
+%            dx=mean(xdta(nst:nen,:),1);
+%            plot(xaxi,dx,LinesClx(il));
+%        end
+%        legend(LinesTtl); legend("boxoff");
+%        ylim([-180 180]);
+%        xlim([xaxi(1) xaxi(end)]);
+%        grid on;
+%    end
+%    title(txt); 
+% 

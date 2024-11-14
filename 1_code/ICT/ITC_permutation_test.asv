@@ -1,114 +1,149 @@
-function [p_values, clusPos_Z_Stat, clusPval_Z_Stat] = ITC_permutation_test(original_ITC, ChDta, ibi_series, numPerms, freq_bins, time_bins, SR)
-    % INPUTS:
-    % original_ITC - Original inter-trial coherence values [Freq x Time]
-    % ibi_series - Vector of interbeat intervals (IBIs) for R-peaks
-    % numPerms - Number of permutations (e.g., 1000)
-    % freq_bins, time_bins - The frequency and time bins for analysis
-    
-    % OUTPUTS:
-    % p_values - Raw p-values (Freq x Time)
+function [clusPos_Z_Stat, clusPval_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ITC_permutation_test(original_ITC, ChDta, ibi_series, numPerms, freq_bins, time_bins, SR)
+% INPUTS:
+% original_ITC - Original inter-trial coherence values [Freq x Time]
+% ibi_series - Vector of interbeat intervals (IBIs) for R-peaks
+% numPerms - Number of permutations (e.g., 1000)
+% freq_bins, time_bins - The frequency and time bins for analysis
 
-    % Initialize storage for permutation-based ITC
-    permuted_ITCs = zeros([numPerms, size(original_ITC, 1), size(original_ITC, 2)]);
+% OUTPUTS:
+% p_values - Raw p-values (Freq x Time)
 
-    BandWidth=2; % BandWidth in Hz;
-    Qfac     =2; % Attenuation in db(-Qfac)
-    tCircMean=0.05;
+% Initialize storage for permutation-based ITC
+permuted_ITCs = zeros([numPerms, size(original_ITC, 1), size(original_ITC, 2)]);
 
-    tWidth   = 1.5;
-    tOffset  = 0.4;
-    FltPassDir = 'onepass';
-    
-    % Generate Permutations
-    for perm = 1 %:numPerms
-        % Step 1: Generate surrogate R-peaks
-        time_shifts = rand(size(ibi_series)) - 0.5; % in sec
-        surrogate_rpeaks(perm,:) = cumsum(ibi_series) + time_shifts;
-     
-        % Time Lock the surrogate R Peaks to the Channel Data
-         tfrSurrData = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, freq_bins, tWidth, tOffset,  BandWidth, Qfac, FltPassDir);
+BandWidth=2; % BandWidth in Hz;
+Qfac     =2; % Attenuation in db(-Qfac)
+tCircMean=0.05;
 
-        % Step 2: Calculate ITC with the surrogate R-peaks (one per channel)
-        [tfrSurrItc(perm, :, :)] = Get_PSI_ByTrials_ITC(tfrSurrData,SR,tCircMean);
-     
-        fprintf('perm = %d', perm)
-    end
-    
-    % Step 3: Compute the p-values by comparing original ITC to permuted ITC distribution
-    clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize = calculate_p_values(original_ITC, permuted_ITCs);
-    
+tWidth   = 1.5;
+tOffset  = 0.4;
+FltPassDir = 'onepass';
+
+
+% Pre-generate surrogate R-peaks outside of the parfor loop
+time_shifts_all = rand(numPerms, length(ibi_series)) - 0.3; 
+surrogate_rpeaks = cumsum(repmat(ibi_series, numPerms, 1), 2) + time_shifts_all;
+
+
+% Time Lock the surrogate R Peaks to the Channel Data
+% [EvData] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, freq_bins, tWidth, tOffset,  BandWidth, Qfac, FltPassDir);
+
+
+startTime = datetime('now');
+disp(['Start Time: ', datestr(startTime)]);
+
+% Generate Permutations
+for perm = 1:numPerms
+   % % Step 1: Generate surrogate R-peaks
+   %  time_shifts = rand(size(ibi_series)) - 0.5; % in sec
+   %  surrogate_rpeaks(perm,:) = cumsum(ibi_series) + time_shifts;
+
+    % Time Lock the surrogate R Peaks to the Channel Data
+    [EvData] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, freq_bins, tWidth, tOffset,  BandWidth, Qfac, FltPassDir);
+
+    % Step 2: Calculate ITC with the surrogate R-peaks (one per channel)
+    [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(EvData,SR,tCircMean);
+
+    fprintf('perm = %d \n', perm)
+end
+
+endTime = datetime('now');
+disp(['End Time: ', datestr(endTime)]);
+
+% Calculate elapsed time
+elapsedTime = endTime - startTime;
+disp(['Elapsed Time: ', char(elapsedTime)]);
+% Define significance threshold and alpha level
+THRESH_SUPRACLUSTER = 0.05; % Threshold for suprathreshold clusters
+ALPHA = 0.05; % Alpha level for final significance testing
+
+PermItcData   = permute(PermItcData, [1,3,2]);  % re-order dimensions to: (NUMPERMS x TIME, FREQ)
+original_ITC = permute(original_ITC, [2,1]); % re-order dimensions to: (TIME, FREQ)
+
+% Step 1: Compute z-scores
+diff_sum_perm_mean = squeeze(mean(PermItcData)); % Mean of the permutation distribution
+diff_sum_perm_std = squeeze(std(PermItcData)); % Standard deviation of permutation distribution
+
+diffPerm_mean(1,:,:) = diff_sum_perm_mean;
+diffPerm_std(1,:,:)  = diff_sum_perm_std;
+
+zscores = (original_ITC - diff_sum_perm_mean) ./ diff_sum_perm_std ;
+zscores_perm = (PermItcData - diffPerm_mean) ./ diffPerm_std;
+
+% Step 2: Compute p-values from z-scores (two-tailed)
+p_orig = 2 * (1 - normcdf(zscores, 0, 1)); % no abs bc unidirectional 
+
+% Step 3: Calculate z-scores for permutations
+p_perm = 2 * (1 - normcdf(zscores_perm, 0, 1)); % no abs bc unidirectional 
+
+% Step 4: Prepare inputs for getSignifClusters
+% Create a logical significance matrix for the original data
+p_sig = p_orig < THRESH_SUPRACLUSTER;
+
+% Call getSignifClusters to find clusters
+[clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ...
+    getSignifClusters_ITC(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA);
+
+% The output clusPos_Z_Stat and clusPos_clusSize will indicate positions of significant clusters
+% clusPval_Z_Stat and clusPval_clusSize contain p-values for each detected cluster
 end
 
 
 % Function to time-lock neural data (e.g., EEG/LFP) to surrogate R-peaks
-function  tfrSurrData = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, freq_bins, tWidth, tOffset, BandWidth, Qfac, FltPassDir)
+function   [EvData] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR,  tWidth, tOffset, BandWidth, Qfac, FltPassDir)
 
 dtTime = 1/SR;
-[EventTms,EvData,TmAxis]=GetEvTimeAndData(surrogate_rpeaks,ChDta,dtTime,tWidth,tOffset);
+%[EventTms,EvData,TmAxis]=GetEvTimeAndData(surrogate_rpeaks,ChDta,dtTime,tWidth,tOffset);
+%[EvTime,EvData,TmAxis]=GetEvTimeAndData(MasEvent,MasData,dtTime,tWidth,tOffset,stPlot)
 
+nEvent=length(surrogate_rpeaks);
+[frs, nDataAll] = size(ChDta);
 
-% Perform time-frequency decomposition
-[nEvs,nData]=size(EvData);
-nFrs=length(freq_bins);
-tfrSurrData=zeros(nEvs,nFrs,nData);
-for iev=1:nEvs
-    dx=squeeze(EvData(iev,:));
-    for ifr=1:nFrs
-        vfr=freq_bins(ifr);
-        df=IIRPeak_Flt(dx,SR,vfr,BandWidth,Qfac,FltPassDir);
-        tfrSurrData(iev,ifr,:)=hilbert(df);
-    end
-end
-end
+nWidth=int32(tWidth/dtTime)+1;
+nOffset=int32(tOffset/dtTime)+1;
 
-
-function clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize = calculate_p_values(tfrSurrItc)
-
-    data1 = tfrSurrItc;
-    data2 =  zeros(size(tfrSurrItc)); % do stats against the null hypothesis 
-    oneDim = false;
-    diff = shiftdim(mean(data2-data1),1); % find the mean difference, important to use shiftdim for 1-d data
-    numSub = size(data1,1);
-
-    % Define significance threshold and alpha level
-    THRESH_SUPRACLUSTER = 0.05; % Threshold for suprathreshold clusters
-    ALPHA = 0.05; % Alpha level for final significance testing
-
-    permuteSign = (rand(numSub, 1, 1, numPerms) < 0.5) * 2 - 1;    % creates -1 or 1 to shuffle the order of condition subtraction for each subject and permutation ...
-    permuteSign = repmat(permuteSign, [1, size(data1,2), size(data1,3), 1]); % ...but leaves the time-frequency association for each subject intact by just replicating it
-    diff_perm   = repmat(data1-data2, [1,1,1,numPerms]) .* permuteSign; % shuffle signs
-    diff_perm   = squeeze(mean(diff_perm, 1)); % take the mean across subjects
-    if oneDim
-        diff_perm   = permute(diff_perm, [2,1]);  % re-order dimensions to: diff_perm(NUMPERMS x TIME/FREQ)
-    else
-        diff_perm   = permute(diff_perm, [3,1,2]);  % re-order dimensions to: diff_perm(NUMPERMS x TIME, FREQ)
-    end
-
-
-
-    % Step 1: Compute z-scores for original data
-    diff_sum_perm_mean = squeeze(mean(diff_perm)); % Mean of the permutation distribution
-    diff_sum_perm_std = squeeze(std(diff_perm)); % Standard deviation of permutation distribution
-
-    zscores = (diff - diff_sum_perm_mean) ./ diff_sum_perm_std;
+% define posible namber of Events
+for permIdx = 1:nPerms
+    % Get the surrogate R-peaks for the current permutation
+    currSurrogateRpeaks = surrogate_rpeaks(permIdx, :);
     
-
-    % Step 2: Compute p-values from z-scores (two-tailed)
-    p_orig = 2 * (1 - normcdf(abs(zscores), 0, 1));
-
-    % Step 3: Calculate z-scores for permutations
-    zscores_perm = bsxfun(@rdivide, bsxfun(@minus, diff_perm, diff_sum_perm_mean), diff_sum_perm_std);
-    p_perm = 2 * (1 - normcdf(abs(zscores_perm), 0, 1));
-
-    % Step 4: Prepare inputs for getSignifClusters
-    % Create a logical significance matrix for the original data
-    p_sig = p_orig < THRESH_SUPRACLUSTER;
-
-    % Call getSignifClusters to find clusters
-    [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ...
-        getSignifClusters(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA);
-
-    % The output clusPos_Z_Stat and clusPos_clusSize will indicate positions of significant clusters
-    % clusPval_Z_Stat and clusPval_clusSize contain p-values for each detected cluster
+    % Find possible events for the current permutation
+    MasEnableEvents = int32(zeros(nEvent, 1));
+    nPosibleEvent = int32(0);
+    
+    for i = 1:nEvent
+        currTime = int32(currSurrogateRpeaks(i)/dtTime);
+        n1 = currTime - nOffset;
+        n2 = n1 + nWidth - 1;
+        
+        if n1 > 0 && n2 < nDataAll
+            nPosibleEvent = nPosibleEvent + 1;
+            MasEnableEvents(nPosibleEvent) = i;
+        end
+    end
+    
+    nEvent = nPosibleEvent;  % Update nEvent to the number of valid events
+    
+    % Time-lock the data for this permutation
+    EvTime = zeros(1, nEvent);
+    
+    for i = 1:nEvent
+        EvTime(i) = currSurrogateRpeaks(MasEnableEvents(i));
+        currTime = int32(EvTime(i)/dtTime);
+        n1 = currTime - nOffset;
+        n2 = n1 + nWidth - 1;
+        EvData(permIdx, :, :) = ChDta(:, n1:n2);
+    end
 end
+%[nEvs,nFreqs,nData]=size(EvData);
+
+% Vectorized TmAxis calculation
+%TmAxis = (-tOffset:dtTime:(-tOffset + (nWidth - 1) * dtTime))';
+
+%TmAxis=zeros(nData,1);
+%s=-1*tOffset;  for i=1:nData;  TmAxis(i)=s;  s=s+dtTime;  end
+
+
+end
+
 

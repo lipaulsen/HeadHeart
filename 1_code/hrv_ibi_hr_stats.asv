@@ -172,7 +172,7 @@ for j = 1:size(data, 1)  % Loop through each individual
 end
 
 % Save the Plot
-gr3 = fullfile(results_dir, feature_name, ['ViolinPlot_HR_', num2str(numel(subjects.goodHeartMOff)),'_subjects_MedOnvs.MedOff.png']);
+gr3 = fullfile(results_dir, feature_name, ['ViolinPlot_HR_', num2str(numel(subjects.goodHeartMOff)),'_subjects_MedOnvs.MedOff.pn']);
 try
     exportgraphics(f3, gr3, "Resolution", 300);
 catch ME

@@ -142,13 +142,13 @@ HR = [];
 
 for fn = 1:2 % MedOn
     subfname = subfnames{fn};
-    for sub = 1:numel(subjects.(subfname))
+    for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
         % Extract the subject
-        subject = subjects.(subfname){sub};
+        subject = subjects.goodHeartMOff{sub};
 
         if ismember('Load Data', steps)
 
-            fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+            fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
 
             % Load subject data
             subject_data = fullfile(data_dir, preprocessed_name, subfname, ['sub-', subject], [subject, '_preprocessed_', subfname, '_Rest.mat']);
@@ -307,7 +307,7 @@ end
 % ylabel('Mean RMSSD HRV');
 % title('Mean RMSSD HRV with 95% Confidence Interval');
 
-save_path = fullfile(avg_features_folder, ['Averages_HRV-IBI-HR_Rest.mat']); % med_name needs an alternative here 
+save_path = fullfile(avg_features_folder, ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects.goodHeartMOff)),'.mat']); % med_name needs an alternative here 
 save(save_path, 'HRV', 'IBI', 'HR');
 
 %% 3a. HRV Averages

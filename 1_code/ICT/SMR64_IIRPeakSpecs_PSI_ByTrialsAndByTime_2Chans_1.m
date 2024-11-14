@@ -9,33 +9,33 @@ Lucia_Data_ECG={
 'All\';
 "SG041_MED_OFF_Rest_2021_09_10.smr";
 "SG041_MEDON_Rest_2021_09_10.smr";
-"SG043_2021_10_01_MedOFF_Rest_Recording.smr";
-"SG043_2021_10_01_MedON_Rest_Recording.smr";
+% "SG043_2021_10_01_MedOFF_Rest_Recording.smr";
+% "SG043_2021_10_01_MedON_Rest_Recording.smr";
 "SG044_2021_10_28_MEDON_RestRec.smr";
 "SG044_2021_10_28_Rest_OFFmed.smr";
-"SG045_2021_10_29_MEDON_Resting.smr";
-"SG046_2021_11_25_MEDOFF_Rest_recording.smr";
-"SG046_2021_11_27_MedON_rest_recordings.smr";
-"SG047_2021_11_26_MedOFF_Rest_Recording.smr";
-"SG047_2021_11_26_MedON_Rest_Recording.smr";
+% "SG045_2021_10_29_MEDON_Resting.smr";
+% "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
+% "SG046_2021_11_27_MedON_rest_recordings.smr";
+% "SG047_2021_11_26_MedOFF_Rest_Recording.smr";
+% "SG047_2021_11_26_MedON_Rest_Recording.smr";
 "SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
 "SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
-"SG052_2022_05_13_MEDOFF_RESTing.smr";
+% "SG052_2022_05_13_MEDOFF_RESTing.smr";
 %"SG052_2022_05_16_MEDON_RESTing.smr";
-"SG056_12_08_2022_MEDOFF_Resting.smr";
-"SG056_12_08_2022_MEDON_Resting.smr";
-"SG060_28_10_2022_MEDON_resting.smr";
+% "SG056_12_08_2022_MEDOFF_Resting.smr";
+% "SG056_12_08_2022_MEDON_Resting.smr";
+% "SG060_28_10_2022_MEDON_resting.smr";
  };
 
 
-% [SG41 , L3 and R3;
-%  SG43, R1
-%  SG44, L1 and R3,
-%  SG46, L4,
-%  SG47 R4, L3
-%  Sg50 L3,R3
-%  SG52 R2
-%  SG56 L4, R1
+% [SG41 , L3 and R3; C3, C4
+%  SG43, R1, C4
+%  SG44, L1 and R3, C3, C4
+%  SG46, L4, C4
+%  SG47 R4, L3 , C3 C4
+%  Sg50 L3,R3, C3, C4
+%  SG52 R2, C4
+%  SG56 L4, R1, C3, C4
 %  ]
 %%------------------------------------------------------------------------
 
@@ -53,8 +53,7 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"}; 
 % channel is the one the ITC will be calculated and plotted for. The second
 % channel will be disregarded in the ITC.
 
-
- EegLfpChTts= {'L3'; 'C3'};
+ EegLfpChTts= {'R3'; 'C4'};
 
 %%
 nSubs=length(FileNames)-1;
@@ -98,7 +97,11 @@ Qfac     =2; % Attenuation in db(-Qfac)
 WaveletnCyc=6;
 WaveletgWidth=3;
 
-permstats = false; % if false then don't calculate them
+permstats = true;% if false then don't calculate them
+if permstats
+    % Enable parallel computing (if available)
+    if isempty(gcp('nocreate')); parpool; end % Start parallel pool if not already running
+end
         
 tSmSpc=0.05;
 tSmPsi =0.05;
@@ -111,7 +114,7 @@ stMapsLinesEPs =1;  % = 1 Plots Maps, Other - Lines
 stMapsLinesCoh =1;  % = 1 Plots Maps, Other - Lines
 
 stPlotPSIMap=1;
-nperm = 200; % number of permutations for the statistics
+nperm = 100; % number of permutations for the statistics
 
 stSpecLog   =1;
 stZscoreSpc =-1;
@@ -202,7 +205,7 @@ for isb=sbSt:sbEn
         return;
     end
     
-    clear ChsEvsData ChsTtl;
+    clear ChsEvsData ChsTtl ChsCmxEvFrTm;
     for ich=1:nChsWv
         ChDta=ChanDataWv(ich).Data;
         ChTtl=ChanDataWv(ich).Title;
@@ -245,7 +248,7 @@ for isb=sbSt:sbEn
         stPlot.Plot=1;
         stPlot.fName=xFileName;
         stPlot.WvEvTtl=ChTtl;
-        [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset,stPlot);        
+        [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);    %stPlot    
         
         [nEvsGood,nData]=size(EvData);
         if nEvsGood ~= nEvs
@@ -253,7 +256,26 @@ for isb=sbSt:sbEn
         end
         nEvs=nEvsGood;        
         ChsEvsData(ich,:,:)=EvData; 
-    end % end of for ich=1:Nchs 
+        
+        % TFD over the entire Channel Data
+        for ifr=1:length(Frqs)
+            vfr=Frqs(ifr);
+            df=IIRPeak_Flt(ChDta,SR,vfr,BandWidth,Qfac,FltPassDir);
+            ChsCmxEvFrTm(ich, ifr,:)=hilbert(df); % ChannelxFreqxTime
+        end
+        [nChsWv,nFrs,nData]=size(ChsCmxEvFrTm);
+        ChsAllFrsTmSpc=zeros(nChsWv,nFrs,nData);
+        ChsAllFrsTmPha=zeros(nChsWv,nFrs,nData);
+        for ich=1:nChsWv
+            for ifr=1:nFrs
+                xlb=squeeze(ChsCmxEvFrTm(ich,ifr,:));
+                df=abs(xlb);
+                ChsAllFrsTmSpc(ich,ifr,:)=df;
+                ChsAllFrsTmPha(ich,ifr,:)=angle(xlb);
+            end
+        end
+
+    end % end of for ich=1:Nchs
     disp("ChsEvsData is OK");   
 
 %% Read in seperate ECG Chan Data 
@@ -286,7 +308,7 @@ for isb=sbSt:sbEn
     stPlot.Plot=-1;
     stPlot.fName=xFileName;
     stPlot.WvEvTtl=ECGChansTtl;
-    [EventTms,EvEcgData,TmAxis]=GetEvTimeAndData(EventTms,ECGData,ecg_dtTime,tWidth,tOffset,stPlot);
+    [EventTms,EvEcgData,TmAxis]=GetEvTimeAndData(EventTms,ECGData,ecg_dtTime,tWidth,tOffset); %stPlot
     disp("ECG Data is OK")
 
     CEDS64Close(fid);
@@ -330,7 +352,7 @@ stMapsLinesEPs=1;
     
     DataInfo.stMapsLines=stMapsLinesEPs;       
     DataInfo.FigSize=[525 563 499 401]; %Monitor 1-> 4 623 652 493; Mon 2-> 1926 623 652 493
-    [avechs]=plot_ChsEvs_Maps_Lines(DataInfo);    
+    %[avechs]=plot_ChsEvs_Maps_Lines(DataInfo);    
 %%    
     %[evaves,evstds]=plot_ChsEvs(DataInfo); 
 %% Get Spectras
@@ -370,6 +392,10 @@ stMapsLinesEPs=1;
     [FrsTmPsiTime,FrsTmPhaTime,TmAxisCoh]=Get_PSI_ByTime(Ch1EvsFrsTmPha,Ch2EvsFrsTmPha,SR,TmAxis,tCohTm,tCohStep);
     disp("Get_PSI_ByTime is OK");
 
+    if permstats
+       [CCC_clusPos_Z_Stat, CCC_clusPval_Z_Stat, CCC_clusPval_clusSize, CCC_clusPos_clusSize] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, nperm,  Frqs, TmAxis, SR);
+    end
+
 
 %% Calc Itc for one Channel by Trials 
     CohItcTtl="ITC Trials";
@@ -383,13 +409,13 @@ stMapsLinesEPs=1;
         % Calculate IBI
         IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
         % Calc the Perm Stats for PSI by Trials across trial
-        [PItc1] = ITC_permutation_test(FrsTmItc1, ChDta, IBI, nperm, Frqs, TmAxis, SR);
-        [PItc2] = ITC_permutation_test(FrsTmItc2, ChDta, IBI, nperm, Frqs, TmAxis, SR);
+        [Itc1_clusPos_Z_Stat, Itc1_clusPval_Z_Stat, Itc1_clusPval_clusSize, Itc1_clusPos_clusSize] = ITC_permutation_test(FrsTmItc1, squeeze(ChsAllFrsTmPha(1,:,:)), IBI, nperm, Frqs, TmAxis, SR);
+        [Itc2_clusPos_Z_Stat, Itc2_clusPval_Z_Stat, Itc2_clusPval_clusSize, Itc2_clusPos_clusSize] = ITC_permutation_test(FrsTmItc2, squeeze(ChsAllFrsTmPha(2,:,:)), IBI, nperm, Frqs, TmAxis, SR);
 
-        % Save these values to load in since this takes ages
-        PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
-        save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
-        save(save_path, 'PItc');
+        % % Save these values to load in since this takes ages
+        % PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
+        % save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
+        % save(save_path, 'PItc');
     end
    
 
@@ -401,13 +427,14 @@ stMapsLinesEPs=1;
     plotinfo.EvTitle="";
     plotinfo.Title1=ChsTtl{1};
     plotinfo.Title2=ChsTtl{2};
+    plotinfo.permstats = permstats;
     
     % include Ecg data
     plotinfo.EcgTitle=ECGChansTtl{1};
     plotinfo.EvEcgData=EvEcgData;
 
     % include Power data for PSD
-    plotinfo.ChsEvsFrsTmSpc = ChsEvsFrsTmSpc
+    plotinfo.ChsEvsFrsTmSpc = ChsEvsFrsTmSpc;
     
     plotinfo.SpecsTtl=SpecTransTtl;
     if stSpecLog > 0; plotinfo.SpecsTtl=plotinfo.SpecsTtl+", Log"; end
@@ -440,6 +467,7 @@ stZscoreSpc=-1;
     plotinfo.CohTrsPsi=FrsTmPsiTrial;
     plotinfo.CohTrsPha=FrsTmPhaTrial;
     plotinfo.CohTrsAxis=TmAxis;
+    if permstats; plotinfo.Ccc_clusPos_Z_Stat = CCC_clusPos_Z_Stat; end
     
     plotinfo.CohTimTtl=CohTimTtl;
     plotinfo.CohTimPsi=FrsTmPsiTime;
@@ -451,7 +479,10 @@ stZscoreSpc=-1;
     plotinfo.CohTrsItc1=FrsTmItc1;
     plotinfo.CohTrsItc2=FrsTmItc2;
     plotinfo.CohItcAxis=TmAxis;
-   
+    % if permstats
+    % plotinfo.Itc1_clusPos_Z_Stat = Itc1_clusPos_Z_Stat;
+    % plotinfo.Itc2_clusPos_Z_Stat = Itc2_clusPos_Z_Stat;
+    % end 
     
     stCohColorAxis=1; CohClxMin=0; CohClxMax=1;
     if stZscorePSI > 0
@@ -482,10 +513,10 @@ stZscoreSpc=-1;
     plotinfo.FrqMean=2;
     
     plotinfo.stMapsLines=stMapsLinesCoh; % 1- plot Maps, other - plot Lines
-    plotinfo.FigSize=[1013 66 866 894]; % 45 611 918 484];
+    plotinfo.FigSize=[1934 -358 1070 1641]; % 45 611 918 484];
     u = plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);
     
-    gr1 = fullfile('F:\HeadHeart\2_results\itc' ,strjoin({char(xFileName{1}), char(EegLfpChTts{1}), 'PSD-ERP_ITC_', char(EegLfpChTts{1}), '_PSI_', char(EegLfpChTts{1}), 'vs.', char(EegLfpChTts{2}),'.png'}, ''));
+    gr1 = fullfile('F:\HeadHeart\2_results\itc' ,strjoin({char(xFileName{1}), char(EegLfpChTts{1}),'and', char(EegLfpChTts{2}),'PSD-ERP_ITC_POW_PSI_', char(EegLfpChTts{1}), 'vs.', char(EegLfpChTts{2}),'.png'}, ''));
     exportgraphics(u,gr1, 'Resolution', 300)
     %
     %plotinfo.stMapsLines=2; % 1- plot Maps, other - plot Lines
