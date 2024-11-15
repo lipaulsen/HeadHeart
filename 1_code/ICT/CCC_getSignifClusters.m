@@ -56,7 +56,7 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
     % parfor (i=1:size(p_perm, 1) , pool.NumWorkers)
     for i = 1:size(p_perm, 1)
         if mod(i, 500) == 0; fprintf(['   ' num2str(i)]);  end
-        [clusLabel_perm, numClus_perm] = getPosAndNegClusters(squeeze(p_perm(i,:,:)), squeeze(zscores_perm(i,:,:)), THRESH_SUPRACLUSTER);
+        [clusLabel_perm, numClus_perm] = getPosAndNegClusters_perm(squeeze(p_perm(i,:,:)), squeeze(zscores_perm(i,:,:)), THRESH_SUPRACLUSTER);
         
         permClus_clusSize = zeros(1, numClus_perm);
         permClus_Z_Stat   = zeros(1, numClus_perm);
@@ -80,7 +80,9 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
     
     % For each original supra-threshold cluster check how many of the
     % maximum sums of the permutation distribution exceeds the sum of
-    % z-scores/pixels of the current cluster
+    % z-scores/pixels of the current cluster 
+
+    %% MAYBE HERE ANOTHER MORE LIBERAL VERSION IS NECESSARY IF NOT SIGNIF
     for c = 1:numClus
         valExtreme         = sum(permDist_maxSum_Z_Stat >= clus_Z_Stat(c));
         clusPval_Z_Stat(c) = valExtreme / numPerms;  
@@ -131,3 +133,28 @@ function [clusLabel, numClus] = getPosAndNegClusters(p_sig, zscores, THRESH_SUPR
 end
 
 
+function [clusLabel, numClus] = getPosAndNegClusters_perm(p_sig, zscores, THRESH_SUPRACLUSTER)
+    % GETPOSANDNEGCLUSTERS Find significant clusters but separate them into
+    %                      positive and negative clusters
+    % INPUTS
+    % psig         - significance matrix (FREQ x TIME)
+    % zscores      - zscores to divide into positive and negative sig. clusters
+    % THRESH_SUPRACLUSTER - significance threshold to determine supra-threshold 
+    %                          clusters (default 0.05)
+    %
+    % OUTPUTS
+    % clusLabel - Cluster labels (each cluster is labeled as int number
+    %             starting at 1)
+    % numClus   - Number of clusters
+
+    % threshold the data
+    p_subThreshold = p_sig < THRESH_SUPRACLUSTER;
+    zscores_thresh = zscores.*p_subThreshold;
+    % find the negative and positive clusters separately
+    [clusNegative, numClus1] = bwlabeln(zscores_thresh < 0);
+    [clusPositive, numClus2] = bwlabeln(zscores_thresh > 0);
+    clus_tmp = clusPositive + numClus1; % increase labels by the num of neg clusters
+    clus_tmp(clusPositive == 0) = 0;   % and make sure to set old 0s back to 0s
+    clusLabel = clusNegative + clus_tmp;
+    numClus = numClus1 + numClus2;
+end
