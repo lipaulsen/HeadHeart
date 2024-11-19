@@ -63,8 +63,12 @@ end
 powerline = 50; % Hz
 
 % Define cutoff frequencies for bandfiltering EEG data
-low_frequency = 0.5; % Hz
+low_frequency = 0.1; % Hz
 high_frequency = 100; % Hz
+
+% Define cutoff frequencies for bandfiltering ECG data
+low_frequency_ecg = 0.5; % Hz
+high_frequency_ecg = 30; % Hz
 
 
 % Define if the first and last 2 seconds of the data should be cut off
@@ -292,7 +296,7 @@ for fn = 1:2
             end
 
             % Design 2nd order twopass Butterworth filter (0.5 Hz high-pass, 30 Hz low-pass)
-            ecg_data_bandpass  = ft_preproc_bandpassfilter(ecg_notch_ft(1,:), SmrData.SR, [0.5 30],  2, 'but','twopass'); % two pass butterworth filter
+            ecg_data_bandpass  = ft_preproc_bandpassfilter(ecg_notch_ft(1,:), SmrData.SR, [low_frequency_ecg high_frequency_ecg],  2, 'but','twopass'); % two pass butterworth filter
             % save filtered data in SmrData struct
             SmrData.WvDataCleaned(21,:) = ecg_data_bandpass;
             SmrData.WvTits{21,1} = 'ECG_filtered';
@@ -329,24 +333,25 @@ for fn = 1:2
             % Find all non-zero Values
             peakIndices = find(SmrData.WvDataCleaned(20, :) ~= 0);
             SmrData.ECG.ECGPeak(1,:) = ecg_timepoints(peakIndices); % in sec
+            SmrData.ECG.ECGTtl{1,:} = 'RPeak Times of Cleaned ECG';
 
-            % Calcualte the IBI
-            SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECG.ECGPeak(1,:)); % extract time differences in s between R-Peaks
-            SmrData.ECG.ECGcompTits{1,:} = 'IBI';
-
-            % Calculate Heart Rate from ECG
-            SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECG.ECGcomp(1,:);
-            SmrData.ECG.ECGcompTits{2,:} = 'HR';
+            % % Calcualte the IBI
+            % SmrData.ECG.ECGcomp(1,:) = diff(SmrData.ECG.ECGPeak(1,:)); % extract time differences in s between R-Peaks
+            % SmrData.ECG.ECGcompTits{1,:} = 'IBI_cleanedECG';
+            % 
+            % % Calculate Heart Rate from ECG
+            % SmrData.ECG.ECGcomp(2,:) = 60 ./ SmrData.ECG.ECGcomp(1,:);
+            % SmrData.ECG.ECGcompTits{2,:} = 'HR_';
 
             %% This is the IBI Calculation for the raw ECG Data (for HRV)
 
             % Calcualte the IBI
             SmrData.EvData.ECGcomp(1,:) = diff(SmrData.EvData.EvECG(1,:)); % extract time differences in s between R-Peaks
-            SmrData.EvData.ECGcompTits{1,:} = 'IBI';
+            SmrData.EvData.ECGcompTits{1,:} = 'IBI_rawECG';
 
             % Calculate Heart Rate from ECG
             SmrData.EvData.ECGcomp(2,:) = 60 ./ SmrData.EvData.ECGcomp(1,:);
-            SmrData.EvData.ECGcompTits{2,:} = 'HR';
+            SmrData.EvData.ECGcompTits{2,:} = 'HR_rawECG';
 
             %% This is not continues with the cleaned ECG Data
 
@@ -392,8 +397,8 @@ for fn = 1:2
             lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(1:15,:), SmrData.SR);
 
             % Design Butterworth High and Low pass filters
-            lfp_data_highpass  = ft_preproc_highpassfilter(lfp_notch_ft(1:15,:), SmrData.SR, 0.5,  4, 'but','twopass'); % two pass butterworth filter
-            lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, 100,  4, 'but','twopass'); % two pass butterworth filter
+            lfp_data_highpass  = ft_preproc_highpassfilter(lfp_notch_ft(1:15,:), SmrData.SR, low_frequency,  4, 'but','twopass'); % two pass butterworth filter
+            lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, high_frequency,  4, 'but','twopass'); % two pass butterworth filter
             % lfp_data_lowpass_10  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, 10,  4, 'but','twopass'); % two pass butterworth filter
 
             % Save cleaned Data into SmrData.WvDataCleaned Struct
@@ -429,14 +434,14 @@ for fn = 1:2
                 legend('raw trace','filtered data')
 
                 % Save Graphics
-                gr5 = fullfile(subject_results_folder, [subject, '_', subfname, '_EEG_HP-LP-Filter.png']);
+                gr5 = fullfile(subject_results_folder, [subject, '_', subfname, '_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),'-Filter.png']);
                 exportgraphics(f5, gr5, "Resolution",300) % WINDOWS
             end
         end
 
         % Save the preprocessed Data in Smr.Data Struct
         %newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
-        save_path = fullfile(subject_preprocessed_folder, [subject,  '_preprocessed_', subfname ,'_Rest.mat']);
+        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', subfname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
         save(save_path, 'SmrData');
 
         disp(['Processed and saved: ', save_path]);

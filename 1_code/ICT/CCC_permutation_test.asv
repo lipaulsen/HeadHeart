@@ -71,6 +71,9 @@ histogram(PermPSICCC);
 
 zscores_thresh = (zscores > 15) | (zscores < -15);
 
+fileName = 
+save()
+
 % % Step 2: Compute p-values from z-scores 
 % %p_orig = 2 * (1 - normcdf(zscores, 0, 1)); % no abs bc unidirectional 
 % %p_orig_cdf = normcdf(zscores, 0, 1); % bc my data was normalized in itself I don't need the two tailed thig

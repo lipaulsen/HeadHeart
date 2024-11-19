@@ -1,4 +1,4 @@
-function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = getSignifClusters(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA)
+function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = getSignifClusters_CCC(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA)
     % GETSIGNIFCLUSTERS Find significant clusters (in original data) based on 
     % clusters obtained by a permutation procedure
     % (based on Maris & Oostenveld (2007) J Neurosci Meth 164:177-190)
@@ -60,9 +60,13 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
         
         permClus_clusSize = zeros(1, numClus_perm);
         permClus_Z_Stat   = zeros(1, numClus_perm);
+       
         % get the summed cluster stats
         for c = 1:numClus_perm
             permClus_Z_Stat(c)   = sum(abs(zscores_perm(i, clusLabel_perm == c))); % abs() for two-tailed testing
+            %disp(permClus_Z_Stat);
+            % disp(['Cluster ', num2str(c), ': Size = ', num2str(sum(clusterIdx))]);
+            % disp(['Z-Scores: ', num2str(zscores_perm(i, clusterIdx))]);
             permClus_clusSize(c) = sum(clusLabel_perm(:) == c);
         end
         
@@ -87,7 +91,7 @@ function [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
         valExtreme         = sum(permDist_maxSum_Z_Stat >= clus_Z_Stat(c));
         clusPval_Z_Stat(c) = valExtreme / numPerms;  
         
-        valExtreme           = sum(permDist_maxSum_clusSize >= clus_clusSize(c));
+        valExtreme           = sum(permDist_maxSum_clusSize(c) >= clus_clusSize(c));
         clusPval_clusSize(c) = valExtreme / numPerms;
     end
     
@@ -146,6 +150,7 @@ function [clusLabel, numClus] = getPosAndNegClusters_perm(p_sig, zscores, THRESH
     % clusLabel - Cluster labels (each cluster is labeled as int number
     %             starting at 1)
     % numClus   - Number of clusters
+    THRESH_SUPRACLUSTER = 0.01;
 
     % threshold the data
     p_subThreshold = p_sig < THRESH_SUPRACLUSTER;
@@ -158,3 +163,14 @@ function [clusLabel, numClus] = getPosAndNegClusters_perm(p_sig, zscores, THRESH
     clusLabel = clusNegative + clus_tmp;
     numClus = numClus1 + numClus2;
 end
+
+
+
+
+% for c = 1:numClus_perm
+%     clusterIdx = clusLabel_perm == c;
+%     disp(['Cluster ', num2str(c), ': Size = ', num2str(sum(clusterIdx))]);
+%     disp(['Z-Scores: ', num2str(zscores_perm(i, clusterIdx))]);
+%     permClus_Z_Stat(c) = sum(abs(zscores_perm(i, clusterIdx)));
+%     permClus_clusSize(c) = sum(clusterIdx);
+% end

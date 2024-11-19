@@ -162,7 +162,6 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    if stMapsLines == 1
        imagesc(DataInfo.TmAxis,Frqs,xpow); axis xy; 
        colormap(DataInfo.ColorMap);
-  
        if stPowColorAxis > 0; clim([PowMin PowMax]); end
        colorbar;
        xline(0, "--k", 'LineWidth', 2);
@@ -214,13 +213,16 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    subplot(7,1,3);
    txt=sprintf('%s, %s',DataInfo.Title1,xttl);
    xdta=DataInfo.CohTrsItc1; 
+   if DataInfo.permstats
+       if sum(DataInfo.Itc1_clusPos_Z_Stat(:)) > 0
+           contour(DataInfo.Itc1_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 0.9);
+           imagesc(xaxi,Frqs,DataInfo.Itc1_clusPos_Z_Stat);axis xy;
+       end
+   end
    if stMapsLines == 1
        imagesc(xaxi,Frqs,xdta); axis xy;
        colormap(DataInfo.ColorMap)
-        hold on
-        if DataInfo.permstats
-            contour(xaxi,Frqs,DataInfo.Itc1_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 0.9);
-        end
+      
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);
        end
@@ -250,9 +252,10 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    if stMapsLines == 1
        imagesc(xaxi,Frqs,xdta); axis xy;
        colormap(DataInfo.ColorMap);
-       hold on
        if DataInfo.permstats  
-               contour(xaxi,Frqs,DataInfo.Itc2_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 1.1);
+           if sum(DataInfo.Itc2_clusPos_Z_Stat(:)) > 0
+               contour(DataInfo.Itc2_clusPos_Z_Stat, 1, 'linecolor', 'k', 'linewidth', 1.1);
+           end
        end
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);
@@ -278,7 +281,7 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    %% Plot Trial PSI Data
    xttl=DataInfo.CohTrsTtl;
    xaxi=DataInfo.CohTrsAxis;
-   ccc_zscores_thresh = (DataInfo.Ccc_zscores > 15) | (DataInfo.Ccc_zscores < -15);
+   ccc_zscores_thresh = (DataInfo.Ccc_zscores > 16) | (DataInfo.Ccc_zscores < -16);
 
    % subplot(2,3,2);
    subplot(7,1,5);
@@ -289,8 +292,8 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
        colormap(DataInfo.ColorMap);
        hold on
        if DataInfo.permstats
-           contour(xaxi,Frqs,ccc_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1); 
-           %imagesc(xaxi,Frqs,ccc_zscores_thresh);axis xy;
+           contour(xaxi,Frqs,ccc_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1);
+           imagesc(xaxi,Frqs,DataInfo.Ccc_clusPos_Z_Stat);axis xy;
        end
        if stCohColorAxis > 0
            %clim([CohClxMin CohClxMax]);

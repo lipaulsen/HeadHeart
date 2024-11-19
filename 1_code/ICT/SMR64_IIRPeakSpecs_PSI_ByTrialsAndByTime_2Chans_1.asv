@@ -7,19 +7,19 @@ FilesDir="C:\UsersData\Lisa\Lucia_StnLFPs_ECG_Lisa\SMR\";
 
 Lucia_Data_ECG={
 'All\';
- % "SG041_MED_OFF_Rest_2021_09_10.smr";
+% "SG041_MED_OFF_Rest_2021_09_10.smr";
 % "SG041_MEDON_Rest_2021_09_10.smr";
 % "SG043_2021_10_01_MedOFF_Rest_Recording.smr";
- % "SG043_2021_10_01_MedON_Rest_Recording.smr";
+ "SG043_2021_10_01_MedON_Rest_Recording.smr";
 % "SG044_2021_10_28_MEDON_RestRec.smr";
 % "SG044_2021_10_28_Rest_OFFmed.smr";
- %"SG045_2021_10_29_MEDON_Resting.smr";
- % "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
+% "SG045_2021_10_29_MEDON_Resting.smr";
+% "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
 % "SG046_2021_11_27_MedON_rest_recordings.smr";
 % "SG047_2021_11_26_MedOFF_Rest_Recording.smr";
 % "SG047_2021_11_26_MedON_Rest_Recording.smr";
- "SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
-% "SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
+"SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
+"SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
 % "SG052_2022_05_13_MEDOFF_RESTing.smr";
 %"SG052_2022_05_16_MEDON_RESTing.smr";
 % "SG056_12_08_2022_MEDOFF_Resting.smr";
@@ -392,9 +392,9 @@ stMapsLinesEPs=1;
     [FrsTmPsiTime,FrsTmPhaTime,TmAxisCoh]=Get_PSI_ByTime(Ch1EvsFrsTmPha,Ch2EvsFrsTmPha,SR,TmAxis,tCohTm,tCohStep);
     disp("Get_PSI_ByTime is OK");
 
-    if permstats
-       [CCC_zscores, CCC_zscores_thresh] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, nperm,  Frqs, TmAxis, SR);
-    end
+    % if permstats
+    %    [CCC_zscores, CCC_zscores_thresh] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, nperm,  Frqs, TmAxis, SR);
+    % end
 
 
 %% Calc Itc for one Channel by Trials 
@@ -405,18 +405,18 @@ stMapsLinesEPs=1;
     [FrsTmItc2]=Get_PSI_ByTrials_ITC(Ch2EvsFrsTmPha,SR,tCircMean);
     fprintf("Get_ICT_ByTrials for %s and %s is OK \n", (ChsTtl{1}), (ChsTtl{2}))
     
-    % if permstats
-    %     % Calculate IBI
-    %     IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
-    %     % Calc the Perm Stats for PSI by Trials across trial
-    %     [Itc1_clusPos_Z_Stat, Itc1_clusPval_Z_Stat, Itc1_clusPval_clusSize, Itc1_clusPos_clusSize] = ITC_permutation_test(FrsTmItc1, squeeze(ChsAllFrsTmPha(1,:,:)), IBI, nperm, Frqs, TmAxis, SR, Ch1EvsFrsTmPha);
-    %     [Itc2_clusPos_Z_Stat, Itc2_clusPval_Z_Stat, Itc2_clusPval_clusSize, Itc2_clusPos_clusSize] = ITC_permutation_test(FrsTmItc2, squeeze(ChsAllFrsTmPha(2,:,:)), IBI, nperm, Frqs, TmAxis, SR);
-    % 
-    %     % % Save these values to load in since this takes ages
-    %     % PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
-    %     % save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
-    %     % save(save_path, 'PItc');
-    % end
+    if permstats
+        % Calculate IBI
+        IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
+        % Calc the Perm Stats for PSI by Trials across trial
+        [Itc1_clusPos_Z_Stat, Itc1_clusPval_Z_Stat, Itc1_clusPval_clusSize, Itc1_clusPos_clusSize] = ITC_permutation_test(FrsTmItc1, squeeze(ChsAllFrsTmPha(1,:,:)), IBI, nperm, Frqs, TmAxis, SR, Ch1EvsFrsTmPha);
+        [Itc2_clusPos_Z_Stat, Itc2_clusPval_Z_Stat, Itc2_clusPval_clusSize, Itc2_clusPos_clusSize] = ITC_permutation_test(FrsTmItc2, squeeze(ChsAllFrsTmPha(2,:,:)), IBI, nperm, Frqs, TmAxis, SR);
+
+        % % Save these values to load in since this takes ages
+        % PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
+        % save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
+        % save(save_path, 'PItc');
+    end
    
 
 %%
@@ -453,7 +453,7 @@ stMapsLinesEPs=1;
     plotinfo.TmAxis=TmAxis;
 
     stPowerColorAxis=-1; PowClxMin=0; PowClxMax=10;
-    stZscoreSpc=-1;    
+stZscoreSpc=-1;    
     if stZscoreSpc == 1
         plotinfo.PowData1=zscore(plotinfo.PowData1,0,2);
         plotinfo.PowData2=zscore(plotinfo.PowData2,0,2);

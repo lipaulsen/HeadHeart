@@ -10,7 +10,6 @@ function [clusPos_Z_Stat, clusPval_Z_Stat, clusPval_clusSize, clusPos_clusSize] 
 
 % Initialize storage for permutation-based ITC
 permuted_ITCs = zeros([numPerms, size(original_ITC, 1), size(original_ITC, 2)]);
-[nTrials, nFreq, nTms] = size(Ch1EvsFrsTmPha);
 
 BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)
@@ -50,27 +49,26 @@ parfor perm = 1:numPerms
     fprintf('perm = %d \n', perm)
 end
 
-endTime = datetime('now'); disp(['End Time: ', datestr(endTime)]);
-% Calculate elapsed time
-elapsedTime = endTime - startTime; disp(['Elapsed Time: ', char(elapsedTime)]);
+endTime = datetime('now');
+disp(['End Time: ', datestr(endTime)]);
 end 
 
 if trials
-    startTime = datetime('now'); disp(['Start Time: ', datestr(startTime)]);
-    parfor perm = 1:numPerms
+parfor perm = 1:numPerms
+    
+    permCh1 = Ch1EvsFrsTmPha(randperm(nTrials), :, :); % Shuffled data for Channel 1, randperm(nTms)
+   
+    %  Calculate ITC with the surrogate R-peaks (one per channel)
+    [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(EvData,SR,tCircMean);
 
-        permCh = Ch1EvsFrsTmPha(:, :, randperm(nTms)); % Shuffled data for Channel 1, randperm(nTms) randperm(nTrials)
-
-        %  Calculate ITC with the surrogate R-peaks (one per channel)
-        [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(permCh,SR,tCircMean);
-
-        fprintf('perm = %d \n', perm)
-    end
-endTime = datetime('now'); disp(['End Time: ', datestr(endTime)]);
-% Calculate elapsed time
-elapsedTime = endTime - startTime; disp(['Elapsed Time: ', char(elapsedTime)]);
+    fprintf('perm = %d \n', perm)
 end
 
+end
+
+% Calculate elapsed time
+elapsedTime = endTime - startTime;
+disp(['Elapsed Time: ', char(elapsedTime)]);
 % Define significance threshold and alpha level
 THRESH_SUPRACLUSTER = 0.05; % Threshold for suprathreshold clusters
 ALPHA = 0.05; % Alpha level for final significance testing
