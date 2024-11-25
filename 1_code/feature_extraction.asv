@@ -1,4 +1,4 @@
-% function [] = time_frequency_decomp(subjects, data_dir, results_dir)
+% function [] = feature_extraction(subjects, data_dir, results_dir)
 
 %% Time Frequency Decomposition for HeadHeart
 
@@ -91,14 +91,11 @@ sampling_frequency_ibi = 1;  % Hz ibi and HR data are already sampled at 1 Hz fr
 lf_band = [0.04, 0.15];
 hf_band = [0.15, 0.4];
 
-% Define parameters for time-frequency analysis of EEG data
-sampling_frequency_eeg = 200;  % Hz EEG data will be downsampled to 100 Hz
-frequencies = 0.5:0.5:50;  % Resolution 0.5 Hz
-cycles = 6;
+% % Define parameters for time-frequency analysis of EEG data
+% sampling_frequency_eeg = 200;  % Hz EEG data will be downsampled to 100 Hz
+% frequencies = 0.5:0.5:50;  % Resolution 0.5 Hz
+% cycles = 6;
 
-% Define frequency bands of interest
-bands = struct('delta', [0.3, 4], 'theta', [4, 8], 'alpha', [8, 13], ...
-    'beta', [13, 30], 'gamma', [30, 45]);
 
 % Create color palette for plots
 colors.ECG.IBI = [0.9569,    0.9451,    0.8706];    % Creme
@@ -112,10 +109,9 @@ colors.EEG.delta = [ 0.9490    0.8000    0.5608];  % Yellow
 % colors.EEG.beta = "#56B4E9";   % Light Blue
 % colors.EEG.gamma = "#009E73";   % Green
 
-
-% Features for averaging across participants
-features_averaging.ecg = {'IBI(sub, :)', 'hrv', 'lf-hrv', 'hf-hrv'};
-features_averaging.eeg = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
+%If we use left and right STN as seperate subjects put this as true
+%(increases subjectsize by 2)
+seperateSTN = true;
 
 % Suppress excessive logging if using FieldTrip
 ft_defaults; % If using FieldTrip
@@ -127,7 +123,26 @@ if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
 Fhp = 2;
 
-channels = {'F3', 'F4', 'C3', ' C4', 'P3', 'P4', 'Pz', 'L1', 'L2', 'L3', 'L4', 'R1', 'R2', 'R3', 'R4'};
+BandWidth=2; % BandWidth in Hz; 
+Qfac     =2; % Attenuation in db(-Qfac)    
+WaveletnCyc=6;
+WaveletgWidth=3;
+FltPassDir='onepass'; % onepass  twopass
+
+channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'L1', 'L2', 'L3', 'L4', 'R1', 'R2', 'R3', 'R4'};
+if seperateSTN
+channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+end
+
+LfpElec.SG041 = {'L3', 'R3'};
+LfpElec.SG043  = {'L4', 'R1'}; 
+LfpElec.SG046  = {'L4', 'R1'};
+LfpElec.SG047  = {'L3', 'R4'};
+LfpElec.SG050 = {'L3', 'R3'};
+LfpElec.SG052  = {'L4', 'R2'};
+LfpElec.SG056  = {'L4', 'R1'};
+LfpElec.STNl = {'L1', 'L2', 'L3', 'L4'};
+LfpElec.STNr = {'R1', 'R2', 'R3', 'R4'};
 
 %% ============================== FUNCTIONS ==============================
 
@@ -135,9 +150,6 @@ channels = {'F3', 'F4', 'C3', ' C4', 'P3', 'P4', 'Pz', 'L1', 'L2', 'L3', 'L4', '
 
 %% ============================ 1. LOAD DATA =============================
 disp("************* STARTING Feature Extraction  *************");
-
-% Define which channels should be used
-channels = "";
 
 %subjects = {'SG041', 'SG043',  'SG047', 'SG050', 'SG052', 'SG056'}; % this is wihtout the 2 patients with arythmia
 
@@ -148,8 +160,6 @@ HRV.rmssd_tits{1} = {'HRV Average of subj'};
 IBI = [];
 
 HR = [];
-
-TFR = []; % time frequencz representation
 
 for fn = 1:2 % MedOn
     subfname = subfnames{fn};
@@ -164,7 +174,7 @@ for fn = 1:2 % MedOn
             pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
-            data = load(filename, 'SmrData');
+            load(filename, 'SmrData');
             % Load subject data
             % subject_data = fullfile(data_dir, preprocessed_name, subfname, ['sub-', subject], [subject, '_preprocessed_', subfname, '_Rest.mat']);
             % load(subject_data, 'SmrData');
@@ -230,133 +240,80 @@ for fn = 1:2 % MedOn
 
 
         %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
-
-        for c = 1:numel(channels)
-            channel = channels{c};
-            fprintf('****************** TIME FREQ DECOMP for %s %s...****************\n', subject, channel);
-            
-            ChDta = SmrData.WvData(channel, :);
-            
-            % DOWNSASMPLE 
-            if NewSR > 0
-                FsOrigin=SR;
-                if  FsOrigin ~=  NewSR
-                    [fsorig, fsres] = rat(FsOrigin/NewSR);
-                    ChDta=resample(ChDta,fsres,fsorig);
-                    dtTime=1/NewSR;
+        if ismember('Feature Extraction EEG', steps)
+            for c = 1:numel(channels)
+                if seperateSTN
+                    channels{8} = LfpElec.(subject){1};
+                    channels{9} = LfpElec.(subject){2};
                 end
-                NewSR=1.0/dtTime;
-            end
+                channel = channels{c};
+               
+                fprintf('****************** TIME FREQ DECOMP for %s %s...****************\n', subject, channel);
+                %TFR = []; % time frequency representation
+                ChsCmxEvFrTm = [];
+                ChDta = SmrData.WvData(c, :);
 
-            % HIGH PASS FILTER
-            if Fhp > 0
-                ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,2,'but', 'twopass'); % twopass
-            end
+                % DOWNSASMPLE
+                if NewSR > 0
+                    FsOrigin=SR;
+                    if  FsOrigin ~=  NewSR
+                        [fsorig, fsres] = rat(FsOrigin/NewSR);
+                        ChDta=resample(ChDta,fsres,fsorig);
+                        dtTime=1/NewSR;
+                    end
+                    NewSR=1.0/dtTime;
+                end
 
-            % TFR HILBERT
-            for ifr=1:length(Frqs)
-                vfr=Frqs(ifr);
-                df=IIRPeak_Flt(ChDta,SR,vfr,BandWidth,Qfac,FltPassDir);
-                ChsCmxEvFrTm(ich, ifr,:)=hilbert(df); % ChannelxFreqxTime
-            end
+                % HIGH PASS FILTER
+                if Fhp > 0
+                    ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,2,'but', 'twopass'); % twopass
+                end
 
-            % EXTRACTION OF POWER AND PHASE
-            [nChsWv,nFrs,nData]=size(ChsCmxEvFrTm);
-            ChsAllFrsTmSpc=zeros(nChsWv,nFrs,nData);
-            ChsAllFrsTmPha=zeros(nChsWv,nFrs,nData);
-            for ich=1:nChsWv
+                % TFR HILBERT
+                for ifr=1:length(Frqs)
+                    vfr=Frqs(ifr);
+                    df=IIRPeak_Flt(ChDta,SR,vfr,BandWidth,Qfac,FltPassDir);
+                    ChsCmxEvFrTm(ifr,:)=hilbert(df); % ChannelxFreqxTime
+                end
+
+                % EXTRACTION OF POWER AND PHASE
+                [nFrs,nData]=size(ChsCmxEvFrTm);
+                ChsAllFrsTmSpc=zeros(nFrs,nData);
+                ChsAllFrsTmPha=zeros(nFrs,nData);
                 for ifr=1:nFrs
-                    xlb=squeeze(ChsCmxEvFrTm(ich,ifr,:));
+                    xlb=ChsCmxEvFrTm(ifr,:);
                     df=abs(xlb);
-                    ChsAllFrsTmSpc(ich,ifr,:)=df; % Power (channelxfreqxpower)
-                    ChsAllFrsTmPha(ich,ifr,:)=angle(xlb); %Phase (channelxfreqxphase)
+                    ChsAllFrsTmSpc(c,ifr,:)=df; % Power (channelxfreqxpower)
+                    ChsAllFrsTmPha(c,ifr,:)=angle(xlb); %Phase (channelxfreqxphase)
                 end
+        
+
+                % % DOWNSAMPLE Power and Phase
+                % if NewSR > 0
+                %     FsOrigin=SR;
+                %     if  FsOrigin ~=  NewSR
+                %         [fsorig, fsres] = rat(FsOrigin/NewSR);
+                %         ChsAllFrsTmSpcDS = resample(ChsAllFrsTmSpc,fsres,fsorig);
+                %         ChsAllFrsTmPhaDS = resample(ChsAllFrsTmPha,fsres,fsorig);
+                %         dtTime=1/NewSR;
+                %     end
+                %     NewSR=1.0/dtTime;
+                % end
+
+                % CREATE TFR STRUCT
+                TFR.(channel).pow = ChsAllFrsTmSpc;
+                TFR.(channel).phase = ChsAllFrsTmPha;
+                TFR.freqs = Frqs;
+                TFR.SR = NewSR;
+
             end
 
-            % % DOWNSAMPLE Power and Phase
-            % if NewSR > 0
-            %     FsOrigin=SR;
-            %     if  FsOrigin ~=  NewSR
-            %         [fsorig, fsres] = rat(FsOrigin/NewSR);
-            %         ChsAllFrsTmSpcDS = resample(ChsAllFrsTmSpc,fsres,fsorig);
-            %         ChsAllFrsTmPhaDS = resample(ChsAllFrsTmPha,fsres,fsorig);
-            %         dtTime=1/NewSR;
-            %     end
-            %     NewSR=1.0/dtTime;
-            % end
-            
-            % CREATE TFR STRUCT
-            TFR.(channel).pow = ChsAllFrsTmSpc;
-            TFR.(channel).phase = ChsAllFrsTmPha;
-            TFR.freqs = Frqs;
-            TFR.SR = NewSR;
-
+            %% =========================== SAVING DATA ===============================
+            save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
+            save(save_path, 'TFR', '-v7.3');
         end
-        % for c = 1:numel(channels)
-        %     wavelet = [];
-        %     channel = channels{c};
-        %     fprintf('Processing %s %s...\n', subj, channel)
-        %
-        %     % EXTRACT DATA & SAMPLE RATE
-        %     currData   = SmrData.WvData.(channel);
-        %
-        %     SR = WvData.SR;
-        %     % HIGHPASS FILTER DATA TO REMOVE SLOW DRIFTS
-        %     data_flt   = ft_preproc_highpassfilter(SmrData.WvDataCleaned(1:15, :), SR, 1, 4, 'but', 'twopass'); % twopass
-        %
-        %     % PREPARE DATA STRUCTURE FOR FIRELDTRIP TOOLBOX
-        %     trialtime       = (1:numel(data_flt)) / SR;
-        %     DataFT.fsample  = SR;
-        %     DataFT.label    = {channel};
-        %     DataFT.time     = {trialtime};
-        %     DataFT.trial    = {squeeze(data_flt)};
-        %
-        %     CfgFrq    = prepConfig(frequencies, cycles, trialtime);
-        %     % RUN TF-DECOMPOSITION
-        %     data_freq = ft_freqanalysis(CfgFrq,DataFT);
-        %
-        %     % CALCULATE POWER AND PHASE
-        %     dataPow     = squeeze(abs(data_freq.fourierspctrm)).^2;  % abs() gives you the amplitude, and squared give you the power, if you don't use abs() you'll get a complex number and can extract the phase by using angle()
-        %     dataPhase   = squeeze(angle(data_freq.fourierspctrm));   % angle() gives you the phase
-        %
-        %     % REMOVE OUTLIERS FROM POWER AND PHASE
-        %     if OUTL_REMOVE
-        %         dataPow_tmp   = nan(size(dataPow,1), numel(currData));
-        %         dataPhase_tmp = nan(size(dataPow,1), numel(currData));
-        %
-        %         dataPow_tmp(:,~currOutlier) = dataPow;
-        %         dataPhase_tmp(:,~currOutlier) = dataPhase;
-        %
-        %         dataPow   = dataPow_tmp;
-        %         dataPhase = dataPhase_tmp;
-        %     end
-        %
-        %     % DOWNSAMPLE POWER AND PHASE DATA
-        %     if  SR ~=  DOWNSAMPLE_SR
-        %         [fsorig, fsres] = rat(SR / DOWNSAMPLE_SR);
-        %         pow_DS   = resample(dataPow', fsres, fsorig)';
-        %         phase_DS = resample(dataPhase', fsres, fsorig)';
-        %     end
-        %
-        %     % SAVE DATA IN ONE STRUCT
-        %     wavelet.(channel).pow    = pow_DS;
-        %     wavelet.(channel).phase  = phase_DS;
-        %     wavelet.freqs      = freqs;
-        %     wavelet.SR         = DOWNSAMPLE_SR;
-        %
-        %     if ~exist([Paths.SaveDir, '/wavelet_decomp/'])
-        %         mkdir([Paths.SaveDir, '/wavelet_decomp/'])
-        %     end
-        %     % SAVE INDIVIDUAL CHANNEL TF-DECOMPOSITION
-        %     save([Paths.SaveDir, '/wavelet_decomp/', recording, subj, '_', channel, EOGfilenameAddOn, additReRef, '.mat'],  'wavelet', '-v7.3')
-        % end
-
-
-        %% =========================== SAVING DATA ===============================
-        
     end
-    save_path = fullfile(data_dir, 'tfr', 'all', [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str() '_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
-    save(save_path, 'TFR');
+  
 
 end
 
