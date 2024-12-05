@@ -1,19 +1,17 @@
 function [FrsTmItc]=Get_PSI_ByTrials_ITC(Ch1EvsFrsTmPha,SR,tCircMean)
 
-
+if ndi(Ch1EvsFrsTmPha)==3
 [nEvs,nFrs,nData]=size(Ch1EvsFrsTmPha);
-
+elseif size(Ch1EvsFrsTmPha)== 2
+    [nFrs,nData]=size(Ch1EvsFrsTmPha);
+end
 
 nCircMeanH=int32(tCircMean*SR)/2+1;
 
 FrsTmItc = zeros(nFrs, nData); % ITC matrix set up
 % Loop over frequencies to calculate ITC for each frequency and time point
 for ifr=1:nFrs
-    %Check for the size of the input data
- 
-          phasedf=squeeze(Ch1EvsFrsTmPha(:, ifr, :));  %Extract phase data for channel 1 at the current frequency
-    
-  
+    phasedf=squeeze(Ch1EvsFrsTmPha(:, ifr, :));  %Extract phase data for channel 1 at the current frequency
     if nCircMeanH > 1
         for itm=nCircMeanH:(nData-nCircMeanH)
             % Take phase data around each time point for smoothing

@@ -44,7 +44,7 @@ subfnames = fieldnames(subjects);
 show_plots = false;
 
 % Define feature extraction steps to perform
-steps = {'Load Data', 'Feature Extraction ECG', 'Feature Extraction EEG'};
+steps = {'Load Data', 'Feature Extraction EEG'}; %'Feature Extraction ECG',
 
 % Define folder variables
 preprocessed_name = 'preprocessed';  % preprocessed folder (inside derivatives)
@@ -123,19 +123,23 @@ if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
 Fhp = 2;
 
-BandWidth=2; % BandWidth in Hz; 
-Qfac     =2; % Attenuation in db(-Qfac)    
+BandWidth=2; % BandWidth in Hz;
+Qfac     =2; % Attenuation in db(-Qfac)
 WaveletnCyc=6;
 WaveletgWidth=3;
-FltPassDir='onepass'; % onepass  twopass
+FltPassDir='twopass'; % onepass  twopass
+
+% Define Time Window
+tWidth   = 0.9;
+tOffset  = 0.3;
 
 channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'L1', 'L2', 'L3', 'L4', 'R1', 'R2', 'R3', 'R4'};
 if seperateSTN
-channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+    channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
 end
 
 LfpElec.SG041 = {'L3', 'R3'};
-LfpElec.SG043  = {'L4', 'R1'}; 
+LfpElec.SG043  = {'L4', 'R1'};
 LfpElec.SG046  = {'L4', 'R1'};
 LfpElec.SG047  = {'L3', 'R4'};
 LfpElec.SG050 = {'L3', 'R3'};
@@ -161,6 +165,13 @@ IBI = [];
 
 HR = [];
 
+ChsCmxEvFrTm =[];
+epoch = true;
+baseline = true;
+baseline_win = [-0.3 -0.1];
+
+
+
 for fn = 1:2 % MedOn
     subfname = subfnames{fn};
     for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
@@ -170,7 +181,7 @@ for fn = 1:2 % MedOn
         if ismember('Load Data', steps)
 
             fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
-            
+
             pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
@@ -179,9 +190,9 @@ for fn = 1:2 % MedOn
             % subject_data = fullfile(data_dir, preprocessed_name, subfname, ['sub-', subject], [subject, '_preprocessed_', subfname, '_Rest.mat']);
             % load(subject_data, 'SmrData');
 
+            SR = SmrData.SR;
+            EventTms = SmrData.EvData.EvECGP_Cl;
         end
-
-        SR = SmrData.SR;
 
         % Define the path to subject feature folder
         subject_feature_folder = fullfile(data_dir, feature_name,  subfname, sprintf('sub-%s', subject));
@@ -190,54 +201,55 @@ for fn = 1:2 % MedOn
         subject_results_folder = fullfile(results_dir, feature_name,  subfname, sprintf('sub-%s', subject));
 
 
+
         %% ================================== HRV ================================
+        if ismember('Feature Extraction ECG', steps)
+            % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
+            disp('Calculating HRV...');
 
-        % Calculate the HRV (Heart-Rate Variability from filtered ECG signal
-        disp('Calculating HRV...');
-
-        % For HRV we will use the Raw ECG Signal (not the cleaned one)
-        IBI.(subfname){sub, :} = SmrData.EvData.ECGcomp(1,:);
-        HR.(subfname){sub, :} = SmrData.EvData.ECGcomp(2,:);
-
-
-        % Calculate RMSSD HRV (Time-Range)
-        HRV.rmssd_avg.(subfname)(1,sub) = sqrt(mean(diff(IBI.(subfname){sub, :}).^2));% average HRV rmssd over all IBI
+            % For HRV we will use the Raw ECG Signal (not the cleaned one)
+            IBI.(subfname){sub, :} = SmrData.EvData.ECGcomp(1,:);
+            HR.(subfname){sub, :} = SmrData.EvData.ECGcomp(2,:);
 
 
-        % Calculate Rolling RMSSD HRV
-        % RMSSD = Root Mean Square of Successive Differences.
-        % comuptes a rolling RMSSD without overlap
+            % Calculate RMSSD HRV (Time-Range)
+            HRV.rmssd_avg.(subfname)(1,sub) = sqrt(mean(diff(IBI.(subfname){sub, :}).^2));% average HRV rmssd over all IBI
 
-        dRR = diff(IBI.(subfname){sub, :}).^2;
-        averaged_window = NaN(length(IBI.(subfname){sub, :}),window_length_hrv);
-        for j=1:window_length_hrv
-            averaged_window(j+1:end,j) = dRR(1:end-j+1);
-        end
-        samplesize = sum(~isnan(averaged_window),2);
-        hrv_rmssd = sqrt(sum(averaged_window,2)./(samplesize-1+1)); % the +1 at the end is for normalization
 
-        if show_plots
-            sample_time = max(SmrData.EvData.EvECG(:, end)) / length(hrv_rmssd);
-            f1 = figure;
-            plot(hrv_rmssd.*1000, 'Color', colors.ECG.HRV)
-            yline(HRV.rmssd_avg.(subfname)(1, sub)*1000, "--k", 'HRV Avg', 'LabelHorizontalAlignment', 'right');
-            new_xticks = 0:50:length(hrv_rmssd);
-            new_xtick_labels = round(new_xticks * sample_time/5)*5;
-            xlim([0, length(hrv_rmssd)]);
-            set(gca, 'XTick', new_xticks, 'XTickLabel', new_xtick_labels);
-            xlabel('Recording Length (in sec)');
-            ylabel('HRV Length (in ms)');
-            title(strcat(subfname, ' HRV (RMSSD) of sub ', num2str(subject), ' avg HRV: ', num2str(round(HRV.rmssd_avg.(subfname)(1, sub) * 1000, 2)), ' ms'))
+            % Calculate Rolling RMSSD HRV
+            % RMSSD = Root Mean Square of Successive Differences.
+            % comuptes a rolling RMSSD without overlap
 
-            % saving
-            gr1 = fullfile(subject_results_folder, [subject, '_', subfname, 'HRV-RMSSD_win_', num2str(window_length_hrv),' sample.png']);
-            try
-                exportgraphics(f1, gr1, "Resolution", 300);
-            catch ME
-                warning("Failed to save the plot: %s", ME.message);
+            dRR = diff(IBI.(subfname){sub, :}).^2;
+            averaged_window = NaN(length(IBI.(subfname){sub, :}),window_length_hrv);
+            for j=1:window_length_hrv
+                averaged_window(j+1:end,j) = dRR(1:end-j+1);
+            end
+            samplesize = sum(~isnan(averaged_window),2);
+            hrv_rmssd = sqrt(sum(averaged_window,2)./(samplesize-1+1)); % the +1 at the end is for normalization
+
+            if show_plots
+                sample_time = max(SmrData.EvData.EvECG(:, end)) / length(hrv_rmssd);
+                f1 = figure;
+                plot(hrv_rmssd.*1000, 'Color', colors.ECG.HRV)
+                yline(HRV.rmssd_avg.(subfname)(1, sub)*1000, "--k", 'HRV Avg', 'LabelHorizontalAlignment', 'right');
+                new_xticks = 0:50:length(hrv_rmssd);
+                new_xtick_labels = round(new_xticks * sample_time/5)*5;
+                xlim([0, length(hrv_rmssd)]);
+                set(gca, 'XTick', new_xticks, 'XTickLabel', new_xtick_labels);
+                xlabel('Recording Length (in sec)');
+                ylabel('HRV Length (in ms)');
+                title(strcat(subfname, ' HRV (RMSSD) of sub ', num2str(subject), ' avg HRV: ', num2str(round(HRV.rmssd_avg.(subfname)(1, sub) * 1000, 2)), ' ms'))
+
+                % saving
+                gr1 = fullfile(subject_results_folder, [subject, '_', subfname, 'HRV-RMSSD_win_', num2str(window_length_hrv),' sample.png']);
+                try
+                    exportgraphics(f1, gr1, "Resolution", 300);
+                catch ME
+                    warning("Failed to save the plot: %s", ME.message);
+                end
             end
         end
-
 
         %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
         if ismember('Feature Extraction EEG', steps)
@@ -247,46 +259,124 @@ for fn = 1:2 % MedOn
                     channels{9} = LfpElec.(subject){2};
                 end
                 channel = channels{c};
-               
-                fprintf('****************** TIME FREQ DECOMP for %s %s...****************\n', subject, channel);
-                %TFR = []; % time frequency representation
-                ChsCmxEvFrTm = [];
-                ChDta = SmrData.WvData(c, :);
 
-                % DOWNSASMPLE
-                if NewSR > 0
-                    FsOrigin=SR;
-                    if  FsOrigin ~=  NewSR
-                        [fsorig, fsres] = rat(FsOrigin/NewSR);
-                        ChDta=resample(ChDta,fsres,fsorig);
-                        dtTime=1/NewSR;
+                if epoch
+                    fprintf('****************** EPOCH for %s %s...****************\n', subject, channel);
+
+                    ChDta = SmrData.WvDataCleaned(c, :);
+
+                    % HIGH PASS FILTER
+                    if Fhp > 0
+                        ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but', 'twopass'); % twopass
                     end
-                    NewSR=1.0/dtTime;
+
+                    % DOWNSASMPLE
+                    if NewSR > 0
+                        FsOrigin=SR;
+                        if  FsOrigin ~=  NewSR
+                            [fsorig, fsres] = rat(FsOrigin/NewSR);
+                            ChDta=resample(ChDta,fsres,fsorig);
+                            dtTime=1/NewSR;
+                        end
+                        NewSR=1.0/dtTime;
+                    end
+
+                    [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);
+                    [nEvs,nData]=size(EvData);
+                  
+
+                    %  Baseline Correction
+                    if baseline
+
+                       fprintf('****************** Baseline Correction for %s %s med: %s ...****************\n', subject, channel, subfname);
+                        % My baseline is the time window -0.3 to -0.1 s
+                        % before my Rpeak of every trial
+
+                        % Find the the indices for the basseline window 
+                        bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
+                        
+                        % for every trial calc the mean of the baseline win
+                        % and subtract that from the entire epoch
+                        for t = 1:nEvs
+                        baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
+                        EvData(t,:) = EvData(t,:)-baseline_mean;
+                        end
+
+                    end
+
+                    fprintf('****************** TIME FREQ DECOMP for %s %s, med: %s ...****************\n', subject, channel, subfname);
+                    %TFR = []; % time frequency representation
+                    ChsCmxEvFrTm = [];
+
+                    % Get IIR Peak
+                    for iev=1:nEvs
+                        dx=squeeze(EvData(iev,:));
+                        for ifr=1:length(Frqs)
+                            vfr=Frqs(ifr);
+                            df=IIRPeak_Flt(dx,NewSR,vfr,BandWidth,Qfac,FltPassDir);
+                            ChsCmxEvFrTm(iev,ifr,:)=hilbert(df); % ChannelxFreqxTime
+                        end
+                    end
+
+                    % EXTRACTION OF POWER AND PHASE
+                    [nEvs, nFrs,nData]=size(ChsCmxEvFrTm);
+                    ChsAllFrsTmSpc=zeros(nEvs,nFrs,nData);
+                    ChsAllFrsTmPha=zeros(nEvs,nFrs,nData);
+                    for iev=1:nEvs
+                        for ifr=1:nFrs
+                            xlb=squeeze(ChsCmxEvFrTm(iev,ifr,:));
+                            df=abs(xlb);
+                            ChsAllFrsTmSpc(iev,ifr,:)=df; % Power (eventxfreqxpower)
+                            ChsAllFrsTmPha(iev,ifr,:)=angle(xlb); %Phase (eventxfreqxphase)
+                        end
+                    end
+
                 end
 
-                % HIGH PASS FILTER
-                if Fhp > 0
-                    ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,2,'but', 'twopass'); % twopass
-                end
+                if ~epoch
 
-                % TFR HILBERT
-                for ifr=1:length(Frqs)
-                    vfr=Frqs(ifr);
-                    df=IIRPeak_Flt(ChDta,SR,vfr,BandWidth,Qfac,FltPassDir);
-                    ChsCmxEvFrTm(ifr,:)=hilbert(df); % ChannelxFreqxTime
-                end
+                    fprintf('****************** TIME FREQ DECOMP for %s %s...****************\n', subject, channel);
+                    %TFR = []; % time frequency representation
+                    ChsCmxEvFrTm = [];
+                    ChDta = SmrData.WvDataCleaned(c, :);
 
-                % EXTRACTION OF POWER AND PHASE
-                [nFrs,nData]=size(ChsCmxEvFrTm);
-                ChsAllFrsTmSpc=zeros(nFrs,nData);
-                ChsAllFrsTmPha=zeros(nFrs,nData);
-                for ifr=1:nFrs
-                    xlb=squeeze(ChsCmxEvFrTm(ifr,:));
-                    df=abs(xlb);
-                    ChsAllFrsTmSpc(ifr,:)=df; % Power (channelxfreqxpower)
-                    ChsAllFrsTmPha(ifr,:)=angle(xlb); %Phase (channelxfreqxphase)
+
+                    % HIGH PASS FILTER
+                    if Fhp > 0
+                        ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but', 'twopass'); % twopass
+                    end
+
+                    % DOWNSASMPLE
+                    if NewSR > 0
+                        FsOrigin=SR;
+                        if  FsOrigin ~=  NewSR
+                            [fsorig, fsres] = rat(FsOrigin/NewSR);
+                            ChDta=resample(ChDta,fsres,fsorig);
+                            dtTime=1/NewSR;
+                        end
+                        NewSR=1.0/dtTime;
+                    end
+
+
+                    % TFR HILBERT
+                    for ifr=1:length(Frqs)
+                        vfr=Frqs(ifr);
+                        df=IIRPeak_Flt(ChDta,NewSR,vfr,BandWidth,Qfac,FltPassDir);
+                        ChsCmxEvFrTm(ifr,:)=hilbert(df); % ChannelxFreqxTime
+                    end
+
+                    % EXTRACTION OF POWER AND PHASE
+                    [nFrs,nData]=size(ChsCmxEvFrTm);
+                    ChsAllFrsTmSpc=zeros(nFrs,nData);
+                    ChsAllFrsTmPha=zeros(nFrs,nData);
+                    for ifr=1:nFrs
+                        xlb=squeeze(ChsCmxEvFrTm(ifr,:));
+                        df=abs(xlb);
+                        ChsAllFrsTmSpc(ifr,:)=df; % Power (freqxpower)
+                        ChsAllFrsTmPha(ifr,:)=angle(xlb); %Phase (freqxphase)
+                    end
+
                 end
-        
 
                 % % DOWNSAMPLE Power and Phase
                 % if NewSR > 0
@@ -305,15 +395,23 @@ for fn = 1:2 % MedOn
                 TFR.(channel).phase = ChsAllFrsTmPha;
                 TFR.freqs = Frqs;
                 TFR.SR = NewSR;
-
+                TFR.times = TmAxis;
             end
 
+
+
             %% =========================== SAVING DATA ===============================
-            save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
+            if epoch & baseline
+                save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+            elseif epoch
+               save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset), '.mat']);
+            else
+                save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
+            end
             save(save_path, 'TFR', '-v7.3');
         end
     end
-  
+
 
 end
 
@@ -332,7 +430,7 @@ end
 %     %HRV.SEM = std(HRV.rmssd_avg)/sqrt(length(HRV.rmssd_avg));  % Standard Error
 %     %ts = tinv([0.025  0.975],length(HRV.rmssd_avg)-1); % T-Score
 %     %HRV.CI = mean(HRV.rmssd_avg) + ts*HRV.SEM; % 95% CI
-% 
+%
 % end
 % % figure
 % errorbar(HRV.mean, 1,  HRV.CI, 'horizontal', 'o')
@@ -342,7 +440,7 @@ end
 % ylabel('Mean RMSSD HRV');
 % title('Mean RMSSD HRV with 95% Confidence Interval');
 
-save_path = fullfile(avg_features_folder, ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects.goodHeartMOff)),'.mat']); % med_name needs an alternative here 
+save_path = fullfile(avg_features_folder, ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects.goodHeartMOff)),'.mat']); % med_name needs an alternative here
 save(save_path, 'HRV', 'IBI', 'HR');
 
 %% 3a. HRV Averages

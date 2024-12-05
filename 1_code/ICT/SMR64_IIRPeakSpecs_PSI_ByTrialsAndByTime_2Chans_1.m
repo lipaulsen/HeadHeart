@@ -7,26 +7,28 @@ FilesDir="C:\UsersData\Lisa\Lucia_StnLFPs_ECG_Lisa\SMR\";
 
 Lucia_Data_ECG={
 'All\';
- % "SG041_MED_OFF_Rest_2021_09_10.smr";
-% "SG041_MEDON_Rest_2021_09_10.smr";
-% "SG043_2021_10_01_MedOFF_Rest_Recording.smr";
- % "SG043_2021_10_01_MedON_Rest_Recording.smr";
+ %"SG041_MED_OFF_Rest_2021_09_10.smr";
+"SG041_MEDON_Rest_2021_09_10.smr";
+ %"SG043_2021_10_01_MedOFF_Rest_Recording.smr";
+  %"SG043_2021_10_01_MedON_Rest_Recording.smr";
 % "SG044_2021_10_28_MEDON_RestRec.smr";
 % "SG044_2021_10_28_Rest_OFFmed.smr";
  %"SG045_2021_10_29_MEDON_Resting.smr";
- % "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
+%  "SG046_2021_11_25_MEDOFF_Rest_recording.smr";
 % "SG046_2021_11_27_MedON_rest_recordings.smr";
-% "SG047_2021_11_26_MedOFF_Rest_Recording.smr";
-% "SG047_2021_11_26_MedON_Rest_Recording.smr";
- "SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
-% "SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
-% "SG052_2022_05_13_MEDOFF_RESTing.smr";
+%"SG047_2021_11_26_MedOFF_Rest_Recording.smr";
+%"SG047_2021_11_26_MedON_Rest_Recording.smr";
+%"SG050_2022_03_04_MEDOFF_resting_seating_eyes_open.smr";
+%"SG050_2022_03_04_MEDON_resting_seating_eyes_open.smr";
+%"SG052_2022_05_13_MEDOFF_RESTing.smr";
 %"SG052_2022_05_16_MEDON_RESTing.smr";
-% "SG056_12_08_2022_MEDOFF_Resting.smr";
-% "SG056_12_08_2022_MEDON_Resting.smr";
-% "SG060_28_10_2022_MEDON_resting.smr";
+ %"SG056_12_08_2022_MEDOFF_Resting.smr";
+"SG056_12_08_2022_MEDON_Resting.smr";
+%"SG060_28_10_2022_MEDON_resting.smr";
  };
 
+
+%subjects.goodHeartMOff = {'SG041', 'SG043', 'SG047', 'SG050', 'SG052', 'SG056'};
 
 % [SG41 , L3 and R3; C3, C4
 %  SG43, R1, C4
@@ -37,6 +39,14 @@ Lucia_Data_ECG={
 %  SG52 R2, C4
 %  SG56 L4, R1, C3, C4
 %  ]
+% 
+% LfpElec.SG041 = {'L3', 'R3'};
+% LfpElec.SG043  = {'L4', 'R1'}; 
+% LfpElec.SG046  = {'L4', 'R1'};
+% LfpElec.SG047  = {'L3', 'R4'};
+% LfpElec.SG050 = {'L3', 'R3'};
+% LfpElec.SG052  = {'L4', 'R2'};
+% LfpElec.SG056  = {'L4', 'R1'};
 %%------------------------------------------------------------------------
 
 
@@ -53,7 +63,7 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"}; 
 % channel is the one the ITC will be calculated and plotted for. The second
 % channel will be disregarded in the ITC.
 
- EegLfpChTts= {'R3'; 'C4'};
+ EegLfpChTts= {'F3'; 'R3'};
 
 %%
 nSubs=length(FileNames)-1;
@@ -82,22 +92,22 @@ if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
 tWidth   = 1.5;
 tOffset  = 0.4;
-tSmtEvWv = 0.1;
-stZscoreWave=1;
+tSmtEvWv = 0;
+stZscoreWave=0;
 
 DcRemHpFlt=0.1;  % global dc remove
-Fhp=2;  % high pass filter
-Flp=-80;  % low pass filter
+Fhp=0.5;  % high pass filter
+Flp=100;  % low pass filter
 
 stIIRPeakSpec=1;  % 1-IIRPeak, other Wavlet
-FltPassDir='onepass'; % onepass  twopass
+FltPassDir='twopass'; % onepass  twopass
 
 BandWidth=2; % BandWidth in Hz; 
 Qfac     =2; % Attenuation in db(-Qfac)    
 WaveletnCyc=6;
 WaveletgWidth=3;
 
-permstats = true;% if false then don't calculate them
+permstats = false;% if false then don't calculate them
 if permstats
     % Enable parallel computing (if available)
     if isempty(gcp('nocreate')); parpool; end % Start parallel pool if not already running
@@ -106,7 +116,7 @@ end
 tSmSpc=0.05;
 tSmPsi =0.05;
 tSmItc =0.05;
-tCircMean=0.05; % for By TRials calc
+tCircMean=0.02; % for By TRials calc
 tCohTm=0.05; 
 tCohStep=0.05;
 
@@ -159,7 +169,7 @@ for isb=sbSt:sbEn
     ChanListTts=ChanList.ChanTitle;   ChanListTts=ChanListTts';
 %%    
     nAllChans  =length(ChanListTts);
-    if strcmp(ChanListTts, 'ECG2');  ChanListTts = strrep(ChanListTts, 'ECG2', 'ECG');end
+    if sum(strcmp(ChanListTts, 'ECG2')) == 1 ;  ChanListTts = strrep(ChanListTts, 'ECG2', 'ECG');end
 %     
     [ChanNumsWv,stState]=Get_ChanNumbersFromTitles(ChanListTts,ChanListNms,EegLfpChTts);
     if stState <= 0; error("Error in Get_ChanNumbersFromTitles"); end
@@ -211,6 +221,17 @@ for isb=sbSt:sbEn
         ChTtl=ChanDataWv(ich).Title;
         SR   =ChanDataWv(ich).SR;
         ChsTtl(ich,1)={ChTtl};
+        
+        if DcRemHpFlt > 0
+            ChDta=ft_preproc_highpassfilter(ChDta,SR,DcRemHpFlt,4,'but',FltPassDir); % twopass onepass
+        end        
+        if Fhp > 0 
+            ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but',FltPassDir); % twopass
+        end    
+        if Flp > 0
+            ChDta=ft_preproc_lowpassfilter(ChDta,SR,Flp,4,'but',FltPassDir);
+        end
+
         if NewSR > 0
             FsOrigin=SR;
             if  FsOrigin ~=  NewSR
@@ -220,15 +241,6 @@ for isb=sbSt:sbEn
             end
             SR=1.0/dtTime;
         end    
-        if DcRemHpFlt > 0
-            ChDta=ft_preproc_highpassfilter(ChDta,SR,DcRemHpFlt,2,'but',FltPassDir); % twopass onepass
-        end        
-        if Fhp > 0 
-            ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,2,'but',FltPassDir); % twopass
-        end    
-        if Flp > 0
-            ChDta=ft_preproc_lowpassfilter(ChDta,SR,Flp,2,'but',FltPassDir);
-        end
 
         if stShuffle == 1 && ich == 1
             nrnd=randperm(length(ChDta));
@@ -296,13 +308,13 @@ for isb=sbSt:sbEn
         EcgSR=1.0/ecg_dtTime;
     end
     if DcRemHpFlt > 0
-        ECGData=ft_preproc_highpassfilter(ECGData,EcgSR,DcRemHpFlt,2,'but',FltPassDir); % twopass onepass
+        ECGData=ft_preproc_highpassfilter(ECGData,EcgSR,DcRemHpFlt,4,'but',FltPassDir); % twopass onepass
     end
     if Fhp > 0
-        ECGData=ft_preproc_highpassfilter(ECGData,EcgSR,Fhp,2,'but',FltPassDir); % twopass
+        ECGData=ft_preproc_highpassfilter(ECGData,EcgSR,Fhp,4,'but',FltPassDir); % twopass
     end
     if Flp > 0
-        ECGData=ft_preproc_lowpassfilter(ECGData,EcgSR,Flp,2,'but',FltPassDir);
+        ECGData=ft_preproc_lowpassfilter(ECGData,EcgSR,Flp,4,'but',FltPassDir);
     end
     
     stPlot.Plot=-1;
@@ -310,6 +322,10 @@ for isb=sbSt:sbEn
     stPlot.WvEvTtl=ECGChansTtl;
     [EventTms,EvEcgData,TmAxis]=GetEvTimeAndData(EventTms,ECGData,ecg_dtTime,tWidth,tOffset); %stPlot
     disp("ECG Data is OK")
+
+   save_path = fullfile('F:\HeadHeart\0_data\itc' ,strjoin({char(xFileName{1}), '_ECGEV_', char(ECGChansTtl{1}), 'Epoch=-0.4to1.1s.mat'}, ''));
+   save(save_path, 'EvEcgData', '-v7.3');
+
 
     CEDS64Close(fid);
 %%    
@@ -392,9 +408,9 @@ stMapsLinesEPs=1;
     [FrsTmPsiTime,FrsTmPhaTime,TmAxisCoh]=Get_PSI_ByTime(Ch1EvsFrsTmPha,Ch2EvsFrsTmPha,SR,TmAxis,tCohTm,tCohStep);
     disp("Get_PSI_ByTime is OK");
 
-    if permstats
-       [CCC_zscores, CCC_zscores_thresh] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, nperm,  Frqs, TmAxis, SR);
-    end
+    % if permstats
+    %    [CCC_zscores] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, nperm,  Frqs, TmAxis, SR);
+    % end
 
 
 %% Calc Itc for one Channel by Trials 
@@ -405,18 +421,24 @@ stMapsLinesEPs=1;
     [FrsTmItc2]=Get_PSI_ByTrials_ITC(Ch2EvsFrsTmPha,SR,tCircMean);
     fprintf("Get_ICT_ByTrials for %s and %s is OK \n", (ChsTtl{1}), (ChsTtl{2}))
     
-    % if permstats
-    %     % Calculate IBI
-    %     IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
-    %     % Calc the Perm Stats for PSI by Trials across trial
-    %     [Itc1_clusPos_Z_Stat, Itc1_clusPval_Z_Stat, Itc1_clusPval_clusSize, Itc1_clusPos_clusSize] = ITC_permutation_test(FrsTmItc1, squeeze(ChsAllFrsTmPha(1,:,:)), IBI, nperm, Frqs, TmAxis, SR, Ch1EvsFrsTmPha);
-    %     [Itc2_clusPos_Z_Stat, Itc2_clusPval_Z_Stat, Itc2_clusPval_clusSize, Itc2_clusPos_clusSize] = ITC_permutation_test(FrsTmItc2, squeeze(ChsAllFrsTmPha(2,:,:)), IBI, nperm, Frqs, TmAxis, SR);
-    % 
-    %     % % Save these values to load in since this takes ages
-    %     % PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
-    %     % save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
-    %     % save(save_path, 'PItc');
-    % end
+    % Scale the ITc to the relative ITC of the channel
+    % meanFrsTmItc1 = mean(mean(FrsTmItc1,1),2);
+    % FrsTmItc1 = FrsTmItc1/meanFrsTmItc1;
+    % meanFrsTmItc2 = mean(mean(FrsTmItc2,1),2);
+    % FrsTmItc2 = FrsTmItc2/meanFrsTmItc2;
+    
+    if permstats
+        % Calculate IBI
+        IBI = diff(EvECGTms,1); IBI = [IBI; IBI(end)]';
+        % Calc the Perm Stats for PSI by Trials across trial
+        [zscoresItc1] = ITC_permutation_test(FrsTmItc1, squeeze(ChsAllFrsTmPha(1,:,:)), IBI, nperm, Frqs, TmAxis, SR, Ch1EvsFrsTmPha);
+        [zscoresItc2] = ITC_permutation_test(FrsTmItc2, squeeze(ChsAllFrsTmPha(2,:,:)), IBI, nperm, Frqs, TmAxis, SR);
+
+        % % Save these values to load in since this takes ages
+        % PItc.(ChsTtl{1}) = PItc1; PItc.(ChsTtl{2}) = PItc2;
+        % save_path = fullfile('F:\HeadHeart\0_data\itc\', strjoin([xFileName, '_ITC_PermStats-Results_', ChsTtl{1}, ChsTtl{2}, '.mat']));
+        % save(save_path, 'PItc');
+    end
    
 
 %%
@@ -467,7 +489,7 @@ stMapsLinesEPs=1;
     plotinfo.CohTrsPsi=FrsTmPsiTrial;
     plotinfo.CohTrsPha=FrsTmPhaTrial;
     plotinfo.CohTrsAxis=TmAxis;
-    if permstats; plotinfo.Ccc_zscores = CCC_zscores; end
+    % if permstats; plotinfo.Ccc_zscores = CCC_zscores; end
     
     plotinfo.CohTimTtl=CohTimTtl;
     plotinfo.CohTimPsi=FrsTmPsiTime;
@@ -479,10 +501,10 @@ stMapsLinesEPs=1;
     plotinfo.CohTrsItc1=FrsTmItc1;
     plotinfo.CohTrsItc2=FrsTmItc2;
     plotinfo.CohItcAxis=TmAxis;
-    % if permstats
-    % plotinfo.Itc1_clusPos_Z_Stat = Itc1_clusPos_Z_Stat;
-    % plotinfo.Itc2_clusPos_Z_Stat = Itc2_clusPos_Z_Stat;
-    % end 
+    if permstats
+    plotinfo.Itc1_clusPos_Z_Stat = zscoresItc1;
+    plotinfo.Itc2_clusPos_Z_Stat = zscoresItc2;
+    end 
     
     stCohColorAxis=1; CohClxMin=0; CohClxMax=1;
     if stZscorePSI > 0
@@ -513,7 +535,7 @@ stMapsLinesEPs=1;
     plotinfo.FrqMean=2;
     
     plotinfo.stMapsLines=stMapsLinesCoh; % 1- plot Maps, other - plot Lines
-    plotinfo.FigSize=[1934 -358 1070 1641]; % 45 611 918 484];
+    plotinfo.FigSize=[2 50 1140 946]; % 45 611 918 484]; 1934 -358 1070 1641
     u = plot_EvSpcCohPhas_DifferAxis_2ch(plotinfo);
     
     gr1 = fullfile('F:\HeadHeart\2_results\itc' ,strjoin({char(xFileName{1}), char(EegLfpChTts{1}),'and', char(EegLfpChTts{2}),'PSD-ERP_ITC_POW_PSI_', char(EegLfpChTts{1}), 'vs.', char(EegLfpChTts{2}),'.png'}, ''));

@@ -51,7 +51,7 @@ manual_cleaning = true;
 % end
 
 % Define preprocessing steps to perform
-steps = {'Preprocessing EEG'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
+steps = {'Cutting', 'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting',
 
 % Define whether scaling of the ECG data should be done
 scaling = false;
@@ -394,10 +394,10 @@ for fn = 1:2
             disp('Cleaning EEG & LFP data...');
 
             % 50Hz Line-Noise Removal using the fieldtrip toolbox;
-            %lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvData(1:15,:), SmrData.SR); % BE AWARE THAT THIS CURRENTLY WORKS WITHOUT CUTTING THE "SEC OFF SmrData.WvDataCleaned(1:15,:)
+            lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(1:15,:), SmrData.SR);
 
             % Design Butterworth High and Low pass filters
-            lfp_data_highpass  = ft_preproc_highpassfilter(SmrData.WvData(1:15,:), SmrData.SR, low_frequency,  4, 'but','twopass'); % two pass butterworth filter lfp_notch_ft(1:15,:)
+            lfp_data_highpass  = ft_preproc_highpassfilter(lfp_notch_ft(1:15,:), SmrData.SR, low_frequency,  4, 'but','twopass'); % two pass butterworth filter
             lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, high_frequency,  4, 'but','twopass'); % two pass butterworth filter
             % lfp_data_lowpass_10  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, 10,  4, 'but','twopass'); % two pass butterworth filter
 
@@ -454,14 +454,14 @@ disp('PREPROCESSING DONE!');
 
 
 
-% SR = 2048;
-% NewSR = 300;
-% 
-% FsOrigin=SR;
-% if  FsOrigin ~=  NewSR
-%     [fsorig, fsres] = rat(FsOrigin/NewSR);
-%     ChDta=resample(lfp_data_lowpass(1,:),fsres,fsorig);
-%     dtTime=1/NewSR;
-% end
-% SR=1.0/dtTime;
+SR = 2048;
+NewSR = 300;
+
+            FsOrigin=SR;
+            if  FsOrigin ~=  NewSR
+                [fsorig, fsres] = rat(FsOrigin/NewSR);      
+                ChDta=resample(lfp_data_lowpass(1,:),fsres,fsorig);   
+                dtTime=1/NewSR;
+            end
+            SR=1.0/dtTime;
    

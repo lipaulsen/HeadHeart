@@ -1,4 +1,4 @@
-function [clusPos_Z_Stat, clusPval_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ITC_permutation_test(original_ITC, ChDta, ibi_series, numPerms, freq_bins, time_bins, SR, Ch1EvsFrsTmPha)
+function [zscores] = ITC_permutation_test(original_ITC, ChDta, ibi_series, numPerms, freq_bins, time_bins, SR, Ch1EvsFrsTmPha)
 % INPUTS:
 % original_ITC - Original inter-trial coherence values [Freq x Time]
 % ibi_series - Vector of interbeat intervals (IBIs) for R-peaks
@@ -59,7 +59,7 @@ if trials
     startTime = datetime('now'); disp(['Start Time: ', datestr(startTime)]);
     parfor perm = 1:numPerms
 
-        permCh = Ch1EvsFrsTmPha(:, :, randperm(nTms)); % Shuffled data for Channel 1, randperm(nTms) randperm(nTrials)
+        permCh = Ch1EvsFrsTmPha(randperm(nTrials), :, :); % Shuffled data for Channel 1, randperm(nTms) randperm(nTrials)
 
         %  Calculate ITC with the surrogate R-peaks (one per channel)
         [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(permCh,SR,tCircMean);
@@ -93,24 +93,24 @@ histogram(PermItcData);
 hold on 
 histogram(original_ITC);
 
-zscores_thresh = (zscores > 25) | (zscores < 25);
+zscores_thresh = (zscores > 5) | (zscores < -5);
 figure;
-imagesc(time_bins, freq_bins, zscores_thresh)
+imagesc(time_bins, freq_bins, zscores_thresh); axis xy;
 histogram(zscores)
 
-% Step 2: Compute p-values from z-scores (two-tailed)
-p_orig = 2 * (1 - normcdf(zscores, 0, 1)); % no abs bc unidirectional 
-
-% Step 3: Calculate z-scores for permutations
-p_perm = 2 * (1 - normcdf(zscores_perm, 0, 1)); % no abs bc unidirectional 
-
-% Step 4: Prepare inputs for getSignifClusters
-% Create a logical significance matrix for the original data
-p_sig = p_orig < THRESH_SUPRACLUSTER;
-
-% Call getSignifClusters to find clusters
-[clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ...
-    CCC_getSignifClusters(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA);
+% % Step 2: Compute p-values from z-scores (two-tailed)
+% p_orig = 2 * (1 - normcdf(zscores, 0, 1)); % no abs bc unidirectional 
+% 
+% % Step 3: Calculate z-scores for permutations
+% p_perm = 2 * (1 - normcdf(zscores_perm, 0, 1)); % no abs bc unidirectional 
+% 
+% % Step 4: Prepare inputs for getSignifClusters
+% % Create a logical significance matrix for the original data
+% p_sig = p_orig < THRESH_SUPRACLUSTER;
+% 
+% % Call getSignifClusters to find clusters
+% [clusPval_Z_Stat, clusPos_Z_Stat, clusPval_clusSize, clusPos_clusSize] = ...
+%     CCC_getSignifClusters(p_sig, zscores, p_perm, zscores_perm, THRESH_SUPRACLUSTER, ALPHA);
 
 % The output clusPos_Z_Stat and clusPos_clusSize will indicate positions of significant clusters
 % clusPval_Z_Stat and clusPval_clusSize contain p-values for each detected cluster

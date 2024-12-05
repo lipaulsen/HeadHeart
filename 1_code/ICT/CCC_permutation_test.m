@@ -1,4 +1,4 @@
-function [zscores, zscores_thresh] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, numPerms, freq_bins, time_bins, SR)
+function [zscores] = CCC_permutation_test(FrsTmPsiTrial,Ch1EvsFrsTmPha, Ch2EvsFrsTmPha, numPerms, freq_bins, time_bins, SR)
 
 
 BandWidth=2; % BandWidth in Hz;

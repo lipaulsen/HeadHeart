@@ -51,7 +51,8 @@ preprocess_physiological(subjects, data_dir, results_dir)
 
 
 %% TIME FREQUENCY DECOMPOSITION
-
+%feature extraction func
+%epoching func
 
 
 %% ERP 
