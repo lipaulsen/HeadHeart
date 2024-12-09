@@ -43,7 +43,7 @@ seperateSTN = true;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Plot SubAvg PermStats'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
+steps = {'Calc Single Subject CCC'}; %'Plot SubAvg PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power'
 
 % Define folder variables
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
@@ -62,6 +62,20 @@ LfpElec.STNl = {'L1', 'L2', 'L3', 'L4'};
 LfpElec.STNr = {'R1', 'R2', 'R3', 'R4'};
 
 
+CCCchans.Comp1 = {'STNl', 'C3'};
+CCCchans.Comp2 = {'STNl', 'F3'};
+CCCchans.Comp3 = {'STNr', 'C4'};
+CCCchans.Comp4 = {'STNr', 'F4'};
+CCCchans.Comp5 = {'F3', 'F4'};
+CCCchans.Comp6 = {'STNl', 'C4'};
+CCCchans.Comp7 = {'STNl', 'F4'};
+CCCchans.Comp8 = {'STNr', 'C3'};
+CCCchans.Comp9 = {'STNr', 'F4'};
+comps = {'Comp1', 'Comp2', 'Comp3', 'Comp4', 'Comp5', 'Comp6', 'Comp7', 'Comp8', 'Comp9'};
+
+Hz_dir = '2Hz';
+
+
 % Define Time Window
 tWidth   = 0.9;
 tOffset  = 0.3;
@@ -78,7 +92,7 @@ BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)
 tCircMean=0.02; % for By TRials calc
 
-permstats = true;
+permstats = false;
 numPerms = 500;
 surrogate = true;
 trials = false;
@@ -96,7 +110,7 @@ PermItcAll = zeros(nSub, numel(channels), numPerms, 141, 271);
 
 
 
-disp("************* STARTING EPOCH AND TIMELOCKING *************");
+disp("************* STARTING CCC Stats FUnction *************");
 
 for fn = 1:2 % MedOn
 
@@ -108,7 +122,7 @@ for fn = 1:2 % MedOn
     filename = fullfile(files(1).folder, files(1).name);
     load(filename, 'AVGECG');
    
-    if ismember ('Calc Single Subject ITC', steps)
+    if ismember ('Calc Single Subject CCC', steps)
 
     for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
 
@@ -136,7 +150,7 @@ for fn = 1:2 % MedOn
 
         if baseline
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
@@ -159,24 +173,36 @@ for fn = 1:2 % MedOn
         EventTms = SmrData.EvData.EvECGP_Cl;
         if baseline; times = TFR.times; else times = AVGECG.times; end
 
-        for c = 1:numel(channels)
-            channel = channels{c};
-            fprintf('************ Calculating ITC for %s in %s **************** \n', subject, channel);
+
+        %% GET PSI / CCC By Trials
+        for c1 = 1:numel(fieldnames(CCCchans))
+            comp = comps{c1};
+            channel1 = CCCchans.(comp){1};
+            channel2 = CCCchans.(comp){2};
+            
+            if strcmp(channel1, 'STNl'); chan1 = LfpElec.(subject){1}; elseif strcmp(channel1, 'STNr'); chan1 = LfpElec.(subject){2}; else; chan1 = channel1; end
+           if strcmp(channel2, 'STNl'); chan2 = LfpElec.(subject){1}; elseif strcmp(channel2, 'STNr'); chan2 = LfpElec.(subject){2}; else; chan2 = channel2; end
+
+
+            fprintf('************ Calculating CCC for %s in %s **************** \n', subject, channel);
             % Calc original ITC
-            [FrsTmItc]=Get_PSI_ByTrials_ITC(TFR.(channel).phase,SR,tCircMean);
+            [FrsTmPsiTrial,FrsTmPhaTrial]=Get_PSI_ByTrials(TFR.(chan1).phase,TFR.(chan2).phase,SR,tCircMean);
 
             % Scale the ITc to the relative ITC of the channel
-            meanFrsTmItc = mean(mean(FrsTmItc,1),2);
-            relFrsTmItc = FrsTmItc/meanFrsTmItc;
+            meanFrsTmCcc = mean(mean(FrsTmPsiTrial,1),2);
+            relFrsTmCcc = FrsTmPsiTrial/meanFrsTmCcc;
 
-            ItcAll(sub,c,:,:) = FrsTmItc; % SubjectxChannelxFreqxTime
-            RelItcAll(sub,c,:,:) = relFrsTmItc;
+            CccAll(sub,c1,:,:) = FrsTmPsiTrial; % SubjectxChannelxFreqxTime
+            RelCccAll(sub,c1,:,:) = relFrsTmCcc;
         end
         
-        outputPDF1 = fullfile('F:\HeadHeart\2_results\itc\ss' , [subject, '_ITC_Allchan_med=', subfname, ...
+        %% PLOT SingleSub PSI/CCC
+        outputPDF1 = fullfile('F:\HeadHeart\2_results\ccc\ss' , [subject, '_CCC_Allchancomp_med=', subfname, ...
                     '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '.pdf']);
-        for c = 1:numel(channels)
-            channel = channels{c};
+        for c1 = 1:numel(fieldnames(CCCchans))
+          comp = comps{c1};
+            channel1 = CCCchans.(comp){1};
+            channel2 = CCCchans.(comp){2};
 
             if plots
                 f1=figure;
@@ -190,14 +216,14 @@ for fn = 1:2 % MedOn
                 title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, subfname))
                 hold off
                 subplot(2,1,2)
-                imagesc(times,freqs,squeeze(ItcAll(sub,c,:,:)));axis xy;
-                colormap('jet');
+                imagesc(times,freqs,squeeze(CccAll(sub,c1,:,:)));axis xy;
+                colormap('parula');
                 xline(0, "--k", 'LineWidth', 2);
                 col = colorbar;
-                col.Label.String = 'ITC Values'; % Add title to colorbar
+                col.Label.String = 'CCC Values'; % Add title to colorbar
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf('ITC for %s in %s, medication: %s', subject, channel, subfname))
+                title(sprintf('CCC PSI for %s, %s - %s, medication: %s', subject, channel1, channel2, subfname))
 
 
                 %gr1 = fullfile('F:\HeadHeart\2_results\itc\ss' , [subject, '_', subfname, '_ITC_', channel, '.png']);
@@ -310,7 +336,7 @@ for fn = 1:2 % MedOn
                 % Lower subplot
                 subplot(2,1,2)
                 imagesc(times, freqs, squeeze(ItcAll(sub,c,:,:))); axis xy;
-                colormap('jet');
+                colormap('parula');
                 col = colorbar;
                 col.Label.String = 'ITC Values'; % Add title to colorbar
                 clims = clim;
@@ -364,9 +390,9 @@ for fn = 1:2 % MedOn
     ITC.ItcAll = ItcAll;
     ITC.RelItcAll = RelItcAll;
     if permstats
-    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'.mat']);
+    save_path = fullfile(data_dir, 'ccc', ['CCC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', freqs(1) ,'.mat']);
     else
-    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)),'.mat']);
+    save_path = fullfile(data_dir, 'ccc', ['CCC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)),'_HP=', freqs(1) ,'.mat']);
     end
     save(save_path, 'ITC', '-v7.3');
     fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
@@ -452,7 +478,7 @@ for fn = 1:2 % MedOn
             zscores_all = (ItcAll_subavg - diff_sum_perm_mean_all) ./ diff_sum_perm_std_all ;
             %zscores_perm = (PermItcData - diffPerm_mean) ./ diffPerm_std;
             p_orig_all = 2 * (1 - normcdf(zscores_all, 0, 1));
-            signif_thresh =0.001;
+            signif_thresh =0.005;
             p_thresh_all = p_orig_all < signif_thresh;
 
 

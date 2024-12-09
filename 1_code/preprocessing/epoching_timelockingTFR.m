@@ -43,7 +43,7 @@ seperateSTN = true;
 baseline = false; %currently no baseline but if needed can be added
 
 % Define feature extraction steps to perform
-steps = {'Load Data', 'Epoch and Timelock Data'}; %'Load Data', 'Epoch and Timelock Data','ECG Data'
+steps = {'ECG Data'}; %'Load Data', 'Epoch and Timelock Data',
 
 % Define folder variables
 tfr_name = 'tfr';  % averaged data folder (inside preprocessed)
@@ -67,8 +67,8 @@ LfpElec.STNr = {'R1', 'R2', 'R3', 'R4'};
 
 
 % Define Time Window
-tWidth   = 1.5;
-tOffset  = 0.4;
+tWidth   = 0.9;
+tOffset  = 0.3;
 
 % Define Struct
 EPOCH = [];
@@ -337,7 +337,7 @@ if ismember('ECG Data', steps)
 
 
              % Load the the cleaned ECG R Peaks Data
-            pattern = fullfile(data_dir, 'itc', [subject, '_', subfname, '*']);
+            pattern = fullfile(data_dir, 'itc', 'evecg' ,[subject, '_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'EvEcgData');
@@ -433,7 +433,7 @@ if ismember('ECG Data', steps)
         save_path = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', subfname ,'n=', num2str(nSub),...
             '_Rest_Hilbert_Freq=', num2str(freqs(1)),'-', num2str(freqs(end)),'Hz_bin=', num2str(mean(diff(freqs))),...
             'HZ-Epoch=', num2str(TmAxis(1)),'to',num2str(TmAxis(end)),'s_BSL=', num2str(baseline),'.mat']);
-        save(save_path, 'AVGECG', 'Params', '-v7.3');
+        save(save_path, 'AVGECG', '-v7.3');
 
     end
 end

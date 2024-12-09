@@ -44,7 +44,7 @@ subfnames = fieldnames(subjects);
 show_plots = false;
 
 % Define feature extraction steps to perform
-steps = {'Load Data', 'Feature Extraction EEG'}; %'Feature Extraction ECG',
+steps = {'Load Data','Feature Extraction EEG'}; %'Feature Extraction ECG',
 
 % Define folder variables
 preprocessed_name = 'preprocessed';  % preprocessed folder (inside derivatives)
@@ -117,11 +117,12 @@ seperateSTN = true;
 ft_defaults; % If using FieldTrip
 
 NewSR=300;
-stfr=0.2;   enfr=30; dfr=0.2;
+stfr=0.5;   enfr=30; dfr=0.2;
 Frqs=stfr:dfr:enfr;
 if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
-Fhp = 2;
+Fhp = 0.5;
+Hz_dir = '0.5Hz';
 
 BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)
@@ -402,17 +403,32 @@ for fn = 1:2 % MedOn
 
             %% =========================== SAVING DATA ===============================
             if epoch & baseline
-                save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+                save_path = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
             elseif epoch
-               save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset), '.mat']);
+               save_path = fullfile(data_dir, 'tfr', Hz_dir,[subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset), '.mat']);
             else
-                save_path = fullfile(data_dir, 'tfr', [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
+                save_path = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR_', subfname ,'_Rest_Hilbert_Freq=', num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', num2str(Fhp),'Hz.mat']);
             end
             save(save_path, 'TFR', '-v7.3');
         end
+    
+
+
+        %% Extract ECG Epochs
+
+        % DOES NOT WORK YET - PREPROCESSING MUST INCLUDE THE CLEANED ECG
+        % SIGNAL FOR THAT 
+        if ismember('ECG Epoch',steps)
+
+            
+            [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);
+                    [nEvs,nData]=size(EvData);
+
+
+
+
+        end
     end
-
-
 end
 
 %% =========================== 3. AVERAGES ================================
