@@ -40,7 +40,7 @@ show_plots = false;
 seperateSTN = true;
 
 % Define feature extraction steps to perform
-steps = {'Calc Single Subject ITC'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
+steps = {'PWelch'}; %'TFR Basis', 'PWelch'
 
 % Define folder variables
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
@@ -68,6 +68,25 @@ nSub = numel(subjects.goodHeartMOff);
 
 plots = true;
 baseline =true;
+epoch = true;
+baseline_win = [-0.3 -0.1];
+% Define Time Window
+tWidth   = 0.9;
+tOffset  = 0.3;
+
+NewSR=300;
+stfr=0.5;   enfr=30; dfr=0.2;
+Frqs=stfr:dfr:enfr;
+if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
+
+window_length = 5000;           % Window length
+window = hamming(window_length); % Hamming window
+noverlap = window_length/2;    % 50% overlap
+nfft = 10000;          % FFT points
+
+Fhp = 2;
+Hz_dir = '2Hz';
+
 
 disp("************* STARTING EPOCH AND TIMELOCKING *************");
 
@@ -90,33 +109,91 @@ for fn = 1:2 % MedOn
             channels{8} = LfpElec.(subject){1};
             channels{9} = LfpElec.(subject){2};
         end
-        
-        if baseline
-            fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        else
-            fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
+        %% Do PSD Based on Hilbert TFR
+
+        if ismember('TFR Basis', steps)
+            if baseline
+                fprintf('Loading TFR Data\n');
+                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
+                files = dir(pattern);
+                filename = fullfile(files(1).folder, files(1).name);
+                load(filename, 'TFR', '-mat');
+            else
+                fprintf('Loading TFR Data\n');
+                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*']);
+                files = dir(pattern);
+                filename = fullfile(files(1).folder, files(1).name);
+                load(filename, 'TFR', '-mat');
+            end
+
+            freqs = TFR.freqs;
+            times = TFR.times;
+
+
+            for c = 1:numel(channels)
+                channel = channels{c};
+
+                PowerAllTrsAvg(sub,c,:,:) = squeeze(mean(TFR.(channel).pow,1));
+            end
         end
 
-        freqs = TFR.freqs;
-        times = TFR.times;
+        %% DO PSD based on PWelch
+
+         if ismember('PWelch', steps)
+        fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
+        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', subfname, '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'SmrData');
+        % Load subject data
+        % subject_data = fullfile(data_dir, preprocessed_name, subfname, ['sub-', subject], [subject, '_preprocessed_', subfname, '_Rest.mat']);
+        % load(subject_data, 'SmrData');
+
+        SR = SmrData.SR;
+        EventTms = SmrData.EvData.EvECGP_Cl;
 
 
-         for c = 1:numel(channels)
+        % PWelch on entire Channel Data
+        for c = 1:numel(channels)
             channel = channels{c};
 
-            PowerAllTrsAvg(sub,c,:,:) = squeeze(mean(TFR.(channel).pow,1));
-         end
-  
-    end
+            ChDta = SmrData.WvDataCleaned(c, :);
 
+            % if NewSR > 0
+            %     FsOrigin=SR;
+            %     if  FsOrigin ~=  NewSR
+            %         [fsorig, fsres] = rat(FsOrigin/NewSR);
+            %         ChDta=resample(ChDta,fsres,fsorig);
+            %         dtTime=1/NewSR;
+            %     end
+            %     NewSR=1.0/dtTime;
+            % end
+
+
+            [FftPwelch, f] = pwelch(ChDta, window, noverlap, nfft, SR);
+
+            PWelchAllDtaAvg(sub,c,:) = FftPwelch;
+
+            
+
+        end
+
+        % PWelch on Epochs
+% freq_limit = 30;  % Hz
+%             idx = f <= freq_limit;  % Index for frequencies up to 30 Hz
+%             f_trimmed = f(idx);
+%             FftPwelch_trimmed = FftPwelch(idx);
+% 
+%             figure
+%             plot(f_trimmed, 10*log10(FftPwelch_trimmed));
+%             xlabel('Frequency (Hz)');
+%             ylabel('Power/Frequency (dB/Hz)');
+%             title('Power Spectral Density (Welch)');
+
+         end
+    end
+%% PLOT PSD on HIlbert
+ if ismember('TFR Basis', steps)
     for c = 1:numel(channels)
         channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
         channel = channels{c};
@@ -138,4 +215,34 @@ for fn = 1:2 % MedOn
         exportgraphics(f1,gr1, 'Resolution', 300)
 
     end
+ end
+%% PLOT PSD on PWELCH
+ if ismember('PWelch', steps)
+ for c = 1:numel(channels)
+        channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+        channel = channels{c};
+
+        ChanSubAllStaAvg = squeeze(mean(squeeze(PWelchAllDtaAvg(:,c,:)),1));
+
+        freq_limit = 30; 
+        freq_limitlow = 2;% Hz
+        idx = f <= freq_limit & f > freq_limitlow ;  % Index for frequencies up to 30 Hz
+        f_trimmed = f(idx);
+        FftPwelch_trimmed = ChanSubAllStaAvg(idx);
+        FftPwelch_trimmed = smoothdata(FftPwelch_trimmed, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines 
+
+        f1 = figure;
+        set(f1,'Position',[1949 123 1023 400]);
+        plot(f_trimmed, 10*log10(FftPwelch_trimmed),'LineWidth', 1, 'Color','k')
+        title(sprintf('Average PSD for in %s,med: %s', channel, subfname))
+        xlabel('Frequencies (Hz)') % Add x-label
+        ylabel('dB/Hz') %
+        axis('tight');
+
+        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_PWelch', channel, '_', subfname,  '.png']);
+        exportgraphics(f1,gr1, 'Resolution', 300)
+
+
+ end
+ end
 end

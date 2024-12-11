@@ -90,7 +90,7 @@ nSub = numel(subjects.goodHeartMOff);
 
 BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)
-tCircMean=0.02; % for By TRials calc
+tCircMean=0.05; % for By TRials calc
 
 permstats = false;
 numPerms = 500;
@@ -213,7 +213,7 @@ for fn = 1:2 % MedOn
                 xline(0, "--k", 'LineWidth', 2);
                 ylabel('Amplitude')
                 axis('tight')
-                title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, subfname))
+                title(sprintf('Average ECG for %s in %s, med= %s', subject, channel, subfname))
                 hold off
                 subplot(2,1,2)
                 imagesc(times,freqs,squeeze(CccAll(sub,c1,:,:)));axis xy;
@@ -223,7 +223,7 @@ for fn = 1:2 % MedOn
                 col.Label.String = 'CCC Values'; % Add title to colorbar
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf('CCC PSI for %s, %s - %s, medication: %s', subject, channel1, channel2, subfname))
+                title(sprintf('CCC PSI for %s, %s - %s, med= %s', subject, channel1, channel2, subfname))
 
 
                 %gr1 = fullfile('F:\HeadHeart\2_results\itc\ss' , [subject, '_', subfname, '_ITC_', channel, '.png']);

@@ -43,7 +43,7 @@ seperateSTN = true;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Calc Single Subject ITC'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
+steps = {'Plot Power'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
 
 % Define folder variables
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
@@ -381,7 +381,7 @@ for fn = 1:2 % MedOn
         if ismember('Calc Single Subject ITC', steps) == false
 
         fprintf('Loading ITC Data\n');
-        pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  subfname, '*']);
+        pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  subfname, '*', '_HP=', Hz_dir(1:end-2), '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'ITC', '-mat');
@@ -402,18 +402,24 @@ for fn = 1:2 % MedOn
                 set(f2,'Position',[1949 123 1023 785]);
                 subplot(2,1,1)
                 plot(times, AVGECG.mean', 'Color', 'k'); hold on
-                set(gca,'Position',[0.1300 0.5838 0.77 0.3])
+                set(gca,'Position',[0.0900  0.6838 0.78 0.2])
                 xline(0, "--k", 'LineWidth', 2);
+                ylabel('Amplitude')
+                axis('tight')
                 title(sprintf('Average ECG over all subjects, medication: %s', subfname))
                 hold off
                 subplot(2,1,2)
+                set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
                 imagesc(times,freqs,ItcAll_subavg);axis xy;
-                colormap('jet');
+                colormap('parula');
                 xline(0, "--k", 'LineWidth', 2);
-                colorbar;
-                title(sprintf('Average ITC for %s, med: %s', channel, subfname))
+                col = colorbar;
+                col.Label.String = 'ITC Values'; % Add title to colorbar
+                xlabel('Time (s)') % Add x-label
+                ylabel('Frequencies (Hz)') % Add y-label
+                title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, subfname, Hz_dir))
 
-                gr2 = fullfile('F:\HeadHeart\2_results\itc' , ['ITC_', channel, '_', subfname,  '.png']);
+                gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', subfname,  '.png']);
                 exportgraphics(f2,gr2, 'Resolution', 300)
             end
         end
@@ -516,12 +522,12 @@ for fn = 1:2 % MedOn
             end
 
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
             freqs = TFR.freqs;
-            %times = TFR.
+            times = TFR.times;
 
             for c = 1:numel(channels)
 
@@ -542,13 +548,13 @@ for fn = 1:2 % MedOn
         f7=figure;
         set(f7,'Position',[1949 123 1023 785]);
         subplot(2,1,1)
-        plot(times, AVGECG.mean', 'Color', 'k'); hold on
-        set(gca,'Position',[0.1300 0.5838 0.77 0.3])
+        plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+        set(gca,'Position',[0.1300 0.5838 0.71 0.3])
         xline(0, "--k", 'LineWidth', 2);
         title(sprintf('Average ECG over all Sub'))
         hold off
         subplot(2,1,2)
-        imagesc(times,freqs,PowAll_subavg);axis xy;
+        imagesc(times(31:end),freqs,PowAll_subavg(:,31:end));axis xy;
         colormap('jet');
         colorbar;
         clims = clim;
@@ -558,7 +564,7 @@ for fn = 1:2 % MedOn
         xline(0, "--k", 'LineWidth', 2);
         title(sprintf('Average  Power in %s, med = %s', channel,  subfname ))
 
-        gr7 = fullfile('F:\HeadHeart\2_results\power\group' , ['AvgPower_', channel, '_', subfname, '.png']);
+        gr7 = fullfile('F:\HeadHeart\2_results\power\', Hz_dir,  'group' , ['AvgPower_', channel, '_', subfname, '.png']);
         exportgraphics(f7,gr7, 'Resolution', 300)
         end
 

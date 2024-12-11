@@ -248,58 +248,19 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    title(txt);
 
 %% Plot ITC for 2nd Channel
-
-   % subplot(7,1,4);
-   subplot(3,1,3);
-   txt=sprintf('%s, %s',DataInfo.Title2,xttl);
-   xdta=DataInfo.CohTrsItc2;
-  
-   if stMapsLines == 1
-       imagesc(xaxi,Frqs,xdta); axis xy;
-       colormap(DataInfo.ColorMap);
-       hold on
-       if DataInfo.permstats  
-           itc2_zscores_thresh = (DataInfo.Itc2_clusPos_Z_Stat > 15) | (DataInfo.Itc2_clusPos_Z_Stat < -15);
-               contour(xaxi,Frqs,itc2_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1);
-       end
-       if stCohColorAxis > 0
-           %clim([CohClxMin CohClxMax]);
-       end
-       colorbar;
-       xline(0, "--k", 'LineWidth', 2);
-   else
-       hold on;
-       for il=1:nLns
-           nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
-           nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
-           dx=mean(xdta(nst:nen,:),1);
-           plot(xaxi,dx,LinesClx(il));
-       end
-       legend(LinesTtl); legend("boxoff");
-       if stCohColorAxis > 0; ylim([CohClxMin CohClxMax]); end
-       xlim([xaxi(1) xaxi(end)]);
-       grid on;
-   end
-   ylabel('Frequency (in Hz)');
-   title(txt);
-
-   % %% Plot Trial PSI Data
-   % xttl=DataInfo.CohTrsTtl;
-   % xaxi=DataInfo.CohTrsAxis;
-   %
    % 
-   % % subplot(2,3,2);
-   % subplot(7,1,5);
-   % txt=sprintf('%s-%s, %s',DataInfo.Title1,DataInfo.Title2,xttl);
-   % xdta=DataInfo.CohTrsPsi;
+   % % subplot(7,1,4);
+   % subplot(3,1,3);
+   % txt=sprintf('%s, %s',DataInfo.Title2,xttl);
+   % xdta=DataInfo.CohTrsItc2;
+   % 
    % if stMapsLines == 1
    %     imagesc(xaxi,Frqs,xdta); axis xy;
    %     colormap(DataInfo.ColorMap);
    %     hold on
-   %     if DataInfo.permstats
-    % ccc_zscores_thresh = (DataInfo.Ccc_zscores > 15) | (DataInfo.Ccc_zscores < -15);
-   %         contour(xaxi,Frqs,ccc_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1); 
-   %         %imagesc(xaxi,Frqs,ccc_zscores_thresh);axis xy;
+   %     if DataInfo.permstats  
+   %         itc2_zscores_thresh = (DataInfo.Itc2_clusPos_Z_Stat > 15) | (DataInfo.Itc2_clusPos_Z_Stat < -15);
+   %             contour(xaxi,Frqs,itc2_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1);
    %     end
    %     if stCohColorAxis > 0
    %         %clim([CohClxMin CohClxMax]);
@@ -319,8 +280,48 @@ function u = plot_EvSpcCohPhas_DifferAxis_2ch(DataInfo)
    %     xlim([xaxi(1) xaxi(end)]);
    %     grid on;
    % end
-   % xlabel('Time (in s)'); ylabel('Frequency (in Hz)');
+   % ylabel('Frequency (in Hz)');
    % title(txt);
+
+   %% Plot Trial PSI Data
+   xttl=DataInfo.CohTrsTtl;
+   xaxi=DataInfo.CohTrsAxis;
+
+
+   % subplot(2,3,2);
+   % subplot(7,1,5);
+   subplot(3,1,3);
+   txt=sprintf('%s-%s, %s',DataInfo.Title1,DataInfo.Title2,xttl);
+   xdta=DataInfo.CohTrsPsi;
+   if stMapsLines == 1
+       imagesc(xaxi,Frqs,xdta); axis xy;
+       colormap(DataInfo.ColorMap);
+       hold on
+       if DataInfo.permstats
+    ccc_zscores_thresh = (DataInfo.Ccc_zscores > 15) | (DataInfo.Ccc_zscores < -15);
+           contour(xaxi,Frqs,ccc_zscores_thresh, 1, 'linecolor', 'k', 'linewidth', 1.1); 
+           %imagesc(xaxi,Frqs,ccc_zscores_thresh);axis xy;
+       end
+       if stCohColorAxis > 0
+           %clim([CohClxMin CohClxMax]);
+       end
+       colorbar;
+       xline(0, "--k", 'LineWidth', 2);
+   else
+       hold on;
+       for il=1:nLns
+           nst=LinesFrq(il)-ncnt; if nst < 1; nst=1; end
+           nen=LinesFrq(il)+ncnt; if nen > nFrqs; nst=nFrqs; end
+           dx=mean(xdta(nst:nen,:),1);
+           plot(xaxi,dx,LinesClx(il));
+       end
+       legend(LinesTtl); legend("boxoff");
+       if stCohColorAxis > 0; ylim([CohClxMin CohClxMax]); end
+       xlim([xaxi(1) xaxi(end)]);
+       grid on;
+   end
+   xlabel('Time (in s)'); ylabel('Frequency (in Hz)');
+   title(txt);
 
    % 
    % %subplot(2,3,3); 

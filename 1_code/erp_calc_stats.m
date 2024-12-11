@@ -54,7 +54,8 @@ seperateSTN = true
 NewSR=300;
 
 % Filter Parameters
-Fhp = 4;
+Fhp = 2;
+Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
 steps = {'Plot SS ERP'}; 
@@ -115,6 +116,9 @@ for fn = 1:2 % MedOn
             if Fhp > 0
                 ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but',FltPassDir); % twopass
             end
+            if Flp >0
+                ChDta = ft_preproc_lowpassfilter(ChDta, SR, Flp, 4, 'but',FltPassDir); 
+            end
 
             % DOWNSASMPLE
             if NewSR > 0
@@ -150,7 +154,18 @@ for fn = 1:2 % MedOn
 
             end
             
-            EvDataAllAvgTrs(sub,c,:) = squeeze(mean(EvData,1));
+            %% Z Score the Ev Data
+            % As the basleine has already been taken the data is alreadu
+            % around 0 but I want it to have the same std as well so I will
+            % do that here
+
+            BslStd = std(EvData(:,bidx(1):bidx(end)), 0, 2);
+            BslStd(BslStd == 0) = eps; % Replace zero std with a small value
+
+            % Normalize ERPData
+            EvData_zscored = EvData ./ BslStd;
+
+            EvDataAllAvgTrs(sub,c,:) = squeeze(mean(EvData_zscored,1));
 
         end
     end
@@ -173,32 +188,84 @@ for fn = 1:2 % MedOn
     for c = 1:numel(channels)
          channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
          channel = channels{c};
-    
+         
+         colors = lines(15);
+          
+  
          EvDataAll_chanavg = squeeze(mean(squeeze(EvDataAllAvgTrs(:,c,:)),1));
+         EvDataAll_chanavg = smoothdata(EvDataAll_chanavg, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines 
             
          f2 = figure;
          set(f2,'Position', [1949 123 1023 785]);
          
          subplot(2,1,1)
-         plot(TmAxis, AVGECG.mean', 'Color', 'k'); hold on
+         plot(TmAxis(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
          set(gca,'Position',[0.1300 0.5838 0.77 0.3])
          xline(0, "--k", 'LineWidth', 2);
-         title(sprintf('Average ECG in %s, medication: %s', channel, subfname))
+         title(sprintf('Grand Average ECG in %s, medication: %s', channel, subfname))
          axis("tight");
          ylabel('Amplitude (μV)')
          hold off
 
          subplot(2,1,2)
-         plot(TmAxis, EvDataAll_chanavg, 'Color', 'b');hold on
-         xline(0, "--k", 'LineWidth', 2);
+         for s = 1:numel(subjects.goodHeartMOff)
+             subject = subjects.goodHeartMOff{sub};
+             EvDataSubAvgTrs = squeeze(EvDataAllAvgTrs(s,c,:));
+             plot(TmAxis(31:end), EvDataSubAvgTrs(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 1);
+             hold on
+         end
+         plot(TmAxis(31:end), EvDataAll_chanavg(31:end), 'Color', 'r', 'LineWidth', 3, 'DisplayName', 'Average');
+         %legend('Location','southwest', 'FontSize',6)
+         xline(0, "--k", 'LineWidth', 2, 'HandleVisibility','off');
          xlabel('Time (s)') % Add x-label
          ylabel('Amplitude (μV)') % Add y-label
-         title(sprintf('Average ERP in %s, medication: %s', channel, subfname))
+         title(sprintf('Grand Average ERP in %s, medication: %s, LPF = %uHz, GF=10', channel, subfname, Flp))
          axis("tight");
 
-         gr2 = fullfile('F:\HeadHeart\2_results\erp' , ['AvgERP_', channel, '_', subfname,  '.png']);
+         gr2 = fullfile('F:\HeadHeart\2_results\erp' , ['AvgERP_', channel, '_', subfname, '_HP=',  num2str(Fhp), '_LP=',  num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), 'GF=On', '.png']);
          exportgraphics(f2,gr2, 'Resolution', 300)
 
     end
+
+    %% Plot ERP For Frontal Central and Parietal Electrodes together 
+
+    EvDataAll_chanavg = squeeze(mean(squeeze(mean(EvDataAllAvgTrs(:,1:2,:),2)),1));
+    EvDataAll_chanavg = smoothdata(EvDataAll_chanavg, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines 
+
+    colors = lines(15);
+
+    f3 = figure;
+    set(f3,'Position', [1949 123 1023 785]);
+
+    subplot(2,1,1)
+    plot(TmAxis(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+    set(gca,'Position',[0.1300 0.5838 0.77 0.3])
+    xline(0, "--k", 'LineWidth', 2);
+    title(sprintf('Grand Average ECG, medication: %s', subfname))
+    axis("tight");
+    ylabel('Amplitude (μV)')
+    hold off
+
+    subplot(2,1,2)
+    for s = 1:numel(subjects.goodHeartMOff)
+        for c = 1:2
+        subject = subjects.goodHeartMOff{sub};
+        EvDataSubAvgTrs = squeeze(EvDataAllAvgTrs(s,c,:));
+        plot(TmAxis(31:end), EvDataSubAvgTrs(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 1);
+        hold on
+        end
+    end
+    plot(TmAxis(31:end), EvDataAll_chanavg(31:end), 'Color', 'r', 'LineWidth', 5, 'DisplayName', 'Average');
+    %legend('Location','southwest', 'FontSize',6)
+    xline(0, "--k", 'LineWidth', 2, 'HandleVisibility','off');
+    xlabel('Time (s)') % Add x-label
+    ylabel('Amplitude (μV)') % Add y-label
+    title(sprintf('Grand Average ERP in Frontal EEG (F3 + F4), medication: %s, LPF = %uHz, GF=10', subfname, Flp))
+    axis("tight");
+
+    gr3 = fullfile('F:\HeadHeart\2_results\erp' , ['AvgERP_Frontals_', subfname, '_HP=',  num2str(Fhp), '_LP=',  num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), 'GF=On','.png']);
+    exportgraphics(f3,gr3, 'Resolution', 300)
+
+
 
 end

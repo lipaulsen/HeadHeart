@@ -7,7 +7,7 @@ FilesDir="C:\UsersData\Lisa\Lucia_StnLFPs_ECG_Lisa\SMR\";
 
 Lucia_Data_ECG={
 'All\';
- %"SG041_MED_OFF_Rest_2021_09_10.smr";
+ "SG041_MED_OFF_Rest_2021_09_10.smr";
 %"SG041_MEDON_Rest_2021_09_10.smr";
  %"SG043_2021_10_01_MedOFF_Rest_Recording.smr";
  % "SG043_2021_10_01_MedON_Rest_Recording.smr";
@@ -63,7 +63,7 @@ FileNames=Lucia_Data_ECG; GrNames="Lucia_Data_ECG"; EvChansTtl = {"EvECGP_Cl"}; 
 % channel is the one the ITC will be calculated and plotted for. The second
 % channel will be disregarded in the ITC.
 
- EegLfpChTts= {'F3'; 'R3'};
+ EegLfpChTts= {'R3'; 'F4'};
 
 %%
 nSubs=length(FileNames)-1;
@@ -116,7 +116,7 @@ end
 tSmSpc=0.05;
 tSmPsi =0.05;
 tSmItc =0.05;
-tCircMean=0.02; % for By TRials calc
+tCircMean=0.05; % for By TRials calc
 tCohTm=0.05; 
 tCohStep=0.05;
 
