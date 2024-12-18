@@ -86,7 +86,7 @@ plots = true;
 ITC = [];
 signif_thresh = 0.05;
 cm_viridis=viridis(100);
-Hz_dir = '4Hz';
+Hz_dir = '2Hz';
 
 
 % Initialize the Perm Matrix be sure here that the freqs and Time are
@@ -555,7 +555,7 @@ for fn = 1:2 % MedOn
         hold off
         subplot(2,1,2)
         imagesc(times(31:end),freqs,PowAll_subavg(:,31:end));axis xy;
-        colormap('jet');
+        colormap('parula');
         colorbar;
         clims = clim;
         % hold on
