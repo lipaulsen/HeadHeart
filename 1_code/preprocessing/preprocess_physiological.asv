@@ -39,7 +39,7 @@ subfnames = fieldnames(subjects);
 
 % Define if plots are to be shown
 % Plots aare only saved if this is true
-show_plots = false;
+show_plots = true;
 
 % Define if manual data cleaning is to be done
 manual_cleaning = true;
@@ -51,7 +51,7 @@ manual_cleaning = true;
 % end
 
 % Define preprocessing steps to perform
-steps = {'Cutting', 'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting',
+steps = {'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
 
 % Define whether scaling of the ECG data should be done
 scaling = false;
@@ -103,12 +103,12 @@ for fn = 1:2
 end
 
 %% ============================ 1. LOAD DATA =================================
-for fn = 1:2
+for fn = 2%:2 nur medon gerade
     subfname = subfnames{fn};
-    for sub = 1:numel(subjects.(subfname))
+    for sub = 1:numel(subjects.new) %(subfname)
 
         % Extract the subject
-        subject = subjects.(subfname){sub};
+        subject = subjects.new{sub}; %(subfname)
 
         fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects.(subfname)));
 
@@ -117,9 +117,22 @@ for fn = 1:2
         load(subject_data, 'SmrData');
 
         % Load the ECG Peak data
-        subject_data = fullfile(data_dir, 'matfiles-cleaned-peaks', subfname, 'justEvs',...
-            ['ECGPeak_', subject,'_', subfname, '_Rest.mat']);
+        subject_data = fullfile(data_dir, rawdata_name, 'justEvs',...
+            ['ECGPeak_', subject,'_', subfname, '_Rest.mat']);  
         load(subject_data, 'EvData');
+        
+        if iscell(SmrData.WvData)
+            numRows = numel(SmrData.WvData);  % Number of rows in each cell
+            numCols = size(SmrData.WvData{1}, 1);   % Number of cells (columns in the output)
+            wvdatacopy = SmrData.WvData;
+            clear SmrData.WvData
+            SmrData.WvData= zeros(numRows, numCols); % Preallocate the output matrix
+
+            % Loop through each cell to populate the matrix
+            for i = 1:numRows
+                SmrData.WvData(i, :) = double(wvdatacopy{i}); % Convert and assign each cell's content
+            end
+        end
 
         % Inject the Event Data into the Data Struct
         SmrData.EvData = EvData;
@@ -130,24 +143,53 @@ for fn = 1:2
         % Define the path to subject results folder
         subject_results_folder = fullfile(results_dir, preprocessed_name,  subfname, sprintf('sub-%s', subject));
 
+        % Assign ECG Channels for different subjects 
+        if strcmp(subject, 'SG078')
+           SmrData.WvTits{25} = 'ECG';
+           SR = SmrData.SRs(1);
+           SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(25,:)];%LFP,EEG and ECG
+           SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(25,:)];
+        elseif strcmp(subject, 'SG079')
+           SmrData.WvTits{26} = 'ECG';
+           SR = SmrData.SRs(1);
+           SmrData.WvDataCleaned = [SmrData.WvData(1:23,:); SmrData.WvData(26,:)]; %LFP,EEG and ECG
+           SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(26,:)];
+        elseif strcmp(subject, 'K29')
+           SmrData.WvTits{23} = 'ECG';
+           SR = SmrData.SRs(1);
+           SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(23,:)]; %LFP,EEG and ECG
+           SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(23,:)];
+        elseif strcmp(subject, 'K28')
+           SmrData.WvTits{40} = 'ECG';
+           SR = SmrData.SRs(1);
+           SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(40,:)]; %LFP,EEG and ECG
+           SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(40,:)];
+        else
+           SR = SmrData.SR;
+           SmrData.WvDataCleaned = SmrData.WvData(1:16,:); %LFP,EEG and ECG
+           SmrData.WvTitsCleaned = SmrData.WvTits(1:16,:); 
+        end
+
+        
+
         % Create Metadata .mat file for the subject to review what
         % preprocessing steps were taken
 
         % Create participant file with relevant preprocessing metadata
-        participant_metadata = struct(...
-            'subject', subject, ...
-            'start_time', datetime("now"), ...
-            'steps', steps, ...
-            'manual_cleaning_of_peaks', manual_cleaning, ...
-            'sampling_rate', SmrData.SR, ...
-            'power_line', powerline, ...
-            'low_frequency', low_frequency, ...
-            'high_frequency', high_frequency, ...
-            'cut_off_seconds', cut_off_seconds);
-
-        % Save the metadata for the participant in JSON File
-        save_metadata = fullfile(subject_preprocessed_folder, [subject, '_preprocessing_metadata_', datestr(datetime('today'), 'yyyy_mm_dd'), '.json']);
-        writestruct(participant_metadata, save_metadata);
+        % participant_metadata = struct(...
+        %     'subject', subject, ...
+        %     'start_time', datetime("now"), ...
+        %     'steps', steps, ...
+        %     'manual_cleaning_of_peaks', manual_cleaning, ...
+        %     'sampling_rate', SR, ...
+        %     'power_line', powerline, ...
+        %     'low_frequency', low_frequency, ...
+        %     'high_frequency', high_frequency, ...
+        %     'cut_off_seconds', cut_off_seconds);
+        % 
+        % % Save the metadata for the participant in JSON File
+        % save_metadata = fullfile(subject_preprocessed_folder, [subject, '_preprocessing_metadata_', datestr(datetime('today'), 'yyyy_mm_dd'), '.json']);
+        % writestruct(participant_metadata, save_metadata);
         % if you want to save it as a .mat file then change the ending in
         % save_metadata and uncomment this line
         %save(save_metadata, 'participant_metadata');
@@ -168,38 +210,14 @@ for fn = 1:2
             % Before we can cut we need to align our detected ECG Peaks with the
             % ECG data
 
-            % Calculate the time points of the ECG data
-            ecg_timepoints = (0:length(SmrData.WvData)-1) / SmrData.SR; % timepoints in sec
-
-            % Initialize a new ECG vector with 0s
-            SmrData.WvData(20,:) = zeros(1, length(ecg_timepoints));
-
-            % Loop through the cleaned R-peak times
-            for i = 1:length(SmrData.EvData.EvECGP_Cl)
-                % Calculate the index corresponding to the R-peak time
-                [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECGP_Cl(i))); % Find the nearest index
-                SmrData.WvData(20, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
-                SmrData.WvTits{20,1} = 'RPeaks_data';
-            end
-
-            % Loop through the all R-peak times (This is done for HRV)
-            for i = 1:length(SmrData.EvData.EvECG)
-                % Calculate the index corresponding to the R-peak time
-                [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECG(i))); % Find the nearest index
-                SmrData.EvData.EvECG_Data(1, idx) = SmrData.WvData(16,idx); % Assign the ECG value at that index
-            end
-
-            % Saving the data as raw but includede with the ECG Data in one
-            % Struct
-            save_path = fullfile(data_dir, preprocessed_name, rawdata_name, [subject, '_', subfname, '_Rest_wECG.mat']);
-            save(save_path, 'SmrData');
+            
 
 
             % Cut off of Data
             if cut_off_seconds > 0
                 disp(['Removing first and last ', num2str(cut_off_seconds), ' seconds of data...']);
 
-                num_samples_cut = SmrData.SR*cut_off_seconds;
+                num_samples_cut = SR*cut_off_seconds;
 
                 % Cut EEG + ECG data
                 SmrData.WvDataCleaned = SmrData.WvData(:, num_samples_cut+1:end - num_samples_cut);
@@ -218,11 +236,11 @@ for fn = 1:2
                 hold on;
                 plot(SmrData.WvDataCleaned(20, 1:max_time), 'r', 'DisplayName', 'Aligned ECG with NaNs');
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (s)');
                 ylabel('ECG Signal (mV)');
                 legend("raw ECG data", "aligned Peaks");
-                title("Aligned ECG Data with R-Peaks for sub " + subject + " for ", num2str(0) + " till " + num2str(max_time/SmrData.SR) + " seconds");
+                title("Aligned ECG Data with R-Peaks for sub " + subject + " for ", num2str(0) + " till " + num2str(max_time/SR) + " seconds");
 
                 % Save Graphics
                 gr1 = fullfile(subject_results_folder, [subject, '_', subfname, '_PeakDetectionCheck.png']);
@@ -247,16 +265,18 @@ for fn = 1:2
 
             disp('********** Preprocessing ECG Data **********');
 
-            % Removal of the DC Offset
+            ecg_idx = find(strcmp(SmrData.WvTits, "ECG"));
+
+            % Removal of the DC Offset of ECG
             disp('Removing DC Offset...');
-            SmrData.WvDataCleaned(16,:) = SmrData.WvDataCleaned(16,:)-mean(SmrData.WvDataCleaned(16,:));
+            SmrData.WvDataCleaned(end,:) = SmrData.WvDataCleaned(end,:)-mean(SmrData.WvDataCleaned(end,:));
 
             % Apply signal cleaning to ECG data
             % 50 Hz powerline filter and 2nd-order two-pass Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
             disp('Cleaning ECG data...');
 
             % Design 50Hz Notch Filter using the fieldtrip toolbox;
-            ecg_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(16,:), SmrData.SR);
+            ecg_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(end,:), SR);
 
             if show_plots
                 % Plot the different results on top of the raw data to see the
@@ -266,24 +286,24 @@ for fn = 1:2
 
                 f2 = figure;
                 subplot(2,1,1);
-                plot(SmrData.WvData(16,1:max_time), 'k','LineWidth',1)
+                plot(SmrData.WvData(ecg_idx,:), 'k','LineWidth',1)
                 hold on
-                plot(SmrData.WvDataCleaned(16,1:max_time),'g','LineWidth',1)
+                plot(SmrData.WvDataCleaned(end,:),'g','LineWidth',1)
                 title(['Raw ECG data and DC Offset for sub ', subject]);
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (s)');
                 ylabel('Amplitude (mV)');
                 legend('raw trace','DC Offset trace')
 
                 % Plot Raw vs. After DC Offset
                 subplot(2,1,2);
-                plot(SmrData.WvData(16,1:max_time), 'k','LineWidth',1)
+                plot(SmrData.WvData(ecg_idx,1:max_time), 'k','LineWidth',1)
                 hold on
                 plot(ecg_notch_ft(1,1:max_time),'b','LineWidth',1)
                 title(['Raw ECG data and Notch filter using Fieldtrip for sub ', subject]);
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (s)');
                 ylabel('Amplitude (mV)');
                 legend('raw trace','filtered trace')
@@ -296,10 +316,10 @@ for fn = 1:2
             end
 
             % Design 2nd order twopass Butterworth filter (0.5 Hz high-pass, 30 Hz low-pass)
-            ecg_data_bandpass  = ft_preproc_bandpassfilter(ecg_notch_ft(1,:), SmrData.SR, [low_frequency_ecg high_frequency_ecg],  2, 'but','twopass'); % two pass butterworth filter
+            ecg_data_bandpass  = ft_preproc_bandpassfilter(ecg_notch_ft(1,:), SR, [low_frequency_ecg high_frequency_ecg],  2, 'but','twopass'); % two pass butterworth filter
             % save filtered data in SmrData struct
-            SmrData.WvDataCleaned(21,:) = ecg_data_bandpass;
-            SmrData.WvTits{21,1} = 'ECG_filtered';
+            SmrData.WvDataCleaned(ecg_idx,:) = ecg_data_bandpass; % this is not great yet!! 
+            SmrData.WvTits{ecg_idx,1} = 'ECG_filtered';
 
             if show_plots
                 % Plot the Raw ECG Data against the bandpass filtered Data
@@ -308,12 +328,12 @@ for fn = 1:2
                 f3 = figure;
                 % Plot Raw vs. After bandpass Filter
                 subplot(1,1,1);
-                plot(SmrData.WvData(16,1:max_time), 'k','LineWidth',1)
+                plot(SmrData.WvData(ecg_idx,1:max_time), 'k','LineWidth',1)
                 hold on
-                plot(SmrData.WvDataCleaned(21,1:max_time),'r','LineWidth',1)
+                plot(SmrData.WvDataCleaned(ecg_idx,1:max_time),'r','LineWidth',1)
                 title(['Raw ECG data and bandpass (0.5-30Hz) Filter for sub ', subject]);
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (in s)');
                 ylabel('Amplitude (mV)');
                 legend('raw trace','bandpass Filter')
@@ -330,8 +350,34 @@ for fn = 1:2
             % Since the data has been cut (including the ECG Peaks) I need to
             % extract the current ECG Peaks from the cropped data
 
+            % Calculate the time points of the ECG data
+            ecg_timepoints = (0:length(SmrData.WvData)-1) / SR; % timepoints in sec
+
+            % Initialize a new ECG vector with 0s
+            SmrData.WvData(end,:) = zeros(1, length(ecg_timepoints));
+
+            % Loop through the cleaned R-peak times
+            for i = 1:length(SmrData.EvData.EvECGP_Cl)
+                % Calculate the index corresponding to the R-peak time
+                [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECGP_Cl(i))); % Find the nearest index
+                SmrData.WvData(end, idx) = SmrData.WvData(ecg_idx,idx); % Assign the ECG value at that index
+                SmrData.WvTits{end,1} = 'RPeaks_data';
+            end
+
+            % Loop through the all R-peak times (This is done for HRV)
+            for i = 1:length(SmrData.EvData.EvECG)
+                % Calculate the index corresponding to the R-peak time
+                [~, idx] = min(abs(ecg_timepoints - SmrData.EvData.EvECG(i))); % Find the nearest index
+                SmrData.EvData.EvECG_Data(1, idx) = SmrData.WvData(ecg_idx,idx); % Assign the ECG value at that index
+            end
+
+            % Saving the data as raw but includede with the ECG Data in one
+            % Struct
+            % save_path = fullfile(data_dir, preprocessed_name, rawdata_name, [subject, '_', subfname, '_Rest_wECG.mat']);
+            % save(save_path, 'SmrData');
+
             % Find all non-zero Values
-            peakIndices = find(SmrData.WvDataCleaned(20, :) ~= 0);
+            peakIndices = find(SmrData.WvDataCleaned(end, :) ~= 0); % change this to automatic 
             SmrData.ECG.ECGPeak(1,:) = ecg_timepoints(peakIndices); % in sec
             SmrData.ECG.ECGTtl{1,:} = 'RPeak Times of Cleaned ECG';
 
@@ -361,7 +407,7 @@ for fn = 1:2
                 f4 = figure;
                 % Plot Raw vs. After bandpass Filter
                 subplot(2,1,1);
-                plot(SmrData.ECGcomp(1,:), 'b','LineWidth',1)
+                plot(SmrData.EvData.ECGcomp(1,:), 'b','LineWidth',1)
                 yline(1, "--k",'LineWidth', 1);
                 title(['IBI Length for sub ', subject]);
                 xlabel('IBI Samples over time');
@@ -370,7 +416,7 @@ for fn = 1:2
 
                 % Plot Raw vs. After high and low pass Filter
                 subplot(2,1,2);
-                plot(SmrData.ECGcomp(2,:), 'k','LineWidth',1)
+                plot(SmrData.EvData.ECGcomp(2,:), 'k','LineWidth',1)
                 yline(60, '--b', 'Lower HR range', 'LabelHorizontalAlignment', 'right');
                 title(['Heartrate (HR) in BPM for sub ', subject]);
                 xlabel('HR Samples over time');
@@ -393,16 +439,35 @@ for fn = 1:2
             % 50 Hz powerline filter and 4th-order two-pass Butterworth filters (0.1 Hz high-pass, 10 Hz low-pass)
             disp('Cleaning EEG & LFP data...');
 
+            ecg_idx = find(strcmp(SmrData.WvTits, "ECG"));
+
             % 50Hz Line-Noise Removal using the fieldtrip toolbox;
-            lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvDataCleaned(1:15,:), SmrData.SR);
+            %lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvData(1:15,:), SR); % BE AWARE THAT THIS CURRENTLY WORKS WITHOUT CUTTING THE "SEC OFF SmrData.WvDataCleaned(1:15,:)
 
             % Design Butterworth High and Low pass filters
-            lfp_data_highpass  = ft_preproc_highpassfilter(lfp_notch_ft(1:15,:), SmrData.SR, low_frequency,  4, 'but','twopass'); % two pass butterworth filter
-            lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, high_frequency,  4, 'but','twopass'); % two pass butterworth filter
-            % lfp_data_lowpass_10  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SmrData.SR, 10,  4, 'but','twopass'); % two pass butterworth filter
+            lfp_data_highpass  = ft_preproc_highpassfilter(SmrData.WvData(1:????,:), SR, low_frequency,  4, 'but','twopass'); % two pass butterworth filter lfp_notch_ft(1:15,:)
+            lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:????,:), SR, high_frequency,  4, 'but','twopass'); % two pass butterworth filter
+            % lfp_data_lowpass_10  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SR, 10,  4, 'but','twopass'); % two pass butterworth filter
 
             % Save cleaned Data into SmrData.WvDataCleaned Struct
-            SmrData.WvDataCleaned(1:15, :) = lfp_data_lowpass;
+            SmrData.WvDataCleaned(1:ecg_idx-1, :) = lfp_data_lowpass;
+
+            %%  ============== BIPOLAR REREFERENCING ====================
+
+            % bipolar rereferencing if for the LFP Electrodes and basedn on
+            % the best common reference LFP with the best beta we can
+            % subracte the activity from the neighboring electrode 
+
+            LfpElec.SG041 = {'L3', 'R3'};
+            LfpElec.SG043  = {'L4', 'R1'};
+            LfpElec.SG046  = {'L4', 'R1'};
+            LfpElec.SG047  = {'L3', 'R4'};
+            LfpElec.SG050 = {'L3', 'R3'};
+            LfpElec.SG052  = {'L4', 'R2'};
+            LfpElec.SG056  = {'L4', 'R1'};
+
+
+            %% Plots
 
             % Visualize filtering
 
@@ -417,7 +482,7 @@ for fn = 1:2
                 plot(lfp_data_highpass(chan,1:max_time),'r','LineWidth',1)
                 title("Raw EEG data and High Pass Filter (0.5 Hz) for sub " + subject + " and channel " + SmrData.WvTits{chan});
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (in s)');
                 ylabel('Amplitude (microvolts)');
                 legend('raw trace','filtered data')
@@ -428,7 +493,7 @@ for fn = 1:2
                 plot(SmrData.WvDataCleaned(chan,1:max_time),'r','LineWidth',1)
                 title("Raw EEG data and High & Low Pass Filter  (0.5-100Hz) for sub " + subject + " and channel " + SmrData.WvTits{chan});
                 xticks(0:2000:max_time);
-                xticklabels((0:2000:max_time) / SmrData.SR);
+                xticklabels((0:2000:max_time) / SR);
                 xlabel('Time (in s)');
                 ylabel('Amplitude (microvolts)');
                 legend('raw trace','filtered data')
@@ -454,14 +519,14 @@ disp('PREPROCESSING DONE!');
 
 
 
-SR = 2048;
-NewSR = 300;
-
-            FsOrigin=SR;
-            if  FsOrigin ~=  NewSR
-                [fsorig, fsres] = rat(FsOrigin/NewSR);      
-                ChDta=resample(lfp_data_lowpass(1,:),fsres,fsorig);   
-                dtTime=1/NewSR;
-            end
-            SR=1.0/dtTime;
+% SR = 2048;
+% NewSR = 300;
+% 
+% FsOrigin=SR;
+% if  FsOrigin ~=  NewSR
+%     [fsorig, fsres] = rat(FsOrigin/NewSR);
+%     ChDta=resample(lfp_data_lowpass(1,:),fsres,fsorig);
+%     dtTime=1/NewSR;
+% end
+% SR=1.0/dtTime;
    

@@ -18,7 +18,7 @@ close all
 % set the directory to best fit your path 
 
 % Define if using Windows or Mac
-windows = true; % if true then Windows if false then Mac
+windows = false; % if true then Windows if false then Mac
 
 if windows
     % Lisas Path Lab on Windows
@@ -35,13 +35,13 @@ end
 %% Analysis SetUp 
 
 % initialize subjects 
-% be aware that for sub 45 and 60 only MEDON is available
-subjects.MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056'};
-subjects.MedOn = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060', 'SG078', 'SG079', 'KS28'};
+% be aware that for sub 45 and 60 and 'SG078', 'SG079', 'KS28' only MEDON is available
+subjects.MedOff = {'SG041', 'SG043', 'SG044', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'KS29'};
+subjects.MedOn = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060', 'SG078', 'SG079', 'KS28', 'KS29'};
 subjects.all = {'SG041', 'SG043', 'SG044', 'SG045', 'SG046', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
 subjects.goodHeartMOn = {'SG041', 'SG043', 'SG045', 'SG047', 'SG050', 'SG052', 'SG056', 'SG060'};
 subjects.goodHeartMOff = {'SG041', 'SG043', 'SG047', 'SG050', 'SG052', 'SG056'};
-subjects.new = {'SG078', 'SG079', 'KS28'};
+subjects.new = {'SG078', 'SG079', 'KS28','KS29'};
 %subjects = subjects_MedOn;
 
 MedFlag = {'MedOn', 'MedOff'}; % MedOn or MedOff
