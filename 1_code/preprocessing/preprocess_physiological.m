@@ -105,7 +105,7 @@ end
 %% ============================ 1. LOAD DATA =================================
 for fn = 2%:2 nur medon gerade
     subfname = subfnames{fn};
-    for sub = 3:numel(subjects.new) %(subfname)
+    for sub = 4:numel(subjects.new) %(subfname)
 
         % Extract the subject
         subject = subjects.new{sub}; %(subfname)
@@ -159,6 +159,8 @@ for fn = 2%:2 nur medon gerade
            SR = SmrData.SRs(1);
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(23,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(23,:)];
+           SmrData.EvData.EvECGP_Cl = SmrData.EvData.EvECG_Cl; SmrData.EvData = rmfield(SmrData.EvData, 'EvECG_Cl');
+
         elseif strcmp(subject, 'KS28')
            SmrData.WvTits{40} = 'ECG';
            SR = SmrData.SRs(1);
@@ -209,9 +211,6 @@ for fn = 2%:2 nur medon gerade
 
             % Before we can cut we need to align our detected ECG Peaks with the
             % ECG data
-
-            
-
 
             % Cut off of Data
             if cut_off_seconds > 0
@@ -445,8 +444,9 @@ for fn = 2%:2 nur medon gerade
             % 50Hz Line-Noise Removal using the fieldtrip toolbox;
             %lfp_notch_ft = ft_preproc_dftfilter(SmrData.WvData(1:15,:), SR); % BE AWARE THAT THIS CURRENTLY WORKS WITHOUT CUTTING THE "SEC OFF SmrData.WvDataCleaned(1:15,:)
 
+
             % Design Butterworth High and Low pass filters
-            lfp_data_highpass  = ft_preproc_highpassfilter(SmrData.WvData(1:eeg_idx,:), SR, low_frequency,  2, 'but','twopass'); % two pass butterworth filter lfp_notch_ft(1:15,:)
+            lfp_data_highpass  = ft_preproc_highpassfilter(SmrData.WvData(1:eeg_idx,:) , SR, low_frequency,  3, 'but','twopass'); % two pass butterworth filter lfp_notch_ft(1:15,:)
             lfp_data_lowpass  = ft_preproc_lowpassfilter(lfp_data_highpass(1:eeg_idx,:), SR, high_frequency,  4, 'but','twopass'); % two pass butterworth filter
             % lfp_data_lowpass_10  = ft_preproc_lowpassfilter(lfp_data_highpass(1:15,:), SR, 10,  4, 'but','twopass'); % two pass butterworth filter
 
