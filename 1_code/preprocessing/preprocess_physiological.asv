@@ -20,7 +20,7 @@
 %
 % Outputs:    Preprocessed data (EEG, ECG, PPG) in tsv files (ECG & PPG) and fif files (EEG, before and after ICA)
 %             Participant metadata in .mat files (data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', 
-%                                                 subfname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),
+%                                                 medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),
 %                                                 '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg),
 %                                                 '_cutoff=', num2str(cut_off_seconds),'s.mat']);)
 %             Plots of preprocessing steps
@@ -85,15 +85,6 @@ elseif MedOff == true & allsubs == true % All Subs that are MedOff
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
 end
 
-
-
-% Convert 'channels_raw' (string) to cell array of strings
-channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
-channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
-
-channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
-chans = string(channel{1,3})
-
 %subfnames = fieldnames(subjects);
 
 %=========================================================================
@@ -107,12 +98,6 @@ manual_cleaning = true;
 
 % Define preprocessing steps to perform
 steps = {'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
-
-% Define whether scaling of the ECG data should be done
-scaling = false;
-if scaling
-    scale_factor = 0.01;
-end
 
 % Define power line frequency
 powerline = 50; % Hz
@@ -139,41 +124,45 @@ results_dir = fullfile(results_dir);
 
 
 % Create preprocessed and results folder for each subject if it does not exist
-for fn = 1:2
-    subfname = subfnames{fn};
-    for i = 1:length(subjects.(subfname))
-        subject = subjects.(subfname){i};
-        % preporcess folder
-        subject_preprocessed_folder = fullfile(data_dir, preprocessed_name, subfname, sprintf('sub-%s', subject));
-        if ~exist(subject_preprocessed_folder, 'dir')
-            mkdir(subject_preprocessed_folder);
-        end
-        % results folder
-        subject_results_folder = fullfile(results_dir, preprocessed_name, subfname, sprintf('sub-%s', subject));
-        if ~exist(subject_results_folder, 'dir')
-            mkdir(subject_results_folder);
-        end
-
-    end
-end
+% for fn = 1:2
+%     for i = 1:length(subjects.(medname))
+%         subject = subjects.(medname){i};
+%         % preporcess folder
+%         subject_preprocessed_folder = fullfile(data_dir, preprocessed_name, medname, sprintf('sub-%s', subject));
+%         if ~exist(subject_preprocessed_folder, 'dir')
+%             mkdir(subject_preprocessed_folder);
+%         end
+%         % results folder
+%         subject_results_folder = fullfile(results_dir, preprocessed_name, medname, sprintf('sub-%s', subject));
+%         if ~exist(subject_results_folder, 'dir')
+%             mkdir(subject_results_folder);
+%         end
+%     end
+% end
 
 %% ============================ 1. LOAD DATA =================================
-for fn = 2%:2 nur medon gerade
-    subfname = subfnames{fn};
-    for sub = 4:numel(subjects.new) %(subfname)
+for med = 1%:2 nur medon gerade
+    
+    if MedOn == true
+        medname = 'MedOn';
+    elseif MedOff == true
+        medname = 'MedOff';
+    end
+
+    for sub = 1:numel(subjects) %(medname)
 
         % Extract the subject
-        subject = subjects.new{sub}; %(subfname)
+        subject = subjects{sub}; %(medname)
 
-        fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects.(subfname)));
+        fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects.(medname)));
 
         % Load subject data
-        subject_data = fullfile(data_dir, rawdata_name, [subject, '_', subfname, '_Rest.mat']);
+        subject_data = fullfile(data_dir, rawdata_name, [subject, '_', medname, '_Rest.mat']);
         load(subject_data, 'SmrData');
 
         % Load the ECG Peak data
         subject_data = fullfile(data_dir, rawdata_name, 'justEvs',...
-            ['ECGPeak_', subject,'_', subfname, '_Rest.mat']);  
+            ['ECGPeak_', subject,'_', medname, '_Rest.mat']);  
         load(subject_data, 'EvData');
         
         if iscell(SmrData.WvData)
@@ -193,10 +182,10 @@ for fn = 2%:2 nur medon gerade
         SmrData.EvData = EvData;
 
         % Define the path to subject preprocessed folder
-        subject_preprocessed_folder = fullfile(data_dir, preprocessed_name,  subfname, sprintf('sub-%s', subject));
+        subject_preprocessed_folder = fullfile(data_dir, preprocessed_name, medname, sprintf('sub-%s', subject));
 
         % Define the path to subject results folder
-        subject_results_folder = fullfile(results_dir, preprocessed_name,  subfname, sprintf('sub-%s', subject));
+        subject_results_folder = fullfile(results_dir, preprocessed_name, medname, sprintf('sub-%s', subject));
 
         % Assign ECG Channels for different subjects 
         if strcmp(subject, 'SG078')
@@ -214,7 +203,7 @@ for fn = 2%:2 nur medon gerade
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(23,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(23,:)];
-           if strcmp(subfname, 'MedOn')
+           if strcmp(medname, 'MedOn')
            SmrData.EvData.EvECGP_Cl = SmrData.EvData.EvECG_Cl; SmrData.EvData = rmfield(SmrData.EvData, 'EvECG_Cl');
            end
         elseif strcmp(subject, 'KS28')
@@ -298,7 +287,7 @@ for fn = 2%:2 nur medon gerade
                 title("Aligned ECG Data with R-Peaks for sub " + subject + " for ", num2str(0) + " till " + num2str(max_time/SR) + " seconds");
 
                 % Save Graphics
-                gr1 = fullfile(subject_results_folder, [subject, '_', subfname, '_PeakDetectionCheck.png']);
+                gr1 = fullfile(subject_results_folder, [subject, '_', medname, '_PeakDetectionCheck.png']);
                 exportgraphics(f1, gr1, "Resolution",300)
             end
         end
@@ -364,7 +353,7 @@ for fn = 2%:2 nur medon gerade
                 legend('raw trace','filtered trace')
 
                 % Save Graphics
-                gr2 = fullfile(subject_results_folder, [subject, '_', subfname, '_ECG-DCOffset-vs-Notch.png']);
+                gr2 = fullfile(subject_results_folder, [subject, '_', medname, '_ECG-DCOffset-vs-Notch.png']);
                 exportgraphics(f2, gr2, "Resolution",300) % WINDOWS
 
 
@@ -394,7 +383,7 @@ for fn = 2%:2 nur medon gerade
                 legend('raw trace','bandpass Filter')
 
                 % Save Graphics
-                gr3 = fullfile(subject_results_folder, [subject, '_', subfname, '_ECG-Filter(0-30Hz).png']);
+                gr3 = fullfile(subject_results_folder, [subject, '_', medname, '_ECG-Filter(0-30Hz).png']);
                 exportgraphics(f3, gr3, "Resolution",300) % WINDOWS
             end
 
@@ -429,7 +418,7 @@ for fn = 2%:2 nur medon gerade
 
             % Saving the data as raw but includede with the ECG Data in one
             % Struct
-            % save_path = fullfile(data_dir, preprocessed_name, rawdata_name, [subject, '_', subfname, '_Rest_wECG.mat']);
+            % save_path = fullfile(data_dir, preprocessed_name, rawdata_name, [subject, '_', medname, '_Rest_wECG.mat']);
             % save(save_path, 'SmrData');
 
             % Find all non-zero Values
@@ -480,7 +469,7 @@ for fn = 2%:2 nur medon gerade
                 legend('HR')
 
                 % Save Graphics
-                gr4 = fullfile(subject_results_folder, [subject, '_', subfname, '_ECG-IBI-HR.png']);
+                gr4 = fullfile(subject_results_folder, [subject, '_', medname, '_ECG-IBI-HR.png']);
                 exportgraphics(f4, gr4, "Resolution",300) % WINDOWS
             end
 
@@ -513,16 +502,22 @@ for fn = 2%:2 nur medon gerade
 
             % bipolar rereferencing if for the LFP Electrodes and basedn on
             % the best common reference LFP with the best beta we can
-            % subracte the activity from the neighboring electrode 
+            % sube the activity from the neighboring electrode 
 
-            LfpElec.SG041 = {'L3', 'R3'};
+            LfpElec.SG041  = {'L3', 'R3'};
             LfpElec.SG043  = {'L4', 'R1'};
+            LfpElec.SG044  = {'L1', 'R3'};
+            LfpElec.SG045  = {'L4', 'R1'}; 
             LfpElec.SG046  = {'L4', 'R1'};
             LfpElec.SG047  = {'L3', 'R4'};
-            LfpElec.SG050 = {'L3', 'R3'};
+            LfpElec.SG050  = {'L3', 'R3'};
             LfpElec.SG052  = {'L4', 'R2'};
             LfpElec.SG056  = {'L4', 'R1'};
-
+            LfpElec.SG060  = {'L2', 'R1'}; 
+            LfpElec.SG078  = {'L1', 'R1'};
+            LfpElec.SG079  = {'L2', 'R7'}; 
+            LfpElec.KS28   = {'L3', 'R8'}; 
+            LfpElec.KS29   = {'L8', 'R7'}; 
 
             %% Plots
 
@@ -556,14 +551,14 @@ for fn = 2%:2 nur medon gerade
                 legend('raw trace','filtered data')
 
                 % Save Graphics
-                gr5 = fullfile(subject_results_folder, [subject, '_', subfname, '_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),'-Filter.png']);
+                gr5 = fullfile(subject_results_folder, [subject, '_', medname, '_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),'-Filter.png']);
                 exportgraphics(f5, gr5, "Resolution",300) % WINDOWS
             end
         end
 
         % Save the preprocessed Data in Smr.Data Struct
         %newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
-        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', subfname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
+        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
         save(save_path, 'SmrData');
 
         disp(['Processed and saved: ', save_path]);

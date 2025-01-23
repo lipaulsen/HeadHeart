@@ -39,8 +39,8 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = true;
-oldsubs = false;
+newsubs = false;
+oldsubs = true;
 allsubs = false;
 
 % make channel info into cells
@@ -74,10 +74,6 @@ elseif MedOff == true & allsubs == true % All Subs that are MedOff
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
 end
 
-
-%FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
-chans = string(channel{1,3})
-
 %subfnames = fieldnames(subjects);
 
 %=========================================================================
@@ -98,18 +94,18 @@ epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
 
 LfpElec.SG041 = {'L3', 'R3'};
 LfpElec.SG043  = {'L4', 'R1'};
-LfpElec.SG044  = {'L1', 'R3'}; 
-LfpElec.SG045  = {'L4', 'R1'}; % NEW 
+LfpElec.SG044  = {'L1', 'R3'};
+LfpElec.SG045  = {'L4', 'R1'}; % NEW
 LfpElec.SG046  = {'L4', 'R1'};
 LfpElec.SG047  = {'L3', 'R4'};
 LfpElec.SG050 = {'L3', 'R3'};
 LfpElec.SG052  = {'L4', 'R2'};
 LfpElec.SG056  = {'L4', 'R1'};
-LfpElec.SG060  = {'L4', 'R1'}; % NEW 
-LfpElec.SG078  = {'L4', 'R1'}; % NEW 
-LfpElec.SG079  = {'L4', 'R1'}; % NEW 
-LfpElec.KS28  = {'L4', 'R1'}; % NEW 
-LfpElec.KS29  = {'L4', 'R1'}; % NEW 
+LfpElec.SG060  = {'L2', 'R1'}; % NEW
+LfpElec.SG078  = {'L1', 'R1'}; % NEW
+LfpElec.SG079  = {'L2', 'R7'}; % NEW
+LfpElec.KS28  = {'L3', 'R8'}; % NEW
+LfpElec.KS29  = {'L8', 'R7'}; % NEW
 
 
 % Define Time Window
@@ -118,7 +114,7 @@ tOffset  = 0.3;
 NewSR = 300;
 freq_bin = 0.2;
 
-nSub = numel(subjects.goodHeartMOff);
+nSub = numel(subjects);
 
 
 plots = true;
@@ -143,40 +139,25 @@ Fhp = 2;
 Hz_dir = '2Hz';
 
 
-disp("************* STARTING EPOCH AND TIMELOCKING *************");
+disp("************* STARTING PSD CALCULATION *************");
 
 for med = 1 %:2 % MedOn
-    
+
     if MedOn == true
         medname = 'MedOn';
     elseif MedOff == true
         medname = 'MedOff';
     end
-    %medname = subfnames{med};
-
+   
     % fprintf('Loading AVG ECG Data\n'); %
     % pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', medname, 'n=', num2str(nSub), '*']);
     % files = dir(pattern);
     % filename = fullfile(files(1).folder, files(1).name);
     % load(filename, 'AVGECG');
 
-    for sub = 1:numel(subjects.new) % subjects.goodHeartMOff BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
-
+    for sub = 4:numel(subjects) % subjects.goodHeartMOff BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
         % Extract the subject
-        subject = subjects.new{sub}; %goodHeartMOff{sub}
-
-
-        if strcmp(subject, 'SG078')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "C3", "C4", "P3", "P4"};
-        elseif strcmp(subject, 'SG079')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F3", "F4", "C3", "C4", "P3", "P4"};
-        elseif strcmp(subject, 'KS29')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"}; % NO EEG in MedOn
-        elseif strcmp(subject, 'KS28')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"};
-        else
-            channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
-        end
+        subject = subjects{sub}; %goodHeartMOff{sub}
 
         if seperateSTN
             channels{8} = LfpElec.(subject){1};
@@ -212,120 +193,131 @@ for med = 1 %:2 % MedOn
 
         %% DO PSD based on PWelch
 
-         if ismember('PWelch', steps)
-        fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
-        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_preprocessed_', medname, '*']);
-        files = dir(pattern);
-        filename = fullfile(files(1).folder, files(1).name);
-        load(filename, 'SmrData');
-        % Load subject data
-        % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
-        % load(subject_data, 'SmrData');
+        if ismember('PWelch', steps)
+            fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+            pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_preprocessed_', medname, '*']);
+            files = dir(pattern);
+            filename = fullfile(files(1).folder, files(1).name);
+            load(filename, 'SmrData');
+            % Load subject data
+            % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
+            % load(subject_data, 'SmrData');
 
-        SR = SmrData.SR;
-        EventTms = SmrData.EvData.EvECGP_Cl;
+            SR = SmrData.SR;
+            EventTms = SmrData.EvData.EvECGP_Cl;
 
+            % Filter the channes for the sub
+            OneSubChans = string(FltSubsChansRaw{sub});
 
-        % PWelch on entire Channel Data
+            f1 = figure;
+            set(f1,'Position',[100 278 1200 800]);
+
+            % PWelch on entire Channel Data
+            for c = 1:numel(FltSubsChansRaw{sub})
+                channel = OneSubChans{c};
+                % Filter Data 
+                ChDta = SmrData.WvDataCleaned(c, :);
+                % Calculate PWelch
+                [FftPwelch, f] = pwelch(ChDta, window, noverlap, nfft, SR);
+                % Save in one big Matrix
+                PWelchAllDtaAvg(sub,c,:) = FftPwelch;
+
+                if show_plots
+
+                    % Trim the PSD to desired range
+                    freq_limit = 30;
+                    freq_limitlow = 0.5;% Hz
+                    idx = f <= freq_limit & f > freq_limitlow ;  % Index for frequencies up to 30 Hz
+                    f_trimmed = f(idx);
+                    FftPwelch_trimmed = squeeze(PWelchAllDtaAvg(sub,c,idx));
+                    FftPwelch_trimmed = smoothdata(FftPwelch_trimmed, 'gaussian', 5); % Apply a Gaussian Filter to Smoothe the lines
+
+                    % Plot for each channel in each subject
+                    subplot(ceil(numel(FltSubsChansRaw{sub})/5),5,c);
+                    plot(f_trimmed, 10*log10(FftPwelch_trimmed),'LineWidth', 1, 'Color','k')
+                    title(sprintf('PSD for %s in %s,med: %s', subject, channel, medname))
+                    xlabel('Frequencies (Hz)') % Add x-label
+                    ylabel('dB/Hz') %
+                    axis('tight');          
+                end
+
+            end
+
+            % Save Plot
+            gr1 = fullfile(results_dir, '/psd/ss' , ['PSD_PWelch_', subject ,'_', channel, '_', medname,  '.png']);
+            exportgraphics(f1,gr1, 'Resolution', 300)
+
+            % PWelch on Epochs
+            % freq_limit = 30;  % Hz
+            %             idx = f <= freq_limit;  % Index for frequencies up to 30 Hz
+            %             f_trimmed = f(idx);
+            %             FftPwelch_trimmed = FftPwelch(idx);
+            %
+            %             figure
+            %             plot(f_trimmed, 10*log10(FftPwelch_trimmed));
+            %             xlabel('Frequency (Hz)');
+            %             ylabel('Power/Frequency (dB/Hz)');
+            %             title('Power Spectral Density (Welch)');
+
+        end
+    end
+
+    disp("************* STARTING PSD PLOT *************");
+    %% PLOT PSD on HIlbert
+    if ismember('TFR Basis', steps)
         for c = 1:numel(channels)
-            channel = channels{c}; 
-
-            ChDta = SmrData.WvDataCleaned(c, :);
-
-            % if NewSR > 0
-            %     FsOrigin=SR;
-            %     if  FsOrigin ~=  NewSR
-            %         [fsorig, fsres] = rat(FsOrigin/NewSR);
-            %         ChDta=resample(ChDta,fsres,fsorig);
-            %         dtTime=1/NewSR;
-            %     end
-            %     NewSR=1.0/dtTime;
-            % end
-
-
-            [FftPwelch, f] = pwelch(ChDta, window, noverlap, nfft, SR);
-
-            PWelchAllDtaAvg(sub,c,:) = FftPwelch;
-
-            
-
-        end
-
-        % PWelch on Epochs
-% freq_limit = 30;  % Hz
-%             idx = f <= freq_limit;  % Index for frequencies up to 30 Hz
-%             f_trimmed = f(idx);
-%             FftPwelch_trimmed = FftPwelch(idx);
-% 
-%             figure
-%             plot(f_trimmed, 10*log10(FftPwelch_trimmed));
-%             xlabel('Frequency (Hz)');
-%             ylabel('Power/Frequency (dB/Hz)');
-%             title('Power Spectral Density (Welch)');
-
-         end
-    end
-%% PLOT PSD on HIlbert
- if ismember('TFR Basis', steps)
-    for c = 1:numel(channels)
-        channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
-        channel = channels{c};
-
-        ChanPowerSubTrsAvg = squeeze(mean(mean(squeeze(PowerAllTrsAvg(:,c,:,:)),1),3));
-        ChanPowerSubTrsAvg = ChanPowerSubTrsAvg.^2;
-        psd = ChanPowerSubTrsAvg / freq_bin;
-
-
-        f1 = figure;
-        set(f1,'Position',[1949 123 1023 400]);
-        plot(freqs, 10*log10(ChanPowerSubTrsAvg),'LineWidth', 1, 'Color','k')
-        title(sprintf('Average PSD for in %s,med: %s', channel, medname))
-        xlabel('Frequencies (Hz)') % Add x-label
-        ylabel('dB/Hz') %
-        axis('tight');
-
-        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_', channel, '_', medname,  '.png']);
-        exportgraphics(f1,gr1, 'Resolution', 300)
-
-    end
- end
-%% PLOT PSD on PWELCH
- if ismember('PWelch', steps)
- for c = 1:numel(channels)
-     if strcmp(subject, 'SG078')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "C3", "C4", "P3", "P4"};
-        elseif strcmp(subject, 'SG079')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F3", "F4", "C3", "C4", "P3", "P4"};
-        elseif strcmp(subject, 'KS29')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"}; % NO EEG in MedOn
-        elseif strcmp(subject, 'KS28')
-            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"};
-        else
             channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+            channel = channels{c};
+
+            ChanPowerSubTrsAvg = squeeze(mean(mean(squeeze(PowerAllTrsAvg(:,c,:,:)),1),3));
+            ChanPowerSubTrsAvg = ChanPowerSubTrsAvg.^2;
+            psd = ChanPowerSubTrsAvg / freq_bin;
+
+
+            f1 = figure;
+            set(f1,'Position',[1949 123 1023 400]);
+            plot(freqs, 10*log10(ChanPowerSubTrsAvg),'LineWidth', 1, 'Color','k')
+            title(sprintf('Average PSD for in %s,med: %s', channel, medname))
+            xlabel('Frequencies (Hz)') % Add x-label
+            ylabel('dB/Hz') %
+            axis('tight');
+
+            gr1 = fullfile(results_dir, '/psd' , ['AvgPSD_', channel, '_', medname,  '.png']);
+            exportgraphics(f1,gr1, 'Resolution', 300)
+
         end
-        channel = channels{c};
+    end
+    %% PLOT PSD on PWELCH
+    if ismember('PWelch', steps)
+        for c = 1:numel(FltSubsChansRaw{sub})
+            channel = OneSubChans{c};
 
-        ChanSubAllStaAvg = squeeze(mean(squeeze(PWelchAllDtaAvg(:,c,:)),1));
+            % Average over channel
+            ChanSubAllStaAvg = squeeze(mean(squeeze(PWelchAllDtaAvg(:,c,:)),1));
+            
+            % Trim the PSD to desired range
+            freq_limit = 30;
+            freq_limitlow = 2;% Hz
+            idx = f <= freq_limit & f > freq_limitlow ;  % Index for frequencies up to 30 Hz
+            f_trimmed = f(idx);
+            FftPwelch_trimmed = ChanSubAllStaAvg(idx);
+            FftPwelch_trimmed = smoothdata(FftPwelch_trimmed, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines
+            
+            % Plot Average over all subjects for each channel
+            f1 = figure;
+            set(f1,'Position',[1949 123 1023 400]);
+            plot(f_trimmed, 10*log10(FftPwelch_trimmed),'LineWidth', 1, 'Color','k')
+            title(sprintf('Average PSD for in %s,med: %s', channel, medname))
+            xlabel('Frequencies (Hz)') % Add x-label
+            ylabel('dB/Hz') %
+            axis('tight');
 
-        freq_limit = 30; 
-        freq_limitlow = 2;% Hz
-        idx = f <= freq_limit & f > freq_limitlow ;  % Index for frequencies up to 30 Hz
-        f_trimmed = f(idx);
-        FftPwelch_trimmed = ChanSubAllStaAvg(idx);
-        FftPwelch_trimmed = smoothdata(FftPwelch_trimmed, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines 
-
-        f1 = figure;
-        set(f1,'Position',[1949 123 1023 400]);
-        plot(f_trimmed, 10*log10(FftPwelch_trimmed),'LineWidth', 1, 'Color','k')
-        title(sprintf('Average PSD for in %s,med: %s', channel, medname))
-        xlabel('Frequencies (Hz)') % Add x-label
-        ylabel('dB/Hz') %
-        axis('tight');
-
-        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_PWelch', channel, '_', medname,  '.png']);
-        exportgraphics(f1,gr1, 'Resolution', 300)
+            % Save Plot
+            gr1 = fullfile(results_dir, '/psd' , ['AvgPSD_PWelch', channel, '_', medname,  '.png']);
+            exportgraphics(f1,gr1, 'Resolution', 300)
 
 
- end
- end
+        end
+    end
 end
+fprintf('PSD Calculation and Plotting DONE!')
