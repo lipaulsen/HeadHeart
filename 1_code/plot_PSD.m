@@ -30,14 +30,64 @@
 %clear all
 %close all
 
-subfnames = fieldnames(subjects);
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = true;
+oldsubs = false;
+allsubs = false;
+
+% make channel info into cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+end
+
+
+%FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+chans = string(channel{1,3})
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 
 % Define if plots are to be shown
-show_plots = false;
+show_plots = true;
 
 %If we use left and right STN as seperate subjects put this as true
 %(increases subjectsize by 2)
-seperateSTN = true;
+seperateSTN = false;
 
 % Define feature extraction steps to perform
 steps = {'PWelch'}; %'TFR Basis', 'PWelch'
@@ -46,15 +96,20 @@ steps = {'PWelch'}; %'TFR Basis', 'PWelch'
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
 
 
-channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
-
 LfpElec.SG041 = {'L3', 'R3'};
 LfpElec.SG043  = {'L4', 'R1'};
+LfpElec.SG044  = {'L1', 'R3'}; 
+LfpElec.SG045  = {'L4', 'R1'}; % NEW 
 LfpElec.SG046  = {'L4', 'R1'};
 LfpElec.SG047  = {'L3', 'R4'};
 LfpElec.SG050 = {'L3', 'R3'};
 LfpElec.SG052  = {'L4', 'R2'};
 LfpElec.SG056  = {'L4', 'R1'};
+LfpElec.SG060  = {'L4', 'R1'}; % NEW 
+LfpElec.SG078  = {'L4', 'R1'}; % NEW 
+LfpElec.SG079  = {'L4', 'R1'}; % NEW 
+LfpElec.KS28  = {'L4', 'R1'}; % NEW 
+LfpElec.KS29  = {'L4', 'R1'}; % NEW 
 
 
 % Define Time Window
@@ -90,20 +145,38 @@ Hz_dir = '2Hz';
 
 disp("************* STARTING EPOCH AND TIMELOCKING *************");
 
-for fn = 1:2 % MedOn
+for med = 1 %:2 % MedOn
+    
+    if MedOn == true
+        medname = 'MedOn';
+    elseif MedOff == true
+        medname = 'MedOff';
+    end
+    %medname = subfnames{med};
 
-    subfname = subfnames{fn};
+    % fprintf('Loading AVG ECG Data\n'); %
+    % pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', medname, 'n=', num2str(nSub), '*']);
+    % files = dir(pattern);
+    % filename = fullfile(files(1).folder, files(1).name);
+    % load(filename, 'AVGECG');
 
-    fprintf('Loading AVG ECG Data\n');
-    pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', subfname, 'n=', num2str(nSub), '*']);
-    files = dir(pattern);
-    filename = fullfile(files(1).folder, files(1).name);
-    load(filename, 'AVGECG');
-
-    for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
+    for sub = 1:numel(subjects.new) % subjects.goodHeartMOff BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
 
         % Extract the subject
-        subject = subjects.goodHeartMOff{sub};
+        subject = subjects.new{sub}; %goodHeartMOff{sub}
+
+
+        if strcmp(subject, 'SG078')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "C3", "C4", "P3", "P4"};
+        elseif strcmp(subject, 'SG079')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F3", "F4", "C3", "C4", "P3", "P4"};
+        elseif strcmp(subject, 'KS29')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"}; % NO EEG in MedOn
+        elseif strcmp(subject, 'KS28')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"};
+        else
+            channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+        end
 
         if seperateSTN
             channels{8} = LfpElec.(subject){1};
@@ -114,13 +187,13 @@ for fn = 1:2 % MedOn
         if ismember('TFR Basis', steps)
             if baseline
                 fprintf('Loading TFR Data\n');
-                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
+                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', medname, '*', '_BSL=', '*']);
                 files = dir(pattern);
                 filename = fullfile(files(1).folder, files(1).name);
                 load(filename, 'TFR', '-mat');
             else
                 fprintf('Loading TFR Data\n');
-                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*']);
+                pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', medname, '*']);
                 files = dir(pattern);
                 filename = fullfile(files(1).folder, files(1).name);
                 load(filename, 'TFR', '-mat');
@@ -141,12 +214,12 @@ for fn = 1:2 % MedOn
 
          if ismember('PWelch', steps)
         fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
-        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', subfname, '*']);
+        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_preprocessed_', medname, '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'SmrData');
         % Load subject data
-        % subject_data = fullfile(data_dir, preprocessed_name, subfname, ['sub-', subject], [subject, '_preprocessed_', subfname, '_Rest.mat']);
+        % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
         % load(subject_data, 'SmrData');
 
         SR = SmrData.SR;
@@ -155,7 +228,7 @@ for fn = 1:2 % MedOn
 
         % PWelch on entire Channel Data
         for c = 1:numel(channels)
-            channel = channels{c};
+            channel = channels{c}; 
 
             ChDta = SmrData.WvDataCleaned(c, :);
 
@@ -206,12 +279,12 @@ for fn = 1:2 % MedOn
         f1 = figure;
         set(f1,'Position',[1949 123 1023 400]);
         plot(freqs, 10*log10(ChanPowerSubTrsAvg),'LineWidth', 1, 'Color','k')
-        title(sprintf('Average PSD for in %s,med: %s', channel, subfname))
+        title(sprintf('Average PSD for in %s,med: %s', channel, medname))
         xlabel('Frequencies (Hz)') % Add x-label
         ylabel('dB/Hz') %
         axis('tight');
 
-        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_', channel, '_', subfname,  '.png']);
+        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_', channel, '_', medname,  '.png']);
         exportgraphics(f1,gr1, 'Resolution', 300)
 
     end
@@ -219,7 +292,17 @@ for fn = 1:2 % MedOn
 %% PLOT PSD on PWELCH
  if ismember('PWelch', steps)
  for c = 1:numel(channels)
-        channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+     if strcmp(subject, 'SG078')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "C3", "C4", "P3", "P4"};
+        elseif strcmp(subject, 'SG079')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F3", "F4", "C3", "C4", "P3", "P4"};
+        elseif strcmp(subject, 'KS29')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"}; % NO EEG in MedOn
+        elseif strcmp(subject, 'KS28')
+            channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"};
+        else
+            channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+        end
         channel = channels{c};
 
         ChanSubAllStaAvg = squeeze(mean(squeeze(PWelchAllDtaAvg(:,c,:)),1));
@@ -234,12 +317,12 @@ for fn = 1:2 % MedOn
         f1 = figure;
         set(f1,'Position',[1949 123 1023 400]);
         plot(f_trimmed, 10*log10(FftPwelch_trimmed),'LineWidth', 1, 'Color','k')
-        title(sprintf('Average PSD for in %s,med: %s', channel, subfname))
+        title(sprintf('Average PSD for in %s,med: %s', channel, medname))
         xlabel('Frequencies (Hz)') % Add x-label
         ylabel('dB/Hz') %
         axis('tight');
 
-        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_PWelch', channel, '_', subfname,  '.png']);
+        gr1 = fullfile('F:\HeadHeart\2_results\psd' , ['AvgPSD_PWelch', channel, '_', medname,  '.png']);
         exportgraphics(f1,gr1, 'Resolution', 300)
 
 

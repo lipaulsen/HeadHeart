@@ -30,7 +30,62 @@
 %clear all
 %close all
 
-subfnames = fieldnames(subjects);
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+% make channel info into cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+end
+
+
+
+% Convert 'channels_raw' (string) to cell array of strings
+channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
+channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
+
+channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
+chans = string(channel{1,3});
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 
 % Define if plots are to be shown
 show_plots = false;

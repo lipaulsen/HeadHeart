@@ -18,8 +18,11 @@
 % Preprocessed data (EEG, LFP, ECG) from .mat file
 %
 % Outputs:    Features extracted from the data in .mat files
-% - ECG: IBI(sub, :), HRV, HF-HRV, LF-HRV
-% - EEG & LFP: Power of delta, theta, alpha, beta, gamma bands for all electrodes
+% - ECG: IBI, HR, HRV (avg_features_folder, ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects.goodHeartMOff)),'.mat'])
+% - EEG & LFP: Epoched TFR (data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', subfname ,'_Rest_Hilbert_Freq=',
+%                           num2str(stfr),'-', num2str(enfr),'_bin=', num2str(dfr),'Hz_DS=', num2str(NewSR),'_HP=', 
+%                           num2str(Fhp),'Hz_EP=-',num2str(tOffset), 'to', num2str(tWidth-tOffset) ,'_BSL=', 
+%                           num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
 
 % Steps:
 % 1. LOAD DATA
@@ -28,10 +31,8 @@
 %   2b. Save HRV features in a tsv file
 %   2c. Plot HRV features
 % 3. FEATURE EXTRACTION EEG
-%   3a. Calculate the power of all EEG frequency bands
-%   3b. Calculate the mean power of the EEG frequency bands for a region of interest (ROI)
-%   3c. Save EEG power features in a tsv file
-%   3d. Plot EEG power features
+%   3a. HP Filter, Downsample, Epoch, Baseline Correction
+%   3b. Time Freq Decomp
 % 4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
 
 %% ============= SET GLOABAL VARIABLES AND PATHS =========================
@@ -173,9 +174,9 @@ baseline_win = [-0.3 -0.1];
 
 
 
-for fn = 1:2 % MedOn
+for fn = 2%:2 % MedOn
     subfname = subfnames{fn};
-    for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
+    for sub = 1:numel(subjects.new) %numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
         % Extract the subject
         subject = subjects.goodHeartMOff{sub};
 
@@ -281,7 +282,8 @@ for fn = 1:2 % MedOn
                         end
                         NewSR=1.0/dtTime;
                     end
-
+    
+                    % Epoch the Data
                     [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);
                     [nEvs,nData]=size(EvData);
                   

@@ -19,8 +19,10 @@
 %
 %
 % Outputs:    Preprocessed data (EEG, ECG, PPG) in tsv files (ECG & PPG) and fif files (EEG, before and after ICA)
-%             Participant metadata in .mat files
-%             Excluded participants (with too many bad channels) in a list
+%             Participant metadata in .mat files (data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', 
+%                                                 subfname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency),
+%                                                 '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg),
+%                                                 '_cutoff=', num2str(cut_off_seconds),'s.mat']);)
 %             Plots of preprocessing steps
 
 % Steps:
@@ -35,7 +37,48 @@
 % clear all
 % close all
 
-subfnames = fieldnames(subjects);
+
+% Extract subject IDs and channels 
+subjects_ids = {subjects.ID};  
+
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOn] == 1).ID});
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOff] == 1).ID});
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOn] == 1).ID});
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOff] == 1).ID});
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subjects.MedOn] == 1).ID});
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subjects.MedOff] == 1).ID});
+end
+
+
+% Convert 'channels_raw' (string) to cell array of strings
+channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
+channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
+
+channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
+chans = string(channel{1,3})
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 
 % Define if plots are to be shown
 % Plots aare only saved if this is true
@@ -43,12 +86,6 @@ show_plots = false;
 
 % Define if manual data cleaning is to be done
 manual_cleaning = true;
-
-% % Only analyze one subject when debug mode is on
-% debug = false;
-% if debug
-%     subjects = subjects(1);
-% end
 
 % Define preprocessing steps to perform
 steps = {'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
@@ -73,7 +110,7 @@ high_frequency_ecg = 30; % Hz
 
 % Define if the first and last 2 seconds of the data should be cut off
 % to avoid any potential artifacts at the beginning and end of the experiment
-cut_off_seconds = 2; % sec
+cut_off_seconds = 0; % sec
 
 % Define the file paths and subject folders to be created
 data_dir = fullfile(data_dir);
@@ -146,24 +183,25 @@ for fn = 2%:2 nur medon gerade
         % Assign ECG Channels for different subjects 
         if strcmp(subject, 'SG078')
            SmrData.WvTits{25} = 'ECG';
-           SR = SmrData.SRs(1);
+           SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(25,:)];%LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(25,:)];
         elseif strcmp(subject, 'SG079')
            SmrData.WvTits{26} = 'ECG';
-           SR = SmrData.SRs(1);
+           SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:23,:); SmrData.WvData(26,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(26,:)];
         elseif strcmp(subject, 'KS29')
            SmrData.WvTits{23} = 'ECG';
-           SR = SmrData.SRs(1);
+           SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(23,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(23,:)];
+           if strcmp(subfname, 'MedOn')
            SmrData.EvData.EvECGP_Cl = SmrData.EvData.EvECG_Cl; SmrData.EvData = rmfield(SmrData.EvData, 'EvECG_Cl');
-
+           end
         elseif strcmp(subject, 'KS28')
            SmrData.WvTits{40} = 'ECG';
-           SR = SmrData.SRs(1);
+           SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(40,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(40,:)];
         else

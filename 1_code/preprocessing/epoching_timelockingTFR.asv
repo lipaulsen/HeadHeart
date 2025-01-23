@@ -30,7 +30,61 @@
 %clear all
 %close all
 
-subfnames = fieldnames(subjects);
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+% get the channel info into the shape of cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+end
+
+
+% Convert 'channels_raw' (string) to cell array of strings
+channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
+channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
+
+channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
+chans = string(channel{1,3})
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 
 % Define if plots are to be shown
 show_plots = false;
@@ -43,7 +97,7 @@ seperateSTN = true;
 baseline = false; %currently no baseline but if needed can be added
 
 % Define feature extraction steps to perform
-steps = {'Load Data', 'Epoch and Timelock Data'}; %'Load Data', 'Epoch and Timelock Data','ECG Data'
+steps = {'ECG Data'}; %'Load Data', 'Epoch and Timelock Data',
 
 % Define folder variables
 tfr_name = 'tfr';  % averaged data folder (inside preprocessed)
@@ -67,8 +121,8 @@ LfpElec.STNr = {'R1', 'R2', 'R3', 'R4'};
 
 
 % Define Time Window
-tWidth   = 1.5;
-tOffset  = 0.4;
+tWidth   = 0.9;
+tOffset  = 0.3;
 
 % Define Struct
 EPOCH = [];
@@ -85,11 +139,11 @@ epochChDtaPowAll = [];
 %% ============================ 1. LOAD DATA =============================
 disp("************* STARTING EPOCH AND TIMELOCKING *************");
 if ismember('Epoch and Timelock Data', steps)
-    for fn = 1:2 % MedOn
+    for fn = 1%:2 % MedOn
         for c = 1:numel(channels)
             subfname = subfnames{fn};
 
-            for sub = 6%:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
+            for sub = 1:numel(subjects.goodHeartMOff) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
 
                 % Extract the subject
                 subject = subjects.goodHeartMOff{sub};
@@ -138,8 +192,8 @@ if ismember('Epoch and Timelock Data', steps)
 
                 fprintf('****************** Extract Time for %s %s...****************\n', subject, channel);
                 % Get Channel Power and Phase Data
-                ChDta_phs = squeeze(TFR.(channel).phase(:,:));
-                ChDta_pow = squeeze(TFR.(channel).pow(:,:));
+                ChDta_phs = TFR.(channel).phase(:,:);
+                ChDta_pow = TFR.(channel).pow(:,:);
 
                 % Extract the Time Windows around Event
                 nEvent=length(EventTms);
@@ -163,7 +217,7 @@ if ismember('Epoch and Timelock Data', steps)
                 MasEnableEvents=int32(zeros(nEvent,1));
                 nPosibleEvent=int32(0);
                 for i = 1:nEvent
-                    currtime=int32(MasEvent(i)/dtTime);
+                    currtime=int32(EventTms(i)/dtTime);
                     n1=currtime-nOffset;
                     n2=n1+nWidth-1;
                     if n1 > 0 && n2 < nDataAll
@@ -173,28 +227,28 @@ if ismember('Epoch and Timelock Data', steps)
                 end
                 nEvent=nPosibleEvent;
                 % Save All events  in case for later analysis, could be delete;
-                EvData=zeros(nEvent,nWidth);
                 EvTime=zeros(1,nEvent);
                 for i = 1:nEvent
-                    EvTime(i)=MasEvent(MasEnableEvents(i));
+                    EvTime(i)=EventTms(MasEnableEvents(i));
                     currtime=int32(EvTime(i)/dtTime);
                     n1=currtime-nOffset;
                     n2=n1+nWidth-1;
                     EPOCH.(channel).(subject).phase(i,:,:) = ChDta_phs(:,n1:n2); %(TrialsxFreqxPhase)
                     EPOCH.(channel).(subject).power(i,:,:) = ChDta_pow(:,n1:n2); %(TrialsxFreqxPower)
                 end
+                EventTms = EvTime;
                 % Ectract the epoch times around the r peak
-                for i = 1:nEvent
-                    currtime=int32(EventTms(i)/dtTime);
-                    n1=currtime-nOffset;
-                    n2=n1+nWidth-1;
-                    if n1 > 0 && n2 < nDataAll % Check that the time windows is int he data
-                        % extract the Data around the time window
-                        EPOCH.(channel).(subject).phase(i,:,:) = ChDta_phs(:,n1:n2); %(TrialsxFreqxPhase)
-                        EPOCH.(channel).(subject).power(i,:,:) = ChDta_pow(:,n1:n2); %(TrialsxFreqxPower)
-                       
-                    end
-                end
+                % for i = 1:nEvent
+                %     currtime=int32(EventTms(i)/dtTime);
+                %     n1=currtime-nOffset;
+                %     n2=n1+nWidth-1;
+                %     if n1 > 0 && n2 < nDataAll % Check that the time windows is int he data
+                %         % extract the Data around the time window
+                %         EPOCH.(channel).(subject).phase(i,:,:) = ChDta_phs(:,n1:n2); %(TrialsxFreqxPhase)
+                %         EPOCH.(channel).(subject).power(i,:,:) = ChDta_pow(:,n1:n2); %(TrialsxFreqxPower)
+                % 
+                %     end
+                % end
                 [nEvent, Frqs, nTm] = size(EPOCH.(channel).(subject).phase);
                 TmAxis=zeros(nTm,1)';
                 s=-1*tOffset;  for i=1:nTm;  TmAxis(i)=s;  s=s+dtTime;  end
@@ -337,7 +391,7 @@ if ismember('ECG Data', steps)
 
 
              % Load the the cleaned ECG R Peaks Data
-            pattern = fullfile(data_dir, 'itc', [subject, '_', subfname, '*']);
+            pattern = fullfile(data_dir, 'itc', 'evecg' ,[subject, '_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'EvEcgData');
@@ -433,7 +487,7 @@ if ismember('ECG Data', steps)
         save_path = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', subfname ,'n=', num2str(nSub),...
             '_Rest_Hilbert_Freq=', num2str(freqs(1)),'-', num2str(freqs(end)),'Hz_bin=', num2str(mean(diff(freqs))),...
             'HZ-Epoch=', num2str(TmAxis(1)),'to',num2str(TmAxis(end)),'s_BSL=', num2str(baseline),'.mat']);
-        save(save_path, 'AVGECG', 'Params', '-v7.3');
+        save(save_path, 'AVGECG', '-v7.3');
 
     end
 end

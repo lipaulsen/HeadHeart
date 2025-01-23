@@ -30,7 +30,44 @@
 %clear all
 %close all
 
-subfnames = fieldnames(subjects);
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOn] == 1).ID});
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOff] == 1).ID});
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOn] == 1).ID});
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOff] == 1).ID});
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subjects.MedOn] == 1).ID});
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subjects.MedOff] == 1).ID});
+end
+
+
+% Convert 'channels_raw' (string) to cell array of strings
+channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
+channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
+
+channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
+chans = string(channel{1,3})
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 preprocessed_name = 'preprocessed'; 
 epoch_name = 'epoch';
 

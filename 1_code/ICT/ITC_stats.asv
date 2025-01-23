@@ -30,7 +30,61 @@
 %clear all
 %close all
 
-subfnames = fieldnames(subjects);
+% ========================== SUBJECT FLAGS ================================
+
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+% get the channel info into the shape of cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+end
+
+
+% Convert 'channels_raw' (string) to cell array of strings
+channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
+channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
+
+channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
+chans = string(channel{1,3})
+
+%subfnames = fieldnames(subjects);
+
+%=========================================================================
 
 % Define if plots are to be shown
 show_plots = false;
@@ -43,7 +97,7 @@ seperateSTN = true;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Plot SubAvg ITC'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
+steps = {'Plot Power'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
 
 % Define folder variables
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
@@ -86,7 +140,7 @@ plots = true;
 ITC = [];
 signif_thresh = 0.05;
 cm_viridis=viridis(100);
-Hz_dir = '0.5Hz';
+Hz_dir = '2Hz';
 
 
 % Initialize the Perm Matrix be sure here that the freqs and Time are
@@ -419,7 +473,7 @@ for fn = 1:2 % MedOn
                 ylabel('Frequencies (Hz)') % Add y-label
                 title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, subfname, Hz_dir))
 
-                gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir,['ITC_', channel, '_', subfname,  '.png']);
+                gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', subfname,  '.png']);
                 exportgraphics(f2,gr2, 'Resolution', 300)
             end
         end
@@ -522,12 +576,12 @@ for fn = 1:2 % MedOn
             end
 
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', [subject, '_TFR-EPOCH_', subfname, '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
             freqs = TFR.freqs;
-            %times = TFR.
+            times = TFR.times;
 
             for c = 1:numel(channels)
 
@@ -548,14 +602,14 @@ for fn = 1:2 % MedOn
         f7=figure;
         set(f7,'Position',[1949 123 1023 785]);
         subplot(2,1,1)
-        plot(times, AVGECG.mean', 'Color', 'k'); hold on
-        set(gca,'Position',[0.1300 0.5838 0.77 0.3])
+        plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+        set(gca,'Position',[0.1300 0.5838 0.71 0.3])
         xline(0, "--k", 'LineWidth', 2);
         title(sprintf('Average ECG over all Sub'))
         hold off
         subplot(2,1,2)
-        imagesc(times,freqs,PowAll_subavg);axis xy;
-        colormap('jet');
+        imagesc(times(31:end),freqs,PowAll_subavg(:,31:end));axis xy;
+        colormap('parula');
         colorbar;
         clims = clim;
         % hold on
@@ -564,7 +618,7 @@ for fn = 1:2 % MedOn
         xline(0, "--k", 'LineWidth', 2);
         title(sprintf('Average  Power in %s, med = %s', channel,  subfname ))
 
-        gr7 = fullfile('F:\HeadHeart\2_results\power\group' , ['AvgPower_', channel, '_', subfname, '.png']);
+        gr7 = fullfile('F:\HeadHeart\2_results\power\', Hz_dir,  'group' , ['AvgPower_', channel, '_', subfname, '.png']);
         exportgraphics(f7,gr7, 'Resolution', 300)
         end
 
