@@ -38,8 +38,51 @@
 %% ============= SET GLOABAL VARIABLES AND PATHS =========================
 %clear all
 %close all
+% ========================== SUBJECT FLAGS ================================
 
-subfnames = fieldnames(subjects);
+% MEDICATION
+% only one can be true at all times
+MedOn = true;
+MedOff = false;
+
+% SUBJECT STATUS
+% only one can be true at all times
+newsubs = false;
+oldsubs = false;
+allsubs = true;
+
+% get the channel info into the shape of cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+elseif MedOn == true & allsubs == true  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+elseif MedOff == true & allsubs == true % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+end
+
+%=========================================================================
 
 % Define if plots are to be shown
 show_plots = false;
@@ -55,27 +98,27 @@ feature_name = 'features';  % feature extraction folder (inside derivatives)
 
 
 % Create the features data folder if it does not exist
-for fn = 1:2 % MedOn and MedOff
-    subfname = subfnames{fn};
-    for i = 1:length(subjects.(subfname))
-        subject = subjects.(subfname){i};
-        subject_features_folder = fullfile(data_dir, feature_name, subfname, sprintf('sub-%s', subject));
-        if ~exist(subject_features_folder, 'dir')
-            mkdir(subject_features_folder);
-        end
+% for fn = 1:2 % MedOn and MedOff
+%     subfname = subfnames{fn};
+%     for i = 1:length(subjects.(subfname))
+%         subject = subjects.(subfname){i};
+%         subject_features_folder = fullfile(data_dir, feature_name, subfname, sprintf('sub-%s', subject));
+%         if ~exist(subject_features_folder, 'dir')
+%             mkdir(subject_features_folder);
+%         end
+% 
+%         % results folder
+%         subject_features_results_folder = fullfile(results_dir, feature_name, subfname, sprintf('sub-%s', subject));
+%         if ~exist(subject_features_results_folder, 'dir')
+%             mkdir(subject_features_results_folder);
+%         end
+%     end
+% end
 
-        % results folder
-        subject_features_results_folder = fullfile(results_dir, feature_name, subfname, sprintf('sub-%s', subject));
-        if ~exist(subject_features_results_folder, 'dir')
-            mkdir(subject_features_results_folder);
-        end
-    end
-end
-
-avg_features_folder = fullfile(data_dir, feature_name, averaged_name);
-if ~exist(avg_features_folder, 'dir')
-    mkdir(avg_features_folder);
-end
+% avg_features_folder = fullfile(data_dir, feature_name, averaged_name);
+% if ~exist(avg_features_folder, 'dir')
+%     mkdir(avg_features_folder);
+% end
 
 % Define parameters for time-frequency analysis of both ECG and EEG data
 window_length_hrv = 10;  % 10 samples window  % Length of the window for smoothing
@@ -142,13 +185,18 @@ end
 
 LfpElec.SG041 = {'L3', 'R3'};
 LfpElec.SG043  = {'L4', 'R1'};
+LfpElec.SG044  = {'L1', 'R3'};
+LfpElec.SG045  = {'L4', 'R1'}; % NEW
 LfpElec.SG046  = {'L4', 'R1'};
 LfpElec.SG047  = {'L3', 'R4'};
 LfpElec.SG050 = {'L3', 'R3'};
 LfpElec.SG052  = {'L4', 'R2'};
 LfpElec.SG056  = {'L4', 'R1'};
-LfpElec.STNl = {'L1', 'L2', 'L3', 'L4'};
-LfpElec.STNr = {'R1', 'R2', 'R3', 'R4'};
+LfpElec.SG060  = {'L2', 'R1'}; % NEW
+LfpElec.SG078  = {'L1', 'R1'}; % NEW
+LfpElec.SG079  = {'L2', 'R7'}; % NEW
+LfpElec.KS28  = {'L3', 'R8'}; % NEW
+LfpElec.KS29  = {'L8', 'R7'}; % NEW
 
 %% ============================== FUNCTIONS ==============================
 

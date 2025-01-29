@@ -39,7 +39,7 @@
 
 
 % Extract subject IDs and channels 
-subjects_ids = {subjects.ID};  
+%subjects_ids = {subject_info.ID};  
 
 % ========================== SUBJECT FLAGS ================================
 
@@ -154,7 +154,7 @@ for med = 1%:2 nur medon gerade
         % Extract the subject
         subject = subjects{sub}; %(medname)
 
-        fprintf('Processing subject %s number %i of %i\n', subject, sub, numel(subjects.(medname)));
+        fprintf('Processing subject %s number %i of %i\n', subject, sub, medname);
 
         % Load subject data
         subject_data = fullfile(data_dir, rawdata_name, [subject, '_', medname, '_Rest.mat']);
@@ -187,22 +187,32 @@ for med = 1%:2 nur medon gerade
         % Define the path to subject results folder
         subject_results_folder = fullfile(results_dir, preprocessed_name, medname, sprintf('sub-%s', subject));
 
+        if strcmp(subject, 'SG052')
+            ecg_idx = find(strcmp(SmrData.WvTits, "ECG2"));
+        else
+            ecg_idx = find(strcmp(SmrData.WvTits, "ECG"));
+        end
+
+
         % Assign ECG Channels for different subjects 
         if strcmp(subject, 'SG078')
            SmrData.WvTits{25} = 'ECG';
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(25,:)];%LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(25,:)];
+           ecg_idx = 25;
         elseif strcmp(subject, 'SG079')
            SmrData.WvTits{26} = 'ECG';
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:23,:); SmrData.WvData(26,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(26,:)];
+           ecg_idx = 26;
         elseif strcmp(subject, 'KS29')
            SmrData.WvTits{23} = 'ECG';
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(23,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(23,:)];
+           ecg_idx = 23;
            if strcmp(medname, 'MedOn')
            SmrData.EvData.EvECGP_Cl = SmrData.EvData.EvECG_Cl; SmrData.EvData = rmfield(SmrData.EvData, 'EvECG_Cl');
            end
@@ -211,6 +221,7 @@ for med = 1%:2 nur medon gerade
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(40,:)]; %LFP,EEG and ECG
            SmrData.WvTitsCleaned = [SmrData.WvTits(1:22,:); SmrData.WvTits(40,:)];
+           ecg_idx = 40;
         else
            SR = SmrData.SR;
            SmrData.WvDataCleaned = SmrData.WvData(1:16,:); %LFP,EEG and ECG
@@ -308,9 +319,7 @@ for med = 1%:2 nur medon gerade
         if ismember('Preprocessing ECG', steps)
 
             disp('********** Preprocessing ECG Data **********');
-
-            ecg_idx = find(strcmp(SmrData.WvTits, "ECG"));
-
+           
             % Removal of the DC Offset of ECG
             disp('Removing DC Offset...');
             SmrData.WvDataCleaned(end,:) = SmrData.WvDataCleaned(end,:)-mean(SmrData.WvDataCleaned(end,:));
@@ -362,8 +371,8 @@ for med = 1%:2 nur medon gerade
             % Design 2nd order twopass Butterworth filter (0.5 Hz high-pass, 30 Hz low-pass)
             ecg_data_bandpass  = ft_preproc_bandpassfilter(ecg_notch_ft(1,:), SR, [low_frequency_ecg high_frequency_ecg],  2, 'but','twopass'); % two pass butterworth filter
             % save filtered data in SmrData struct
-            SmrData.WvDataCleaned(ecg_idx,:) = ecg_data_bandpass; % this is not great yet!! 
-            SmrData.WvTits{ecg_idx,1} = 'ECG_filtered';
+            SmrData.WvDataCleaned(end,:) = ecg_data_bandpass; % this is not great yet!! 
+            SmrData.WvTits{end,1} = 'ECG_filtered';
 
             if show_plots
                 % Plot the Raw ECG Data against the bandpass filtered Data
@@ -502,23 +511,71 @@ for med = 1%:2 nur medon gerade
 
             % bipolar rereferencing if for the LFP Electrodes and basedn on
             % the best common reference LFP with the best beta we can
-            % sube the activity from the neighboring electrode 
+            % subtract the activity from the neighboring electrode 
 
-            LfpElec.SG041  = {'L3', 'R3'};
-            LfpElec.SG043  = {'L4', 'R1'};
-            LfpElec.SG044  = {'L1', 'R3'};
-            LfpElec.SG045  = {'L4', 'R1'}; 
-            LfpElec.SG046  = {'L4', 'R1'};
-            LfpElec.SG047  = {'L3', 'R4'};
-            LfpElec.SG050  = {'L3', 'R3'};
-            LfpElec.SG052  = {'L4', 'R2'};
-            LfpElec.SG056  = {'L4', 'R1'};
-            LfpElec.SG060  = {'L2', 'R1'}; 
-            LfpElec.SG078  = {'L1', 'R1'};
-            LfpElec.SG079  = {'L2', 'R7'}; 
-            LfpElec.KS28   = {'L3', 'R8'}; 
-            LfpElec.KS29   = {'L8', 'R7'}; 
+            if ismember ('Bipolar Rereferencing', steps)
+                LfpElec.SG041  = {'L3', 'R3'};
+                LfpElec.SG043  = {'L4', 'R1'};
+                LfpElec.SG044  = {'L1', 'R3'};
+                LfpElec.SG045  = {'L4', 'R1'};
+                LfpElec.SG046  = {'L4', 'R1'};
+                LfpElec.SG047  = {'L3', 'R4'};
+                LfpElec.SG050  = {'L3', 'R3'};
+                LfpElec.SG052  = {'L4', 'R2'};
+                LfpElec.SG056  = {'L4', 'R1'};
+                LfpElec.SG060  = {'L2', 'R1'};
+                LfpElec.SG078  = {'L1', 'R1'};
+                LfpElec.SG079  = {'L2', 'R7'};
+                LfpElec.KS28   = {'L3', 'R8'};
+                LfpElec.KS29   = {'L8', 'R7'};
 
+                for el = 1:2
+                    currchan = find(strcmp(FltSubsChansRaw{sub},LfpElec.(subject){el}));
+                    if currchan == 1
+                        BipolarReRefLow = 0;
+                        BipolarReRefHigh = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan+1,:);
+                    else
+                        BipolarReRefLow = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan-1,:);
+                        BipolarReRefHigh = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan+1,:);
+                    end
+
+                    % Put the reref things into the smrdata 
+
+                    if show_plots
+                        f6 = figure;
+                        set(gcf, 'Position', [1 59 1440 738]);
+                        subplot(5,1,1)
+                        outlier1 = diff(SmrData.EvData.EvECGP_Cl)> 0.9;
+                        outlierdata1 = SmrData.EvData.EvECGP_Cl(outlier1);
+                        outlier2 = diff(SmrData.EvData.EvECGP_Cl)> 1.1;
+                        outlierdata2 = SmrData.EvData.EvECGP_Cl(outlier2);
+                        title('black = 0.9s time difference and red = 1.1 ms time difference')
+                        scatter(outlierdata1, 1, 'filled', 'k'), axis('tight')
+                        hold on
+                        scatter(outlierdata2, 1, 'filled', 'r'), axis('tight')
+                        subplot(5,1,2)
+                        plot(SmrData.WvDataCleaned(currchan,:), 'k','LineWidth',1)
+                        axis('tight');
+                        subplot(5,1,3)
+                        plot(BipolarReRefLow, 'r','LineWidth',1)
+                        axis('tight');
+                        subplot(5,1,4)
+                        plot(BipolarReRefHigh, 'b','LineWidth',1)
+                        axis('tight');
+                        subplot(5,1,5)
+                        plot(SmrData.WvDataCleaned(currchan,:), 'k','LineWidth',1)
+                        hold on
+                        plot(BipolarReRefLow, 'r','LineWidth',1)
+                        hold on
+                        plot(BipolarReRefHigh, 'b','LineWidth',1)
+                        axis('tight');
+                        title(['LFP (black) vs. bipolar refrenced one below (red) and one above (blue) sub ' subject, ' Electrode ', LfpElec.(subject){el}]);
+
+                        gr6 = fullfile(results_dir, preprocessed_name, 'bpreref', [subject, '_', medname ,'_bpreref_EEG_raw-vs-below-vs-above_El=', LfpElec.(subject){el},'.png']);
+                        exportgraphics(f6, gr6, "Resolution",300)
+                    end
+                end
+            end
             %% Plots
 
             % Visualize filtering
@@ -558,10 +615,21 @@ for med = 1%:2 nur medon gerade
 
         % Save the preprocessed Data in Smr.Data Struct
         %newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
+        low = true;
+        high = false;
+
+        if ismember('Bipolar Rereferencing', steps) & low
         save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
         save(save_path, 'SmrData');
+        elseif ismember('Bipolar Rereferencing', steps) & high
+        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
+        save(save_path, 'SmrData');
+        else
+        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
+        save(save_path, 'SmrData');
+        end
 
-        disp(['Processed and saved: ', save_path]);
+        %disp(['Processed and saved: ', save_path]);
 
     end
 end
@@ -569,16 +637,3 @@ end
 disp('PREPROCESSING DONE!');
 
 
-
-
-% SR = 2048;
-% NewSR = 300;
-% 
-% FsOrigin=SR;
-% if  FsOrigin ~=  NewSR
-%     [fsorig, fsres] = rat(FsOrigin/NewSR);
-%     ChDta=resample(lfp_data_lowpass(1,:),fsres,fsorig);
-%     dtTime=1/NewSR;
-% end
-% SR=1.0/dtTime;
-   
