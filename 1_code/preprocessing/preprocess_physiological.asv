@@ -58,6 +58,7 @@ allsubs = true;
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
 AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
 
+
 % filter which subjects and which channels you want
 if MedOn == true & newsubs == true % Only New Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
@@ -97,7 +98,7 @@ show_plots = false;
 manual_cleaning = true;
 
 % Define preprocessing steps to perform
-steps = {'Preprocessing ECG', 'Preprocessing EEG'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
+steps = {'Preprocessing ECG', 'Preprocessing EEG', 'Bipolar Rereferencing'}; %'Formatting', 'Cutting', 'Preprocessing ECG', 
 
 % Define power line frequency
 powerline = 50; % Hz
@@ -149,12 +150,12 @@ for med = 1%:2 nur medon gerade
         medname = 'MedOff';
     end
 
-    for sub = 1:numel(subjects) %(medname)
+    for sub = 11:numel(subjects) %(medname)
 
         % Extract the subject
         subject = subjects{sub}; %(medname)
 
-        fprintf('Processing subject %s number %i of %i\n', subject, sub, medname);
+        fprintf('Processing subject %s number %i of %i, med: %s\n', subject, sub, numel(subjects), medname);
 
         % Load subject data
         subject_data = fullfile(data_dir, rawdata_name, [subject, '_', medname, '_Rest.mat']);
@@ -192,10 +193,12 @@ for med = 1%:2 nur medon gerade
         else
             ecg_idx = find(strcmp(SmrData.WvTits, "ECG"));
         end
-
+        
+       
 
         % Assign ECG Channels for different subjects 
         if strcmp(subject, 'SG078')
+           SmrData.WvTits = cellfun(@char, SmrData.WvTits, 'UniformOutput', false);
            SmrData.WvTits{25} = 'ECG';
            SR = SmrData.SRs(1); SmrData.SR = SR; SmrData = rmfield(SmrData, 'SRs');
            SmrData.WvDataCleaned = [SmrData.WvData(1:22,:); SmrData.WvData(25,:)];%LFP,EEG and ECG
@@ -228,6 +231,15 @@ for med = 1%:2 nur medon gerade
            SmrData.WvTitsCleaned = SmrData.WvTits(1:16,:); 
         end
 
+         % Create a clear list with teh EEG and LFP Channels for this subject 
+        subidx = find(strcmp(subject, {subject_info.ID})); % das ist mein Index 
+        EEGChans = strsplit(subject_info(subidx).EEG, ', '); % extracting EEG Chans
+        LFPChans = strsplit(subject_info(subidx).LFP, ', '); % extracting LFP Chans
+        eegidx = find(ismember(SmrData.WvTitsCleaned, EEGChans));
+        lfpidx = find(ismember(SmrData.WvTits,LFPChans));
+
+        ((ischar(SmrData.WvTits) || iscellstr(SmrData.WvTits)) && (ischar(b) || iscellstr(EEGChans)))
+        cellfun(@class, SmrData.WvTitsCleaned, 'UniformOutput', false)
         
 
         % Create Metadata .mat file for the subject to review what
@@ -529,17 +541,22 @@ for med = 1%:2 nur medon gerade
                 LfpElec.KS28   = {'L3', 'R8'};
                 LfpElec.KS29   = {'L8', 'R7'};
 
+                BPRerefLw = zeros(2,size(SmrData.WvDataCleaned,2));
+                BPRerefHi = zeros(2,size(SmrData.WvDataCleaned,2));
+
                 for el = 1:2
                     currchan = find(strcmp(FltSubsChansRaw{sub},LfpElec.(subject){el}));
                     if currchan == 1
                         BipolarReRefLow = 0;
                         BipolarReRefHigh = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan+1,:);
                     else
-                        BipolarReRefLow = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan-1,:);
-                        BipolarReRefHigh = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan+1,:);
+                        BipolarReRefLow = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan-1,:); % Low = the electrode numerically below
+                        BipolarReRefHigh = SmrData.WvDataCleaned(currchan,:) - SmrData.WvDataCleaned(currchan+1,:); % High = the electrode numerically above 
                     end
-
-                    % Put the reref things into the smrdata 
+                    
+                    
+                    BPRerefLw(el,:) = BipolarReRefLow;
+                    BPRerefHi(el,:) = BipolarReRefHigh;
 
                     if show_plots
                         f6 = figure;
@@ -575,6 +592,19 @@ for med = 1%:2 nur medon gerade
                         exportgraphics(f6, gr6, "Resolution",300)
                     end
                 end
+
+                % Put the reref things into the smrdata 
+                    
+                if sum(strcmp(subject, {subject_info([subject_info.new]== 1).ID})) == 1 % Check if the curr subject is one of the new ones
+                    SmrData.WvDataBPRerefHi = vertcat(SmrData.WvDataCleaned(eegidx,:), BPRerefHi, SmrData.WvDataCleaned(end,:));
+                    SmrData.WvDataBPRerefLow = vertcat(SmrData.WvDataCleaned(eegidx,:), BPRerefLw, SmrData.WvDataCleaned(end,:));
+                    SmrData.WvTitsBPReref = horzcat(SmrData.WvTitsCleaned(eegidx,:)', LfpElec.(subject), SmrData.WvTitsCleaned(end,:));
+                elseif sum(strcmp(subject, {subject_info([subject_info.new]== 1).ID})) == 0
+                    SmrData.WvDataBPRerefHi = vertcat(SmrData.WvDataCleaned(eegidx,:), BPRerefHi, SmrData.WvDataCleaned(end,:));
+                    SmrData.WvDataBPRerefLow = vertcat(SmrData.WvDataCleaned(eegidx,:), BPRerefLw, SmrData.WvDataCleaned(end,:));
+                    SmrData.WvTitsBPReref = horzcat(SmrData.WvTitsCleaned(eegidx,:)', LfpElec.(subject), SmrData.WvTitsCleaned(end,:));
+                end
+
             end
             %% Plots
 
@@ -615,21 +645,15 @@ for med = 1%:2 nur medon gerade
 
         % Save the preprocessed Data in Smr.Data Struct
         %newFileName = fullfile(data_dir, sprintf('ECGPeak_%s.mat', SmrData.FileName));
-        low = true;
-        high = false;
-
-        if ismember('Bipolar Rereferencing', steps) & low
-        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
-        save(save_path, 'SmrData');
-        elseif ismember('Bipolar Rereferencing', steps) & high
-        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
-        save(save_path, 'SmrData');
+        
+        if ismember('Bipolar Rereferencing', steps)
+        save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_BPReref_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
         else
         save_path = fullfile(data_dir, preprocessed_name, 'all', [subject,  '_preprocessed_', medname ,'_Rest_EEG_HP=', num2str(low_frequency), '-LP=',num2str(high_frequency), '_ECG_HP=', num2str(low_frequency_ecg), '_LP=', num2str(high_frequency_ecg), '_cutoff=', num2str(cut_off_seconds),'s.mat']);
-        save(save_path, 'SmrData');
         end
+        save(save_path, 'SmrData');
 
-        %disp(['Processed and saved: ', save_path]);
+        disp(['Processed and saved: ', save_path]);
 
     end
 end
