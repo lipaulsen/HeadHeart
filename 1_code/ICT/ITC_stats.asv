@@ -43,35 +43,18 @@ newsubs = false;
 oldsubs = false;
 allsubs = true;
 
-% get the channel info into the shape of cells
-AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
-AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
-
-% filter which subjects and which channels you want
 if MedOn == true & newsubs == true % Only New Subs that are MedOn
-    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOn] == 1).ID});
 elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
-    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOff] == 1).ID});
 elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
-    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOn] == 1).ID});
 elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
-    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOff] == 1).ID});
 elseif MedOn == true & allsubs == true  % All Subs that are MedOn
-    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+    subjects = string({subject_info([subjects.MedOn] == 1).ID});
 elseif MedOff == true & allsubs == true % All Subs that are MedOff
-    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
-    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
-    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+    subjects = string({subject_info([subjects.MedOff] == 1).ID});
 end
 
 
@@ -103,7 +86,7 @@ steps = {'Plot Power'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Pl
 epoch_name = 'epoch';  % feature extraction folder (inside derivatives)
 
 
-channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
+%channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
 
 LfpElec.SG041 = {'L3', 'R3'};
 LfpElec.SG043  = {'L4', 'R1'};
@@ -154,12 +137,18 @@ PermItcAll = zeros(nSub, numel(channels), numPerms, 141, 271);
 
 disp("************* STARTING EPOCH AND TIMELOCKING *************");
 
-for fn = 1:2 % MedOn
+for fn = 1%:2 % MedOn
 
-    subfname = subfnames{fn};
+    if MedOn == true
+        medname = 'MedOn';
+    elseif MedOff == true
+        medname = 'MedOff';
+    end
+
+    medname = subfnames{fn};
 
     fprintf('Loading AVG ECG Data\n');
-    pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', subfname, 'n=', num2str(nSub), '*']);
+    pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', medname, 'n=', num2str(nSub), '*']);
     files = dir(pattern);
     filename = fullfile(files(1).folder, files(1).name);
     load(filename, 'AVGECG');
@@ -178,34 +167,34 @@ for fn = 1:2 % MedOn
 
         % fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
         % fprintf('Loading Epoch Data\n');
-        % pattern = fullfile(data_dir, epoch_name, [subject, '_', subfname, '*']);
+        % pattern = fullfile(data_dir, epoch_name, [subject, '_', medname, '*']);
         % files = dir(pattern);
         % filename = fullfile(files(1).folder, files(1).name);
         % load(filename, 'EP', '-mat');
 
         % Load the the cleaned ECG R Peaks Data
         fprintf('Loading ECG Data\n');
-        pattern = fullfile(data_dir, 'itc', 'evecg' ,[subject, '_', subfname, '*']);
+        pattern = fullfile(data_dir, 'itc', 'evecg' ,[subject, '_', medname, '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'EvEcgData');
 
         if baseline
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*', '_BSL=', '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*', '_BSL=', '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
         else
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
         end
 
         fprintf('Loading Smr Data\n');
-        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_preprocessed_', subfname, '*']);
+        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_preprocessed_', medname, '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'SmrData');
@@ -229,7 +218,7 @@ for fn = 1:2 % MedOn
             RelItcAll(sub,c,:,:) = relFrsTmItc;
         end
         
-        outputPDF1 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'ss', [subject, '_ITC_Allchan_med=', subfname, ...
+        outputPDF1 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'ss', [subject, '_ITC_Allchan_med=', medname, ...
                     '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '.pdf']);
         for c = 1:numel(channels)
             channel = channels{c};
@@ -243,7 +232,7 @@ for fn = 1:2 % MedOn
                 xline(0, "--k", 'LineWidth', 2);
                 ylabel('Amplitude')
                 axis('tight')
-                title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, subfname))
+                title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, medname))
                 hold off
                 subplot(2,1,2)
                 imagesc(times,freqs,squeeze(ItcAll(sub,c,:,:)));axis xy;
@@ -253,17 +242,17 @@ for fn = 1:2 % MedOn
                 col.Label.String = 'ITC Values'; % Add title to colorbar
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf('ITC for %s in %s, medication: %s', subject, channel, subfname))
+                title(sprintf('ITC for %s in %s, medication: %s', subject, channel, medname))
 
 
-                %gr1 = fullfile('F:\HeadHeart\2_results\itc\ss' , [subject, '_', subfname, '_ITC_', channel, '.png']);
+                %gr1 = fullfile('F:\HeadHeart\2_results\itc\ss' , [subject, '_', medname, '_ITC_', channel, '.png']);
                 %exportgraphics(f1,gr1, 'Resolution', 300)
                 exportgraphics(f1, outputPDF1, 'Append', true);
             end
         end
             %% ==================== PERMUTATION ===========================
             if permstats
-                outputPDF = fullfile('F:\HeadHeart\2_results\itc\ss_perm' , [subject, '_ITC-PermStats_Allchan_med=', subfname, '_perm=', num2str(numPerms), ...
+                outputPDF = fullfile('F:\HeadHeart\2_results\itc\ss_perm' , [subject, '_ITC-PermStats_Allchan_med=', medname, '_perm=', num2str(numPerms), ...
                     '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '_pval=', num2str(signif_thresh),'.pdf']);
                 for c = 1:numel(channels)
                     
@@ -273,7 +262,7 @@ for fn = 1:2 % MedOn
                     end
 
                     channel = channels{c};
-                %[ITCzscores]=ITC_permutation_test(FrsTmItc, relFrsTmItcAll, IBI.(subfname){1}, numPerms, freqs, time_bins, SR, TFR.(channel).phase);
+                %[ITCzscores]=ITC_permutation_test(FrsTmItc, relFrsTmItcAll, IBI.(medname){1}, numPerms, freqs, time_bins, SR, TFR.(channel).phase);
                 fprintf('************ Calculating Perm Stats for %s in %s **************** \n', subject, channel); 
 
                 % Intitialize variables
@@ -338,15 +327,15 @@ for fn = 1:2 % MedOn
                 % histogram(PermItcData);
                 % hold on
                 % histogram(squeeze(ItcAll(sub,c,:,:)));
-                % %title(sprintf('Perm ITC and Original ITC Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, subfname))
+                % %title(sprintf('Perm ITC and Original ITC Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
                 % 
                 % f4 = figure;
                 % subplot(2,1,1);
                 % histogram(zscores);
-                % %title(sprintf('Z Score Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, subfname))
+                % %title(sprintf('Z Score Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
                 % subplot(2,1,2);
                 % histogram(p_orig);
-                % %title(sprintf('P Val Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, subfname))
+                % %title(sprintf('P Val Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
 
                 %itc_zscores_thresh = (zscores > 2) | (zscores < -2);
 
@@ -359,7 +348,7 @@ for fn = 1:2 % MedOn
                 set(gca,'Position',[0.1300 0.5838 0.71 0.3])
                 xline(0, "--k", 'LineWidth', 2);
                 axis('tight')
-                title(sprintf('Average ECG for %s, med: %s', subject, subfname))
+                title(sprintf('Average ECG for %s, med: %s', subject, medname))
                 ylabel('Amplitude')
                 hold off
 
@@ -374,18 +363,18 @@ for fn = 1:2 % MedOn
                 contour(times, freqs, p_thresh, 1, 'linecolor', 'k', 'linewidth', 1.5);
                 xline(0, "--k", 'LineWidth', 2);
                 clim(clims);
-                title(sprintf('ITC for %s in %s, perms: %d, med: %s, p<%.4g', subject, channel, numPerms, subfname, signif_thresh))
+                title(sprintf('ITC for %s in %s, perms: %d, med: %s, p<%.4g', subject, channel, numPerms, medname, signif_thresh))
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
                 hold off
 
-                % outputPDF = fullfile('F:\HeadHeart\2_results\itc' , [subject, '_ITC-PermStats_chan=', channel, '_med=', subfname, '_perm=', num2str(numPerms), ...
+                % outputPDF = fullfile('F:\HeadHeart\2_results\itc' , [subject, '_ITC-PermStats_chan=', channel, '_med=', medname, '_perm=', num2str(numPerms), ...
                 %     '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '_pval=', num2str(signif_thresh),'.pdf']);
                 % exportgraphics(f5,gr5, 'Resolution', 300)
                 exportgraphics(f5, outputPDF, 'Append', true);
 
                 % % Define the output PDF file name
-                % outputPDF = fullfile('F:\HeadHeart\2_results\itc\ss_perm' , [subject, '_ITC-PermStats_chan=', channel, '_med=', subfname, '_perm=', num2str(numPerms), '.pdf']);
+                % outputPDF = fullfile('F:\HeadHeart\2_results\itc\ss_perm' , [subject, '_ITC-PermStats_chan=', channel, '_med=', medname, '_perm=', num2str(numPerms), '.pdf']);
                 % 
                 % % Ensure the PDF file doesn't already exist
                 % if isfile(outputPDF)
@@ -420,9 +409,9 @@ for fn = 1:2 % MedOn
     ITC.ItcAll = ItcAll;
     ITC.RelItcAll = RelItcAll;
     if permstats
-    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
     else
-    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', subfname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+    save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
     end
     save(save_path, 'ITC', '-v7.3');
     fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
@@ -435,7 +424,7 @@ for fn = 1:2 % MedOn
         if ismember('Calc Single Subject ITC', steps) == false
 
         fprintf('Loading ITC Data\n');
-        pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  subfname, '*', '_HP=', Hz_dir(1:end-2), '*']);
+        pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  medname, '*', '_HP=', Hz_dir(1:end-2), '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'ITC', '-mat');
@@ -460,7 +449,7 @@ for fn = 1:2 % MedOn
                 xline(0, "--k", 'LineWidth', 2);
                 ylabel('Amplitude')
                 axis('tight')
-                title(sprintf('Average ECG over all subjects, medication: %s', subfname))
+                title(sprintf('Average ECG over all subjects, medication: %s', medname))
                 hold off
                 subplot(2,1,2)
                 set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
@@ -471,9 +460,9 @@ for fn = 1:2 % MedOn
                 col.Label.String = 'ITC Values'; % Add title to colorbar
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, subfname, Hz_dir))
+                title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, medname, Hz_dir))
 
-                gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', subfname,  '.png']);
+                gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', medname,  '.png']);
                 exportgraphics(f2,gr2, 'Resolution', 300)
             end
         end
@@ -485,7 +474,7 @@ for fn = 1:2 % MedOn
 
         if ismember('Calc Single Subject ITC', steps) == false
             fprintf('Loading ITC Data\n');
-            pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  subfname, '*', '_perm=', '*']);
+            pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  medname, '*', '_perm=', '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'ITC', '-mat');
@@ -538,7 +527,7 @@ for fn = 1:2 % MedOn
                 xline(0, "--k", 'LineWidth', 2);
                 axis('tight')
                 ylabel('Amplitude (μV)')
-                title(sprintf('Average ECG over all subjects, med: %s', subfname))
+                title(sprintf('Average ECG over all subjects, med: %s', medname))
                 hold off
 
 
@@ -553,9 +542,9 @@ for fn = 1:2 % MedOn
                 xline(0, "--k", 'LineWidth', 2);
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf(' Average ITC in %s, perm = %d, med = %s, p<%.4g', channel, numPerms, subfname, signif_thresh))
+                title(sprintf(' Average ITC in %s, perm = %d, med = %s, p<%.4g', channel, numPerms, medname, signif_thresh))
 
-                gr6 = fullfile('F:\HeadHeart\2_results\itc\group_perm' , ['AvgITC_', channel, '_', subfname, '_perm=', num2str(numPerms), '.png']);
+                gr6 = fullfile('F:\HeadHeart\2_results\itc\group_perm' , ['AvgITC_', channel, '_', medname, '_perm=', num2str(numPerms), '.png']);
                 exportgraphics(f6,gr6, 'Resolution', 300)
                 
            
@@ -576,7 +565,7 @@ for fn = 1:2 % MedOn
             end
 
             fprintf('Loading TFR Data\n');
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', subfname, '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
@@ -616,9 +605,9 @@ for fn = 1:2 % MedOn
         % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
         % clim(clims);
         xline(0, "--k", 'LineWidth', 2);
-        title(sprintf('Average  Power in %s, med = %s', channel,  subfname ))
+        title(sprintf('Average  Power in %s, med = %s', channel,  medname ))
 
-        gr7 = fullfile('F:\HeadHeart\2_results\power\', Hz_dir,  'group' , ['AvgPower_', channel, '_', subfname, '.png']);
+        gr7 = fullfile('F:\HeadHeart\2_results\power\', Hz_dir,  'group' , ['AvgPower_', channel, '_', medname, '.png']);
         exportgraphics(f7,gr7, 'Resolution', 300)
         end
 
