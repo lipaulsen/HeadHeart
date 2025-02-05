@@ -7,19 +7,14 @@
 % Created on: 1 October 2024
 % Last update: 15 October 2024
 
-%% REQUIRED TOOLBOXES
-% Image Processing Toolbox
-% Signal Processing Toolbox
-% Statistics and Machine Learning Toolbox
-
-% Extract Features through Time Frequencz Decomposition from EEG and ECG data
+%% INPUT OUTPUT 
+% calculate and plot the PSD using PWelch 
 %
 % Inputs:
 % Preprocessed data (EEG, LFP, ECG) from .mat file
 %
-% Outputs:    Features extracted from the data in .mat files
-% - ECG: IBI(sub, :), HRV, HF-HRV, LF-HRV
-% - EEG & LFP: Power of delta, theta, alpha, beta, gamma bands for all electrodes
+% Outputs: 
+% Single Subject and Grand Average Plots for each Channel 
 
 % Steps:
 % 1. LOAD DATA

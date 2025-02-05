@@ -234,7 +234,6 @@ end
 
 
 %% ============== Plotting ERPs GROUP LEVEL=========================
-% Channel combination needs to be created 
 
 for c = 1:numel(channels)
     channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
