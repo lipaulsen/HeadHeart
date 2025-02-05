@@ -7,19 +7,14 @@
 % Created on: 1 October 2024
 % Last update: 15 October 2024
 
-%% REQUIRED TOOLBOXES
-% Image Processing Toolbox
-% Signal Processing Toolbox
-% Statistics and Machine Learning Toolbox
-
-% Extract Features through Time Frequencz Decomposition from EEG and ECG data
+%% INPUT OUTPUT 
+% calculate and plot the PSD using PWelch 
 %
 % Inputs:
 % Preprocessed data (EEG, LFP, ECG) from .mat file
 %
-% Outputs:    Features extracted from the data in .mat files
-% - ECG: IBI(sub, :), HRV, HF-HRV, LF-HRV
-% - EEG & LFP: Power of delta, theta, alpha, beta, gamma bands for all electrodes
+% Outputs: 
+% Single Subject and Grand Average Plots for each Channel 
 
 % Steps:
 % 1. LOAD DATA
@@ -103,7 +98,7 @@ LfpElec.SG052  = {'L4', 'R2'};
 LfpElec.SG056  = {'L4', 'R1'};
 LfpElec.SG060  = {'L2', 'R1'}; % NEW
 LfpElec.SG078  = {'L1', 'R1'}; % NEW
-LfpElec.SG079  = {'L4', 'R1'}; % NEW
+LfpElec.SG079  = {'L2', 'R7'}; % NEW
 LfpElec.KS28  = {'L3', 'R8'}; % NEW
 LfpElec.KS29  = {'L8', 'R7'}; % NEW
 
@@ -148,31 +143,16 @@ for med = 1 %:2 % MedOn
     elseif MedOff == true
         medname = 'MedOff';
     end
-    %medname = subfnames{med};
-
+   
     % fprintf('Loading AVG ECG Data\n'); %
     % pattern = fullfile(data_dir, epoch_name, 'avg', ['ECG-AVG_', medname, 'n=', num2str(nSub), '*']);
     % files = dir(pattern);
     % filename = fullfile(files(1).folder, files(1).name);
     % load(filename, 'AVGECG');
 
-    for sub = 10:numel(subjects) % subjects.goodHeartMOff BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
-
+    for sub = 4:numel(subjects) % subjects.goodHeartMOff BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
         % Extract the subject
         subject = subjects{sub}; %goodHeartMOff{sub}
-
-
-        % if strcmp(subject, 'SG078')
-        %     channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "C3", "C4", "P3", "P4"};
-        % elseif strcmp(subject, 'SG079')
-        %     channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F3", "F4", "C3", "C4", "P3", "P4"};
-        % elseif strcmp(subject, 'KS29')
-        %     channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"}; % NO EEG in MedOn
-        % elseif strcmp(subject, 'KS28')
-        %     channels = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "Fz", "Cz", "Oz", "Pz", "C3", "C4"};
-        % else
-        %     channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
-        % end
 
         if seperateSTN
             channels{8} = LfpElec.(subject){1};
@@ -221,6 +201,7 @@ for med = 1 %:2 % MedOn
             SR = SmrData.SR;
             EventTms = SmrData.EvData.EvECGP_Cl;
 
+            % Filter the channes for the sub
             OneSubChans = string(FltSubsChansRaw{sub});
 
             f1 = figure;
@@ -229,22 +210,11 @@ for med = 1 %:2 % MedOn
             % PWelch on entire Channel Data
             for c = 1:numel(FltSubsChansRaw{sub})
                 channel = OneSubChans{c};
-
+                % Filter Data 
                 ChDta = SmrData.WvDataCleaned(c, :);
-
-                % if NewSR > 0
-                %     FsOrigin=SR;
-                %     if  FsOrigin ~=  NewSR
-                %         [fsorig, fsres] = rat(FsOrigin/NewSR);
-                %         ChDta=resample(ChDta,fsres,fsorig);
-                %         dtTime=1/NewSR;
-                %     end
-                %     NewSR=1.0/dtTime;
-                % end
-
-
+                % Calculate PWelch
                 [FftPwelch, f] = pwelch(ChDta, window, noverlap, nfft, SR);
-
+                % Save in one big Matrix
                 PWelchAllDtaAvg(sub,c,:) = FftPwelch;
 
                 if show_plots
