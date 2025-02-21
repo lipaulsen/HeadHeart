@@ -46,35 +46,41 @@ allsubs = true;
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
 AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
-
+AllSubsOnlyStn = cellfun(@(x) strsplit(x, ', '), {subject_info.STN}, 'UniformOutput', false);
 
 % filter which subjects and which channels you want
+
 if MedOn == true & newsubs == true % Only New Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
 elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
 elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
 elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
 elseif MedOn == true & allsubs == true  % All Subs that are MedOn
     subjects = string({subject_info([subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOn] == 1);
 elseif MedOff == true & allsubs == true % All Subs that are MedOff
     subjects = string({subject_info([subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOff] == 1);
 end
-
 
 %=========================================================================
 

@@ -51,30 +51,53 @@ newsubs = false;
 oldsubs = false;
 allsubs = true;
 
-if MedOn == true & newsubs == true % Only New Subs that are MedOn
-    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOn] == 1).ID});
+% GOOD HEART STATUS
+% patients with arrithmyia have been excluded after their ECG was
+% investigated
+GoodHeart = 1;
+
+% get the channel info into the shape of cells
+AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
+AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+AllSubsOnlyStn = cellfun(@(x) strsplit(x, ', '), {subject_info.STN}, 'UniformOutput', false);
+
+% filter which subjects and which channels you want
+
+if MedOff == true & allsubs == true & GoodHeart % All Subs that are MedOff with good Heart
+    subjects = string({subject_info([subject_info.MedOff] == 1& [subject_info.goodHeart_MedOff] == 1).ID});
+elseif MedOn == true & allsubs == true & GoodHeart == 1 % All Subs that are MedOn with good Heart
+    subjects = string({subject_info([subject_info.MedOn] == 1& [subject_info.goodHeart_MedOn] == 1).ID});
+elseif MedOn == true & newsubs == true % Only New Subs that are MedOn
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
 elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
-    subjects = string({subjects([subjects.new] == 1 & [subjects.MedOff] == 1).ID});
+    subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
 elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
-    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOn] == 1).ID});
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
 elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
-    subjects = string({subjects([subjects.new] == 0 & [subjects.MedOff] == 1).ID});
+    subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
 elseif MedOn == true & allsubs == true  % All Subs that are MedOn
-    subjects = string({subject_info([subjects.MedOn] == 1).ID});
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOn] == 1);
 elseif MedOff == true & allsubs == true % All Subs that are MedOff
-    subjects = string({subject_info([subjects.MedOff] == 1).ID});
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOff] == 1);
 end
-
-
-% Convert 'channels_raw' (string) to cell array of strings
-channels_raw = cellfun(@(x) strsplit(x, ', '), {subjects.channels_raw}, 'UniformOutput', false);
-channels_stn = cellfun(@(x) strsplit(x, ', '), {subjects.channels}, 'UniformOutput', false);
-
-channel = channels_stn([subjects.new] == 1 & [subjects.MedOn] == 1);
-chans = string(channel{1,3})
-
-%subfnames = fieldnames(subjects);
-
 %=========================================================================
 
 % Define if plots are to be shown
@@ -85,9 +108,11 @@ show_plots = true;
 averaged_name = 'avg';  % averaged data folder (inside preprocessed)
 feature_name = 'features';  % feature extraction folder (inside derivatives)
 
-% Initialize how many subjects you will be looking at 
-n_sub_medon = 1;
-n_sub_medoff = 1;
+if MedOn == true
+    medname = 'MedOn';
+elseif MedOff == true
+    medname = 'MedOff';
+end
 
 
 %% ============================ 1. LOAD DATA =============================
@@ -96,9 +121,25 @@ disp("************* Starting HRV IBI and HR Stats *************");
 
 %fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
 
-% Load Med On
-subject_data = fullfile(data_dir, feature_name, averaged_name, ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects.goodHeartMOff)),'.mat']);
-load(subject_data, 'HRV', 'IBI', 'HR');
+% Load MEd ON
+pattern = fullfile(data_dir, 'features/avg/',['Averages_HRV-IBI-HR_', '*' ,'_Rest_nsub=11','*']);
+files = dir(pattern);
+filename = fullfile(files(1).folder, files(1).name);
+load(filename, 'HRV', 'IBI', 'HR');
+AllHR.MedOn = HR.MedOn;
+AllIBI.MedOn = IBI.MedOn;
+AllHRV.MedOn = HRV.MedOn;
+
+%Load Med Off
+pattern = fullfile(data_dir, 'features/avg/',['Averages_HRV-IBI-HR_', '*' ,'_Rest_nsub=11','*']);
+files = dir(pattern);
+filename = fullfile(files(1).folder, files(1).name);
+load(filename, 'HRV', 'IBI', 'HR');
+AllHR.MedOn = HR.MedOn;
+AllIBI.MedOn = IBI.MedOn;
+AllHRV.MedOn = HRV.MedOn;
+
+
 
 % plot(HRV_MedOn.rmssd_avg, 'k')
 % hold on
@@ -109,9 +150,10 @@ load(subject_data, 'HRV', 'IBI', 'HR');
 %% Prep IBI AND HR DATA 
 
 %Extract themeans over subject
-for num = 1:numel(IBI.MedOff)
+for num = 1:numel(IBI.(medname))
     % Mean over Subjects IBI 
-    IBI.MedOffSubMean(1,num) = mean(IBI.MedOff{num}); IBI.MedOnSubMean(1,num) = mean(IBI.MedOn{num});
+    IBI.MedOffSubMean(1,num) = mean(IBI.(medname){num}); 
+    IBI.MedOnSubMean(1,num) = mean(IBI.(medname){num});
     % Mean over Subjects HR 
     HR.MedOffSubMean(1,num) = mean(HR.MedOff{num}); HR.MedOnSubMean(1,num) = mean(HR.MedOn{num});
 end

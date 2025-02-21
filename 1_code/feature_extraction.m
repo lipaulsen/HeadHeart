@@ -45,9 +45,9 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = false;
+newsubs = true;
 oldsubs = false;
-allsubs = true;
+allsubs = false;
 
 % GOOD HEART STATUS
 % patients with arrithmyia have been excluded after their ECG was
@@ -57,47 +57,55 @@ GoodHeart = 0;
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
 AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+AllSubsOnlyStn = cellfun(@(x) strsplit(x, ', '), {subject_info.STN}, 'UniformOutput', false);
+AllSubsOnlyEEG = cellfun(@(x) strsplit(x, ', '), {subject_info.EEG}, 'UniformOutput', false);
 
 % filter which subjects and which channels you want
-
-if MedOff == true & allsubs == true & GoodHeart % All Subs that are MedOff with good Heart
-    subjects = string({subject_info([subject_info.MedOff] == 1& [subject_info.goodHeart_MedOff] == 1).ID});
-elseif MedOn == true & allsubs == true & GoodHeart == 1 % All Subs that are MedOn with good Heart
-    subjects = string({subject_info([subject_info.MedOn] == 1& [subject_info.goodHeart_MedOn] == 1).ID});
-elseif MedOn == true & newsubs == true % Only New Subs that are MedOn
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 1 & [subject_info.MedOn] == 1);
 elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 1 & [subject_info.MedOff] == 1);
 elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 0 & [subject_info.MedOn] == 1);
 elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 0 & [subject_info.MedOff] == 1);
 elseif MedOn == true & allsubs == true  % All Subs that are MedOn
     subjects = string({subject_info([subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOn] == 1);
 elseif MedOff == true & allsubs == true % All Subs that are MedOff
     subjects = string({subject_info([subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOff] == 1);
 end
 
 %=========================================================================
-
 
 % Define if plots are to be shown
 show_plots = false;
 
 % Define feature extraction steps to perform
-steps = {'ECG Data'}; %'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
+steps = {'Load Data', 'ECG Epoch'}; %'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
 
 % Define folder variables
 preprocessed_name = 'preprocessed';  % preprocessed folder (inside derivatives)
@@ -236,6 +244,8 @@ for sub = 1:numel(subjects)
                 warning("Failed to save the plot: %s", ME.message);
             end
         end
+
+
     end
 
     %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============

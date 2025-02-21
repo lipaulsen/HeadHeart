@@ -782,7 +782,7 @@ if ismember('Plot Power',steps)
 
         % Plot time-frequency power for each cluster
         figure;
-        for cl = 1:numel(clusters)
+        for cl = 4:numel(clusters)
 
             f8=figure;
             set(f8,'Position',[1949 123 1023 785]);

@@ -40,45 +40,49 @@ newsubs = false;
 oldsubs = false;
 allsubs = true;
 
-% GOOD HEART STATUS
-% patients with arrithmyia have been excluded after their ECG was
-% investigated
-GoodHeart = 0;
-
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
 AllSubsChansStn = cellfun(@(x) strsplit(x, ', '), {subject_info.channels}, 'UniformOutput', false);
+AllSubsOnlyStn = cellfun(@(x) strsplit(x, ', '), {subject_info.STN}, 'UniformOutput', false);
+AllSubsOnlyEEG = cellfun(@(x) strsplit(x, ', '), {subject_info.EEG}, 'UniformOutput', false);
 
 % filter which subjects and which channels you want
-
-if MedOff == true & allsubs == true & GoodHeart % All Subs that are MedOff with good Heart
-    subjects = string({subject_info([subject_info.MedOff] == 1& [subject_info.goodHeart_MedOff] == 1).ID});
-elseif MedOn == true & allsubs == true & GoodHeart == 1 % All Subs that are MedOn with good Heart
-    subjects = string({subject_info([subject_info.MedOn] == 1& [subject_info.goodHeart_MedOn] == 1).ID});
-elseif MedOn == true & newsubs == true % Only New Subs that are MedOn
+if MedOn == true & newsubs == true % Only New Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 1 & [subject_info.MedOn] == 1);
 elseif MedOff == true & newsubs == true  % Only New Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 1 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 1 & [subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 1 & [subject_info.MedOff] == 1);
 elseif MedOn == true & oldsubs == true  % Only Old Subs that are MedOn
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 0 & [subject_info.MedOn] == 1);
 elseif MedOff == true & oldsubs == true  % Only Old Subs that are MedOff
     subjects = string({subject_info([subject_info.new] == 0 & [subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.new] == 0 & [subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.new] == 0 & [subject_info.MedOff] == 1);
 elseif MedOn == true & allsubs == true  % All Subs that are MedOn
     subjects = string({subject_info([subject_info.MedOn] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOn] == 1);
 elseif MedOff == true & allsubs == true % All Subs that are MedOff
     subjects = string({subject_info([subject_info.MedOff] == 1).ID});
     FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
     FltSubsChansRaw = AllSubsChansRaw([subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOff] == 1);
 end
 
 %=========================================================================
@@ -91,8 +95,6 @@ show_plots = false;
 
 nSub = numel(subjects);
 
-seperateSTN = true;
-
 NewSR=300;
 
 % Filter Parameters
@@ -100,7 +102,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot SS ERP'};
+steps = {'ERP Group Cluster'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP',
 
 % Define Time Window
 tWidth   = 0.9;
@@ -122,10 +124,12 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
-
-
 fprintf('Loading AVG ECG Data\n');
-pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, 'n=', num2str(nSub), '*']);
+if strcmp(medname, 'MedOn')
+pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=11_', '*']); 
+elseif strcmp(medname, 'MedOff')
+pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=7_', '*']);
+end
 files = dir(pattern);
 filename = fullfile(files(1).folder, files(1).name);
 load(filename, 'AVGECG');
@@ -144,29 +148,46 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
     % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
     % load(subject_data, 'SmrData');
 
-    pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_', medname, '*']);
-    files = dir(pattern);
-    filename = fullfile(files(1).folder, files(1).name);
-    load(filename, 'EvEcgData');
+    % pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
+    % files = dir(pattern);
+    % filename = fullfile(files(1).folder, files(1).name);
+    % load(filename, 'EvECG');
 
     SR = SmrData.SR;
     EventTms = SmrData.EvData.EvECGP_Cl;
 
     channels = FltSubsChansStn{sub};
 
-    for c = 1:numel(channels)
-        channel = channels{c};
+    for el = 1:numel(channels)
+        chanidx(el,:) = find(strcmp(FltSubsChansRaw{sub},channels{el}));
+    end
+                
+    for c = 1:numel(channels)    
 
+        if ~BPReref   
+            channel = FltSubsChansRaw{sub}{chanidx(c)};
+        else
+            channel = channels{c};
+        end
+           
         %% ==================== EPOCH DATA ==========================
         fprintf('****************** EPOCH for %s %s...****************\n', subject, channel);
 
-        ChDta = SmrData.WvDataCleaned(c, :);
+        if BPReref & BPRerefHi
+            ChDta = SmrData.WvDataBPRerefHi(c, :);
+        elseif BPReref & BPRerefLw
+            ChDta = SmrData.WvDataBPRerefLow(c, :);
+        elseif BPReref & BPRerefBest
+            ChDta = SmrData.WvDataBPRerefLow(c, :); % Hier filter oder vielleicht doch schon im Preprocessing später!!
+        else
+            ChDta = SmrData.WvDataCleaned(c, :);
+        end
 
         % HIGH PASS FILTER
         if Fhp > 0
             ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but',FltPassDir); % twopass
         end
-        if Flp >0
+        if Flp > 0
             ChDta = ft_preproc_lowpassfilter(ChDta, SR, Flp, 4, 'but',FltPassDir);
         end
 
@@ -218,24 +239,50 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
         EvDataAllAvgTrs(sub,c,:) = squeeze(mean(EvData_zscored,1));
 
     end
+    %% ============== Plotting ERPs SUBJECT LEVEL=========================
+if show_plots
+    fprintf('Plotting ERPs for subject %s\n', subject);
+    f1 = figure; % initialize Figure
+    set(f1, 'Position', [100, 100, 1920, 1080]);
+    for chan = 1:numel(channels)
+        channel = channels{chan};
+
+        row = ceil(chan / 3); % Calculate the row number
+        col = mod(chan - 1, 3) + 1; % Calculate the column number
+        subplot(3, 3, (row - 1) * 3 + col)
+
+        % Plot the ERP per channel for 1 subj
+        plot(TmAxis(31:end), squeeze(EvDataAllAvgTrs(sub, chan, 31:end))', 'Color', 'k'); hold on
+        xline(0, "--k", 'LineWidth', 2);
+        title(sprintf('ERP in %s', channel))
+        axis("tight");
+        hold off
+        % Set Labels
+        xlabel('Time (ms)');
+        ylabel('Amplitude (uV)'); 
+    end
+
+    if BPReref & BPRerefHi
+        sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefHiTit)); % Major Title
+        gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefHiTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+    elseif BPReref & BPRerefLw
+        sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefLwTit)); % Major Title
+        gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefLwTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+    elseif  BPReref & BPRerefBest
+        sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefBestTit)); % Major Title
+        gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefBestTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+    else
+        sgtitle(sprintf('ERPs for Subject %s - All Channels with %s', subject, medname)); % Major Title
+        gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+    end
+    exportgraphics(f1, gr1, "Resolution",300);
+
 end
-
-%% ============== Plotting ERPs SUBJECT LEVEL=========================
-%
-% f2 = figure;
-%         set(f2,'Position', [1949 123 1023 785]);
-%         row = ceil(c / 3); % Calculate the row number
-%         col = mod(c - 1, 3) + 1; % Calculate the column number
-%         subplot(3, 5, (row - 1) * 5 + col)
-
-
-
-
-
+end
 
 %% ============== Plotting ERPs GROUP LEVEL=========================
 % Channel combination needs to be created 
-
+if ismember('ERPs Group', steps)
 for c = 1:numel(channels)
     channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
     channel = channels{c};
@@ -277,46 +324,171 @@ for c = 1:numel(channels)
     exportgraphics(f2,gr2, 'Resolution', 300)
 
 end
+end
+%% ====== Plot ERP For Frontal Central and Parietal Electrodes together ========
+if ismember('ERP Group Cluster', steps)
 
-%% Plot ERP For Frontal Central and Parietal Electrodes together
+% Define EEG clusters
+clusters = ["Frontal", "Central", "Parietal", "STNleft", "STNright"];
+Frontal = ["F3", "F4", "Fz"];
+Central = ["C3", "C4", "Cz"];
+Parietal = ["P3", "P4", "Pz"];
+STNleft = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
+STNright = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"];
 
-EvDataAll_chanavg = squeeze(mean(squeeze(mean(EvDataAllAvgTrs(:,1:2,:),2)),1));
-EvDataAll_chanavg = smoothdata(EvDataAll_chanavg, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines
 
-colors = lines(15);
+% Store in a struct for easy access
+clusterMap = struct('Frontal', Frontal, 'Central', Central, 'Parietal', Parietal, 'STNleft', STNleft, 'STNright', STNright);
 
-f3 = figure;
-set(f3,'Position', [1949 123 1023 785]);
+for ci = 4:numel(clusters)
+    cluster_name = clusters{ci}; % e.g., 'frontal'
+    cluster_channels = clusterMap.(cluster_name); % Get corresponding channels
 
-subplot(2,1,1)
-plot(TmAxis(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
-set(gca,'Position',[0.1300 0.5838 0.77 0.3])
-xline(0, "--k", 'LineWidth', 2);
-title(sprintf('Grand Average ECG, medication: %s', medname))
-axis("tight");
-ylabel('Amplitude (μV)')
-hold off
+    % Initialize figure
+    f3 = figure;
+    set(f3, 'Position', [1949 123 1023 785]);
 
-subplot(2,1,2)
-for s = 1:numel(subjects.goodHeartMOff)
-    for c = 1:2
-        subject = subjects.goodHeartMOff{sub};
-        EvDataSubAvgTrs = squeeze(EvDataAllAvgTrs(s,c,:));
-        plot(TmAxis(31:end), EvDataSubAvgTrs(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 1);
-        hold on
+    % ECG Plot (Remains unchanged)
+    subplot(2,1,1);
+    plot(TmAxis(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on;
+    set(gca, 'Position', [0.1300 0.5838 0.77 0.3]);
+    xline(0, "--k", 'LineWidth', 2);
+    title(sprintf('Grand Average ECG, medication: %s', medname));
+    axis("tight");
+    ylabel('Amplitude (μV)');
+    hold off;
+
+    % Iterate through EEG clusters
+    subplot(2,1,2);
+    hold on;
+    colors = lines(numel(subjects)); % Generate unique colors per subject
+
+    % EvDataAllChanAvg = squeeze(mean(squeeze(mean(EvDataAllAvgTrs(:,1:2,:),2)),1));
+    % EvDataAllChanAvg = smoothdata(EvDataAll_chanavg, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines
+    %
+    % % Initialize matrix for storing averages per subject
+    % EvDataAllChanAvg = zeros(numel(subjects), numel(TmAxis));
+
+    if sum(strcmp(["STNleft", "STNright"], cluster_name))==1
+        sg47idx = find(ismember(subjects, "SG047"));
+        FltSubsChansStn(sg47idx)= [];
+        subjects(subjects == "SG047") = []; 
+        EvDataAllAvgTrs(sg47idx,:,:) = [];
+        size(EvDataAllAvgTrs)
     end
+
+    for s = 1:numel(subjects)
+        subject = subjects{s};
+
+        if BPReref
+            subject_channels = FltSubsChansStn{s};
+        else
+            subject_channels = FltSubsChansRaw{s}; % Extract available EEG channels for this subject % here maybe channels because also STNl and STNr
+        end
+
+        % Find available channel indices for this subject
+        chanIdx = find(ismember(subject_channels, cluster_channels));
+
+        if isempty(chanIdx)
+            warning('No matching channels for subject %s in cluster %s.', subject, cluster_name);
+            continue;
+        end
+
+        subplot(2,1,2)
+
+        % Extract and average data for available channels
+        for ch = 1:numel(chanIdx)
+            cha = chanIdx(ch);
+            EvDataSub = squeeze(EvDataAllAvgTrs(s, cha, :));
+            plot(TmAxis(31:end), EvDataSub(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 0.3);
+            hold on
+            EvDataAllClus(s, ch, :) = EvDataSub;
+        end
+
+        % Code für wenn man die Channels meaned bevor man sie plotted
+        % for ch = 1: numel(chanIdx)
+        %     cha = chanIdx(ch);
+        %     EvDataSub = squeeze(EvDataAllAvgTrs(s, cha, :));
+        %     EvDataAllClus(s, ch, :) = EvDataSub;
+        % end
+        % % EvDataSubAvg = squeeze(mean(EvDataAllClus(s,:,:), 2));
+        % % plot(TmAxis(31:end), EvDataSubAvg(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 0.5);
+        % % hold on
+    end
+
+    % Compute grand average across subjects
+    grandAvg = squeeze(mean(squeeze(mean(EvDataAllClus, 2)),1));
+    grandAvg = smoothdata(grandAvg, 'gaussian', 10); % Apply Gaussian smoothing
+
+    % Plot grand average
+    plot(TmAxis(31:end), grandAvg(31:end), 'Color', 'r', 'LineWidth', 5, 'DisplayName', ['Avg ' cluster_name]);
+    % Final plot formatting
+    xline(0, "--k", 'LineWidth', 2, 'HandleVisibility', 'off');
+    xlabel('Time (s)');
+    ylabel('Amplitude (μV)');
+    title(sprintf('Grand Average ERP %s, medication: %s, LPF = %uHz, GF=10', cluster_name, medname, Flp));
+    axis("tight");
+    %legend('Location', 'southwest', 'FontSize', 6);
+    hold off;
+    % Save the figure
+    if BPReref
+    gr3 = fullfile(results_dir, '/erp', ['AvgERP_', cluster_name, '_', medname, '_HP=', num2str(Fhp), '_LP=', num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), '_GF=On_', BPRerefTit, '.png']);
+    else
+    gr3 = fullfile(results_dir, '/erp', ['AvgERP_', cluster_name, '_', medname, '_HP=', num2str(Fhp), '_LP=', num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), '_GF=On_','.png']);
+    end
+    exportgraphics(f3, gr3, 'Resolution', 300);
 end
-plot(TmAxis(31:end), EvDataAll_chanavg(31:end), 'Color', 'r', 'LineWidth', 5, 'DisplayName', 'Average');
-%legend('Location','southwest', 'FontSize',6)
-xline(0, "--k", 'LineWidth', 2, 'HandleVisibility','off');
-xlabel('Time (s)') % Add x-label
-ylabel('Amplitude (μV)') % Add y-label
-title(sprintf('Grand Average ERP in Frontal EEG (F3 + F4), medication: %s, LPF = %uHz, GF=10', medname, Flp))
-axis("tight");
-
-gr3 = fullfile('F:\HeadHeart\2_results\erp' , ['AvgERP_Frontals_', medname, '_HP=',  num2str(Fhp), '_LP=',  num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), 'GF=On','.png']);
-exportgraphics(f3,gr3, 'Resolution', 300)
-
-
-
 end
+
+
+
+
+    
+    
+    
+%  clusters = {'frontal', 'central', 'parietal'};
+% frontal = {'F3', 'F4' 'Fz'};
+% central = {'C3', 'C4', 'Cz'};
+% parietal = {'P3', 'P4', 'Pz'};
+% 
+% EvDataAll_chanavg = squeeze(mean(squeeze(mean(EvDataAllAvgTrs(:,1:2,:),2)),1));
+% EvDataAll_chanavg = smoothdata(EvDataAll_chanavg, 'gaussian', 10); % Apply a Gaussian Filter to Smoothe the lines
+% 
+% colors = lines(15);
+% 
+% f3 = figure;
+% set(f3,'Position', [1949 123 1023 785]);
+% 
+% subplot(2,1,1)
+% plot(TmAxis(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+% set(gca,'Position',[0.1300 0.5838 0.77 0.3])
+% xline(0, "--k", 'LineWidth', 2);
+% title(sprintf('Grand Average ECG, medication: %s', medname))
+% axis("tight");
+% ylabel('Amplitude (μV)')
+% hold off
+% 
+% subplot(2,1,2)
+% for s = 1:numel(subjects)
+%     for c = 1:2
+%         subject = subjects{s};
+%         EvDataSubAvgTrs = squeeze(EvDataAllAvgTrs(s,c,:));
+%         plot(TmAxis(31:end), EvDataSubAvgTrs(31:end), 'Color', colors(s, :), 'DisplayName', subject, 'LineWidth', 1);
+%         hold on
+%     end
+% end
+% plot(TmAxis(31:end), EvDataAll_chanavg(31:end), 'Color', 'r', 'LineWidth', 5, 'DisplayName', 'Average');
+% %legend('Location','southwest', 'FontSize',6)
+% xline(0, "--k", 'LineWidth', 2, 'HandleVisibility','off');
+% xlabel('Time (s)') % Add x-label
+% ylabel('Amplitude (μV)') % Add y-label
+% title(sprintf('Grand Average ERP in Frontal EEG (F3 + F4), medication: %s, LPF = %uHz, GF=10', medname, Flp))
+% axis("tight");
+% 
+% gr3 = fullfile('F:\HeadHeart\2_results\erp' , ['AvgERP_Frontals_', medname, '_HP=',  num2str(Fhp), '_LP=',  num2str(Flp), '_BSL=', num2str(baseline_win(1)), 'to', num2str(baseline_win(2)), 'GF=On','.png']);
+% exportgraphics(f3,gr3, 'Resolution', 300)
+% end
+
+disp('================= ERP DONE! =======================')
+
+
