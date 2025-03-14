@@ -32,6 +32,12 @@
 
 % ========================== SUBJECT FLAGS ================================
 
+% To Dos for ITC with new subs and BPReref
+% new subs EEG: 22 chans 
+% new subs STN: 8 chans x 3  (BPReref Hi, Low and raw)
+% old subs STN: 20 chans x 2 (BPReref Hi, Low)
+
+
 % MEDICATION
 % only one can be true at all times
 MedOn = true;
@@ -39,9 +45,9 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = false;
+newsubs = true;
 oldsubs = false;
-allsubs = true;
+allsubs = false;
 
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
@@ -97,7 +103,7 @@ show_plots = false;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = { 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power'
+steps = {'Calc Single Subject ITC'}; %'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster', 
 
 % Define Time Window
 tWidth   = 0.9;
@@ -109,11 +115,11 @@ BandWidth = 2; % BandWidth in Hz;
 Qfac      = 2; % Attenuation in db(-Qfac)
 tCircMean = 0.02; % for By TRials calc
 
-permstats = false;
+permstats = true;
 numPerms = 500;
 surrogate = true;
 trials = false;
-plots = true;
+plots = false;
 ITC = [];
 signif_thresh = 0.05;
 Hz_dir = '2Hz';
@@ -127,15 +133,15 @@ end
 
 % Use BPReref Data
 BPReref = true; BPRerefTit = 'BPReref';
-BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
-BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
+BPRerefHi = false; BPRerefHiTit = 'BPRerefHi';
+BPRerefLw = true; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 % Flag if only EEG, STN or all channels
-allchans = true;
-onlyeeg = false;
+allchans = false;
+onlyeeg = true;
 onlystn = false;
 
-disp("************* STARTING EPOCH AND TIMELOCKING *************");
+disp("************* STARTING ITC *************");
 
 fprintf('Loading AVG ECG Data\n');
 if strcmp(medname, 'MedOn')
@@ -152,28 +158,17 @@ if ismember ('Calc Single Subject ITC', steps)
 % Initialize the Perm Matrix be sure here that the freqs and Time are
 % fitting because it does not work with the getting it out of the data with
 %out overwriting it
-PermItcAll = zeros(numel(subjects), 9, numPerms, 141, 271);
+max_chan = max(cellfun(@numel, FltSubsChansStn));
+PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
 % ZScoresAll = zeros(numel(subjects), numel(channels), 141, 271);
 % PValAll = zeros(numel(subjects), numel(channels), 141, 271);
 
-    for sub = 2:numel(subjects)
+    for sub = 1:numel(subjects)
         % Extract the subject
         subject = subjects{sub};
 
-        % fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects.goodHeartMOff));
-        % fprintf('Loading Epoch Data\n');
-        % pattern = fullfile(data_dir, epoch_name, [subject, '_', medname, '*']);
-        % files = dir(pattern);
-        % filename = fullfile(files(1).folder, files(1).name);
-        % load(filename, 'EP', '-mat');
-
         % % Load the the cleaned ECG R Peaks Data
         fprintf('Loading ECG Data\n');
-        % pattern = fullfile(data_dir, 'itc', 'evecg' ,[subject, '_', medname, '*']);
-        % files = dir(pattern);
-        % filename = fullfile(files(1).folder, files(1).name);
-        % load(filename, 'EvEcgData');
-
         pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
@@ -227,8 +222,10 @@ PermItcAll = zeros(numel(subjects), 9, numPerms, 141, 271);
         elseif onlyeeg
             channels = FltSubsOnlyEEG{sub};
         elseif onlystn
-            channels = FltSubsOnlySTN{sub};
+            channels = FltSubsOnlyStn{sub};
         end
+
+        subject_channels = FltSubsChansRaw{sub}; % this is only needed to get the correct row in the ChDta 
 
         % KS29 has no EEG recordings in MedOn so we delete those values
         if strcmp(medname,'MedOn') & strcmp(subject,'KS29')
@@ -295,9 +292,11 @@ PermItcAll = zeros(numel(subjects), 9, numPerms, 141, 271);
                 % Intitialize variables
                 %permuted_ITCs = zeros([numPerms, size(FrsTmItc, 1), size(FrsTmItc, 2)]);
                 [nTrials, nFreq, nTms] = size(TFR.(channel).phase);
+               
+                chan_idx = find(strcmp(subject_channels, channel)); % Find index
 
                 % Get the raw channel data
-                ChDta = SmrData.WvDataCleaned(c, :);
+                ChDta = SmrData.WvDataCleaned(chan_idx, :);
                 % Override SR here with the raw channel SR
                 oldSR = SmrData.SR;
 
@@ -317,7 +316,7 @@ PermItcAll = zeros(numel(subjects), 9, numPerms, 141, 271);
                     startTime = datetime('now');
                     disp(['Start Time: ', datestr(startTime)]);
 
-                    parfor perm = 1:numPerms
+                    for perm = 1:numPerms % here chage to parfor
                         % Time Lock the surrogate R Peaks to the Channel
                         % Data and apply the filters as well as the DS and
                         % create TFR for the new epochs
@@ -663,7 +662,7 @@ if ismember('Plot Power',steps)
         elseif onlyeeg
             channels = FltSubsOnlyEEG{sub};
         elseif onlystn
-            channels = FltSubsOnlySTN{sub};
+            channels = FltSubsOnlyStn{sub};
         end
 
         for c = 1:numel(channels)
@@ -677,20 +676,33 @@ if ismember('Plot Power',steps)
 
     if ismember('Plot Plow Single Channels', steps)
         % Get unique channel names across all subjects
-        all_channels = unique([FltSubsChansStn{:}]);  % Extract all channels present across subjects
-        num_channels = numel(all_channels);
+        if allchans
+        all_channels = unique([FltSubsChansStn{:}]); % Extract all channels present across subjects
+        elseif onlyeeg
+        all_channels = unique([FltSubsOnlyEEG{:}]); 
+        elseif onlystn
+        all_channels = unique([FltSubsOnlyStn{:}]);
+        end
 
         % Initialize storage for averaged power per channel
-        pow_channel_avg = nan(num_channels, size(pow_all,3), size(pow_all,4));  % [channels, freqs, times]
+        pow_channel_avg = nan(numel(all_channels), size(pow_all,3), size(pow_all,4));  % [channels, freqs, times]
 
         % Loop through each unique channel
-        for ch = 1:num_channels
+        for ch = 1:numel(all_channels)
             channel_name = all_channels{ch};
             subject_pow = nan(numel(subjects), size(pow_all,3), size(pow_all,4));  % Store per subject
 
             % Loop through subjects
             for sub = 1:numel(subjects)
-                subject_channels = FltSubsChansStn{sub}; % Channels for this subject
+                if allchans
+                    subject_channels = FltSubsChansStn{sub}; % Channels for this subject
+                elseif onlyeeg
+                    subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
+                elseif onlystn
+                    subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
+                end
+
+
                 chan_idx = find(strcmp(subject_channels, channel_name)); % Find index
 
                 if ~isempty(chan_idx) % Ensure channel exists for subject
@@ -708,7 +720,7 @@ if ismember('Plot Power',steps)
 
         % Plot time-frequency power for each channel
         figure;
-        for ch = 211:num_channels
+        for ch = 1:numel(all_channels)
             
             f7=figure;
             set(f7,'Position',[1949 123 1023 785]);
@@ -731,7 +743,11 @@ if ismember('Plot Power',steps)
             xline(0, "--k", 'LineWidth', 2);
             title(sprintf('Average Power in %s, med = %s', all_channels{ch},  medname ));
 
-            gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', medname, '.png']);
+            if BPReref & BPRerefHi
+            gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefHiTit ,'_',medname, '.png']);
+            elseif BPReref & BPRerefLw
+            gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefLwTit ,'_',medname, '.png']);
+            end
             exportgraphics(f7,gr7, 'Resolution', 300)
         end
     end
@@ -751,9 +767,17 @@ if ismember('Plot Power',steps)
 
         % Initialize storage for cluster-averaged power
         pow_cluster_avg = nan(numel(clusters), size(pow_all,3), size(pow_all,4)); % [clusters, freqs, times]
+        
+        if allchans
+            start = 1; numofcluster = numel(clusters);
+        elseif onlyeeg
+            start = 1; numofcluster = 3;
+        elseif onlystn
+            start = 4; numofcluster = 5;
+        end
 
         % Loop through clusters
-        for cl = 1:numel(clusters)
+        for cl = start : numofcluster %numel(clusters)
             cluster_name = clusters(cl);
             cluster_chans = clusterMap.(cluster_name);  % Get channel list for this cluster
 
@@ -761,7 +785,14 @@ if ismember('Plot Power',steps)
 
             % Loop through subjects
             for sub = 1:numel(subjects)
-                subject_channels = FltSubsChansStn{sub}; % Subject's available channels
+
+                if allchans
+                    subject_channels = FltSubsChansStn{sub}; % Channels for this subject
+                elseif onlyeeg
+                    subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
+                elseif onlystn
+                    subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
+                end
 
                 % Find indices of channels that belong to the cluster
                 cluster_idx = find(ismember(subject_channels, cluster_chans));
@@ -805,7 +836,11 @@ if ismember('Plot Power',steps)
             xline(0, "--k", 'LineWidth', 2);
             title(sprintf('Average  Power in %s, med = %s', clusters{cl},  medname ))
 
-            gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', medname, '.png']);
+            if BPReref & BPRerefHi
+            gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefHiTit , '_', medname, '.png']);
+            elseif BPReref & BPRerefLw
+            gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefLwTit , '_', medname, '.png']);
+            end
             exportgraphics(f8,gr8, 'Resolution', 300)
         end
     end
