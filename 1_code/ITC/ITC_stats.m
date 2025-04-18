@@ -113,13 +113,13 @@ NewSR = 300;
 
 BandWidth = 2; % BandWidth in Hz;
 Qfac      = 2; % Attenuation in db(-Qfac)
-tCircMean = 0.02; % for By TRials calc
+tCircMean = 0; %0.02; % for By TRials calc
 
-permstats = true;
+permstats = false;
 numPerms = 500;
 surrogate = true;
 trials = false;
-plots = false;
+plots = true;
 ITC = [];
 signif_thresh = 0.05;
 Hz_dir = '2Hz';
@@ -316,7 +316,7 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
                     startTime = datetime('now');
                     disp(['Start Time: ', datestr(startTime)]);
 
-                    for perm = 1:numPerms % here chage to parfor
+                    for perm = 1:numPerms % here change to parfor
                         % Time Lock the surrogate R Peaks to the Channel
                         % Data and apply the filters as well as the DS and
                         % create TFR for the new epochs
@@ -922,7 +922,12 @@ nOffset=int32(tOffset/dtTime)+1;
 
 
 % HIGH PASS FILTER
+if onlyeeg
+ChDta=ft_preproc_highpassfilter(ChDta,SR,0.5,4,'but', 'twopass'); % twopass
+elseif onlystn
 ChDta=ft_preproc_highpassfilter(ChDta,SR,2,4,'but', 'twopass'); % twopass
+end
+
 
 
 % DOWNSASMPLE

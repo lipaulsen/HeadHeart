@@ -124,9 +124,23 @@ stfr=0.5;   enfr=30; dfr=0.2;
 Frqs=stfr:dfr:enfr;
 if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
 
+% Flag if only EEG, STN or all channels
+allchans = true;
+onlyeeg = false;
+onlystn = false;
+
 % HPF Parameter
-Fhp = 2;
-Hz_dir = '2Hz';
+if onlyeeg
+    Fhp = 0.5;
+    Hz_dir = '0.5Hz';
+elseif onlystn
+    Fhp = 2;
+    Hz_dir = '2Hz';
+elseif allchans
+    Fhp = 2;
+    Hz_dir = '2Hz';
+end
+
 FltPassDir='twopass'; % onepass
 
 % Hilbert TFR Parameters

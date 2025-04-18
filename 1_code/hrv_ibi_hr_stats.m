@@ -54,7 +54,7 @@ allsubs = true;
 % GOOD HEART STATUS
 % patients with arrithmyia have been excluded after their ECG was
 % investigated
-GoodHeart = 1;
+GoodHeart = 0;
 
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
@@ -128,16 +128,16 @@ filename = fullfile(files(1).folder, files(1).name);
 load(filename, 'HRV', 'IBI', 'HR');
 AllHR.MedOn = HR.MedOn;
 AllIBI.MedOn = IBI.MedOn;
-AllHRV.MedOn = HRV.MedOn;
+AllHRV.MedOn = HRV.rmssd_avg.MedOn;
 
-%Load Med Off
-pattern = fullfile(data_dir, 'features/avg/',['Averages_HRV-IBI-HR_', '*' ,'_Rest_nsub=11','*']);
-files = dir(pattern);
-filename = fullfile(files(1).folder, files(1).name);
-load(filename, 'HRV', 'IBI', 'HR');
-AllHR.MedOn = HR.MedOn;
-AllIBI.MedOn = IBI.MedOn;
-AllHRV.MedOn = HRV.MedOn;
+% %Load Med Off
+% pattern = fullfile(data_dir, 'features/avg/',['Averages_HRV-IBI-HR_', '*' ,'_Rest_nsub=11','*']);
+% files = dir(pattern);
+% filename = fullfile(files(1).folder, files(1).name);
+% load(filename, 'HRV', 'IBI', 'HR');
+% AllHR.MedOn = HR.MedOn;
+% AllIBI.MedOn = IBI.MedOn;
+% AllHRV.MedOn = HRV.rmssd_avg.MedOn;
 
 
 
@@ -152,10 +152,11 @@ AllHRV.MedOn = HRV.MedOn;
 %Extract themeans over subject
 for num = 1:numel(IBI.(medname))
     % Mean over Subjects IBI 
-    IBI.MedOffSubMean(1,num) = mean(IBI.(medname){num}); 
-    IBI.MedOnSubMean(1,num) = mean(IBI.(medname){num});
+    IBI.SubMean(1,num) = mean(IBI.(medname){num}); 
+    IBI.SubMean(1,num) = mean(IBI.(medname){num});
     % Mean over Subjects HR 
-    HR.MedOffSubMean(1,num) = mean(HR.MedOff{num}); HR.MedOnSubMean(1,num) = mean(HR.MedOn{num});
+    HR.SubMean(1,num) = mean(HR.(medname){num});
+    HR.SubMeanFreqs(1,num) = HR.SubMean(1,num)/60;
 end
 
 % Calculate the mean over all subjects

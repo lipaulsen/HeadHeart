@@ -191,7 +191,7 @@ if ismember ('Calc Single Subject CCC', steps)
 
         if baseline & BPReref & BPRerefHi
             fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefHiTit, '*', '_HP=', Hz_dir, '*']);
+            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefHiTit, '*', ]);
             files = dir(pattern);
             filename = fullfile(files(1).folder, files(1).name);
             load(filename, 'TFR', '-mat');
