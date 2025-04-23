@@ -251,20 +251,43 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
 
             fprintf('************ Calculating Perm Stats for %s in %s **************** \n', subject, channel);
 
+            % prep for the surrogate data
             chan_idx = find(strcmp(subject_channels, channel)); % Find index
             % Get the raw channel data
             ChDta = SmrData.WvDataCleaned(chan_idx, :);
+            oldSR = SmrData.SR;
 
             % Pre-generate surrogate R-peaks outside of the parfor loops
-            % time_shifts_all = rand(numPerms, length(ibi_series)) - 0.3;
             surrogate_rpeaks = zeros(numPerms, length(EventTms));
             for p = 1:numPerms
                 surrogate_rpeaks(p, :) = EventTms + (rand(1, length(EventTms)) - 0.5);
             end
 
+            startTime = datetime('now');
+            disp(['Start Time: ', datestr(startTime)]);
+
+            for pe = 1:numPerms
+                currSurrogateRpeaks = surrogate_rpeaks(pe, :);
+                [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, numPerms, NewSR, freqs, times);
+            end
+
             % Step 1: Generate surrogate HEPs for each subject
             % (Assuming you have a function getSurrogateHEP that returns [subjects x timepoints])
             surrogateHEP = getSurrogateHEP(epochedData, eventMarkers, nSurrogates);
+
+            for perm = 1:numPerms % here change to parfor
+                % Time Lock the surrogate R Peaks to the Channel
+                % Data and apply the filters as well as the DS and
+                % create TFR for the new epochs
+                currSurrogateRpeaks = surrogate_rpeaks(perm, :);
+                [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, numPerms, NewSR, freqs, times);
+
+                %  Calculate ITC with the surrogate R-peaks (one per channel)
+                [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(ChsAllFrsTmPha,NewSR,tCircMean);
+                fprintf('perm = %d \n', perm)
+            end
+
+
 
             % Step 2: Compute observed t-values (real vs surrogate) at each timepoint
             tvals = zeros(1, nTime);
@@ -576,4 +599,11 @@ end
 
 disp('================= ERP DONE! =======================')
 
+
+
+function   [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, numPerms, NewSR, Frqs, times)
+nEvent=length(surrogate_rpeaks);
+
+
+end
 

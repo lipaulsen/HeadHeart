@@ -45,9 +45,9 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = true;
+newsubs = false;
 oldsubs = false;
-allsubs = false;
+allsubs = true;
 
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
@@ -115,11 +115,10 @@ BandWidth = 2; % BandWidth in Hz;
 Qfac      = 2; % Attenuation in db(-Qfac)
 tCircMean = 0; %0.02; % for By TRials calc
 
-permstats = false;
-numPerms = 500;
+permstats = true;
+numPerms = 1000;
 surrogate = true;
 trials = false;
-plots = true;
 ITC = [];
 signif_thresh = 0.05;
 Hz_dir = '2Hz';
@@ -138,8 +137,8 @@ BPRerefLw = true; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 % Flag if only EEG, STN or all channels
 allchans = false;
-onlyeeg = true;
-onlystn = false;
+onlyeeg = false;
+onlystn = true;
 
 disp("************* STARTING ITC *************");
 
@@ -159,7 +158,7 @@ if ismember ('Calc Single Subject ITC', steps)
 % fitting because it does not work with the getting it out of the data with
 %out overwriting it
 max_chan = max(cellfun(@numel, FltSubsChansStn));
-PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
+%PermItcAll = zeros(numel(subjects), max_chan, numPerms, 148, 271);
 % ZScoresAll = zeros(numel(subjects), numel(channels), 141, 271);
 % PValAll = zeros(numel(subjects), numel(channels), 141, 271);
 
@@ -243,7 +242,9 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
             relFrsTmItc = FrsTmItc/meanFrsTmItc;
 
             ItcAll(sub,c,:,:) = FrsTmItc; % SubjectxChannelxFreqxTime
+            ItcSub(c,:,:) = FrsTmItc; % ChannelxFreqxTime
             RelItcAll(sub,c,:,:) = relFrsTmItc;
+            RelItcSub(c,:,:) = relFrsTmItc;
         end
 
         outputPDF1 = fullfile(results_dir, 'itc' , Hz_dir, 'ss', [subject, '_ITC_Allchan_med=', medname, ...
@@ -252,7 +253,7 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
         for c = 1:numel(channels)
             channel = channels{c};
 
-            if plots
+            if show_plots
                 f1=figure;
                 set(f1,'Position',[1949 123 1023 785]);
                 subplot(2,1,1)
@@ -281,7 +282,7 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
         end
         %% ==================== PERMUTATION ===========================
         if permstats
-            outputPDF = fullfile('F:\HeadHeart\2_results\itc\ss_perm' , [subject, '_ITC-PermStats_Allchan_med=', medname, '_perm=', num2str(numPerms), ...
+            outputPDF = fullfile(results_dir, 'itc', Hz_dir, 'ss_perm' , [subject, '_ITC-PermStats_Allchan_med=', medname, '_perm=', num2str(numPerms), ...
                 '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '_pval=', num2str(signif_thresh),'.pdf']);
             for c = 1:numel(channels)
                 channel = channels{c};
@@ -316,12 +317,12 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
                     startTime = datetime('now');
                     disp(['Start Time: ', datestr(startTime)]);
 
-                    for perm = 1:numPerms % here change to parfor
+                    parfor perm = 1:numPerms % here change to parfor
                         % Time Lock the surrogate R Peaks to the Channel
                         % Data and apply the filters as well as the DS and
                         % create TFR for the new epochs
                         currSurrogateRpeaks = surrogate_rpeaks(perm, :);
-                        [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, numPerms, NewSR, freqs, times);
+                        [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, NewSR, freqs, times, onlyeeg);
 
                         %  Calculate ITC with the surrogate R-peaks (one per channel)
                         [PermItcData(perm, :, :)] = Get_PSI_ByTrials_ITC(ChsAllFrsTmPha,NewSR,tCircMean);
@@ -346,7 +347,7 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
 
                 % ZScoresAll(sub,c,:,:) = zscores; % SubjectxChannelxFreqxTime (Last two are ITC ZScores)
                 % PValAll(sub,c,:,:) = p_orig;  % SubjectxChannelxFreqxTime (Last two are ITC PVals)
-                PermItcAll(sub,c,:,:,:) = PermItcData; % SubjectxChannelxPermutationxFreqxTime
+                %PermItcAll(sub,c,:,:,:) = PermItcData; % SubjectxChannelxPermutationxFreqxTime
 
 
                 % f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
@@ -366,11 +367,11 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
                 %itc_zscores_thresh = (zscores > 2) | (zscores < -2);
 
                 f5 = figure;
-                set(f5,'Position',[1949 123 1023 785]);
+                set(f5,'Position',[159 50 1122 774.5000]);
 
                 % Upper subplot
                 subplot(2,1,1)
-                plot(times, mean(EvEcgData,1), 'Color', 'k'); hold on
+                plot(times, mean(EvECG.EvData,1), 'Color', 'k'); hold on
                 set(gca,'Position',[0.1300 0.5838 0.71 0.3])
                 xline(0, "--k", 'LineWidth', 2);
                 axis('tight')
@@ -420,45 +421,80 @@ PermItcAll = zeros(numel(subjects), max_chan, numPerms, 141, 271);
             end
         end
 
+        if permstats
+            %ITC.PERM.ZScoresAll = ZScoresAll;  % SubjectxChannelxFreqxTime (Last two are ITC ZScores)
+            %ITC.PERM.PValAll = PValAll; % SubjectxChannelxFreqxTime (Last two are ITC PVals)
+            ITC.PermItc = PermItcData; %SubjectxChannelxPermutationxFreqxTime
+        end
+        % Save ITC MAtrix of all Subjects and all Channels
+        ITC.SR = SR;
+        ITC.times = times;
+        ITC.freqs = freqs;
+        ITC.ItcAll = ItcSub;
+        ITC.RelItcAll = RelItcSub;
 
+        if permstats & BPRerefHi & onlystn
+            save_path = fullfile(data_dir, 'itc', 'ss', [subject, 'ITC_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats & BPRerefLw & onlystn
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject, 'ITC_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats & onlyeeg
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject,'ITC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats & allchans & BPRerefHi
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject, 'ITC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats & allchans & BPRerefLw
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject, 'ITC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats & allchans
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject, 'ITC_', medname ,'_BP=NONE','_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        elseif permstats
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject,'ITC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+        else
+            save_path = fullfile(data_dir, 'itc', 'ss',[subject,'ITC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+        end
+        save(save_path, 'ITC', '-v7.3');
+        fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
+
+        % Free up some storage
+        clear ItcSub
+        clear RelItcSub
+        clear PermItcData
 
     end
-    if permstats
-        ITC.PERM.ZScoresAll = ZScoresAll;  % SubjectxChannelxFreqxTime (Last two are ITC ZScores)
-        ITC.PERM.PValAll = PValAll; % SubjectxChannelxFreqxTime (Last two are ITC PVals)
-        ITC.PERM.PermItcAll = PermItcAll; %SubjectxChannelxPermutationxFreqxTime
-    end
-    % Save ITC MAtrix of all Subjects and all Channels
-    ITC.SR = SR;
-    ITC.times = times;
-    ITC.freqs = freqs;
-    ITC.ItcAll = ItcAll;
-    ITC.RelItcAll = RelItcAll;
-
-    % Create Paths
-    if permstats & newsubs & BPRerefHi & onlystn
-        save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & newsubs & BPRerefLw & onlystn
-        save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & newsubs & onlyeeg
-        save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & newsubs & allchans
-        save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & oldsubs & BPRerefHi & onlystn
-        save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & oldsubs & BPRerefLw & onlystn
-        save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname , '_OnlySTN_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & oldsubs & onlyeeg
-        save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats & oldsubs & allchans
-        save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    elseif permstats
-        save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-    else
-        save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
-    end
-    save(save_path, 'ITC', '-v7.3');
-    fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
+%     if permstats
+%        % ITC.PERM.ZScoresAll = ZScoresAll;  % SubjectxChannelxFreqxTime (Last two are ITC ZScores)
+%         %ITC.PERM.PValAll = PValAll; % SubjectxChannelxFreqxTime (Last two are ITC PVals)
+%         ITC.PERM.PermItcAll = PermItcAll; %SubjectxChannelxPermutationxFreqxTime
+%     end
+%     % Save ITC MAtrix of all Subjects and all Channels
+%     ITC.SR = SR;
+%     ITC.times = times;
+%     ITC.freqs = freqs;
+%     ITC.ItcAll = ItcAll;
+%     ITC.RelItcAll = RelItcAll;
+% 
+%     % Create Paths
+%     if permstats & newsubs & BPRerefHi & onlystn
+%         save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & newsubs & BPRerefLw & onlystn
+%         save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & newsubs & onlyeeg
+%         save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & newsubs & allchans
+%         save_path = fullfile(data_dir, 'itc', ['ITC-NewSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & oldsubs & BPRerefHi & onlystn
+%         save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & oldsubs & BPRerefLw & onlystn
+%         save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname , '_OnlySTN_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & oldsubs & onlyeeg
+%         save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats & oldsubs & allchans
+%         save_path = fullfile(data_dir, 'itc', ['ITC-OldSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     elseif permstats
+%         save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+%     else
+%         save_path = fullfile(data_dir, 'itc', ['ITC-AllSubs_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+%     end
+%     save(save_path, 'ITC', '-v7.3');
+%     fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
 end
 
 
@@ -549,8 +585,8 @@ if ismember('Plot SubAvg PermStats', steps)
         %ChanMeanZscores_avg = squeeze(mean(squeeze(ITC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are ITC ZScores)
         %ChanMeanPVal_avg = squeeze(mean(squeeze(ITC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are ITC PVals)
         PermItcAll_avg = squeeze(mean(squeeze(ITC.PERM.PermItcAll(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
-        ItcAll_subavg = squeeze(mean(squeeze(ITC.ItcAll(:,c,:,:)),1));
-        RelItcAll_subavg = squeeze(mean(squeeze(ITC.RelItcAll(:,c,:,:)),1));
+        %ItcAll_subavg = squeeze(mean(squeeze(ITC.ItcAll(:,c,:,:)),1));
+        %RelItcAll_subavg = squeeze(mean(squeeze(ITC.RelItcAll(:,c,:,:)),1));
 
         % Step 1: Compute z-scores
         diff_sum_perm_mean_all = squeeze(mean(PermItcAll_avg,1)); % Mean of the permutation distribution
@@ -906,7 +942,7 @@ end
 
 
 
-function   [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, numPerms, NewSR, Frqs, times)
+function   [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, NewSR, Frqs, times, onlyeeg)
 dtTime = 1/NewSR;
 nEvent=length(surrogate_rpeaks);
 BandWidth=2; % BandWidth in Hz;
@@ -924,7 +960,7 @@ nOffset=int32(tOffset/dtTime)+1;
 % HIGH PASS FILTER
 if onlyeeg
 ChDta=ft_preproc_highpassfilter(ChDta,SR,0.5,4,'but', 'twopass'); % twopass
-elseif onlystn
+else
 ChDta=ft_preproc_highpassfilter(ChDta,SR,2,4,'but', 'twopass'); % twopass
 end
 
