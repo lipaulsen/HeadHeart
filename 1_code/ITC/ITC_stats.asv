@@ -503,63 +503,63 @@ max_chan = max(cellfun(@numel, FltSubsChansStn));
 end
 
 
-% % PLOT THE AVERAGE ITC PER SUBJECT
-% if ismember('Plot SubAvg ITC', steps)
-%     fprintf('Plot SubAvg ITC\n');
-%     if ismember('Calc Single Subject ITC', steps) == false
-% 
-%         fprintf('Loading ITC Data\n');
-%         pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  medname, '*', '_HP=', Hz_dir(1:end-2), '*']);
-%         files = dir(pattern);
-%         filename = fullfile(files(1).folder, files(1).name);
-%         load(filename, 'ITC', '-mat');
-%         SR= ITC.SR;
-%         freqs = ITC.freqs;
-% 
-%     end
-%     plots = true;
-% 
-%     if allchans
-%         channels = FltSubsChansStn{sub};
-%     elseif onlyeeg
-%         channels = FltSubsOnlyEEG{sub};
-%     elseif onlystn
-%         channels = FltSubsOnlySTN{sub};
-%     end
-% 
-%     for c = 1:numel(channels)
-%         channel = channels{c};
-% 
-%         ItcAll_subavg = squeeze(mean(squeeze(ITC.ItcAll(:,c,:,:)),1));
-%         RelItcAll_subavg = squeeze(mean(squeeze(ITC.RelItcAll(:,c,:,:)),1));
-% 
-%         if plots
-%             f2=figure;
-%             set(f2,'Position',[1949 123 1023 785]);
-%             subplot(2,1,1)
-%             plot(times, AVGECG.mean', 'Color', 'k'); hold on
-%             set(gca,'Position',[0.0900  0.6838 0.78 0.2])
-%             xline(0, "--k", 'LineWidth', 2);
-%             ylabel('Amplitude')
-%             axis('tight')
-%             title(sprintf('Average ECG over all subjects, medication: %s', medname))
-%             hold off
-%             subplot(2,1,2)
-%             set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
-%             imagesc(times,freqs,ItcAll_subavg);axis xy;
-%             colormap('parula');
-%             xline(0, "--k", 'LineWidth', 2);
-%             col = colorbar;
-%             col.Label.String = 'ITC Values'; % Add title to colorbar
-%             xlabel('Time (s)') % Add x-label
-%             ylabel('Frequencies (Hz)') % Add y-label
-%             title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, medname, Hz_dir))
-% 
-%             gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', medname,  '.png']);
-%             exportgraphics(f2,gr2, 'Resolution', 300)
-%         end
-%     end
-% end
+% PLOT THE AVERAGE ITC PER SUBJECT
+if ismember('Plot SubAvg ITC', steps)
+    fprintf('Plot SubAvg ITC\n');
+    if ismember('Calc Single Subject ITC', steps) == false
+
+        fprintf('Loading ITC Data\n');
+        pattern = fullfile(data_dir, 'itc', ['ITC-AllSubs_',  medname, '*', '_HP=', Hz_dir(1:end-2), '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'ITC', '-mat');
+        SR= ITC.SR;
+        freqs = ITC.freqs;
+
+    end
+    plots = true;
+
+    if allchans
+        channels = FltSubsChansStn{sub};
+    elseif onlyeeg
+        channels = FltSubsOnlyEEG{sub};
+    elseif onlystn
+        channels = FltSubsOnlySTN{sub};
+    end
+
+    for c = 1:numel(channels)
+        channel = channels{c};
+
+        ItcAll_subavg = squeeze(mean(squeeze(ITC.ItcAll(:,c,:,:)),1));
+        RelItcAll_subavg = squeeze(mean(squeeze(ITC.RelItcAll(:,c,:,:)),1));
+
+        if plots
+            f2=figure;
+            set(f2,'Position',[1949 123 1023 785]);
+            subplot(2,1,1)
+            plot(times, AVGECG.mean', 'Color', 'k'); hold on
+            set(gca,'Position',[0.0900  0.6838 0.78 0.2])
+            xline(0, "--k", 'LineWidth', 2);
+            ylabel('Amplitude')
+            axis('tight')
+            title(sprintf('Average ECG over all subjects, medication: %s', medname))
+            hold off
+            subplot(2,1,2)
+            set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
+            imagesc(times,freqs,ItcAll_subavg);axis xy;
+            colormap('parula');
+            xline(0, "--k", 'LineWidth', 2);
+            col = colorbar;
+            col.Label.String = 'ITC Values'; % Add title to colorbar
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            title(sprintf('Average ITC for %s, med: %s, HP: %s', channel, medname, Hz_dir))
+
+            gr2 = fullfile('F:\HeadHeart\2_results\itc' , Hz_dir, 'group', ['ITC_', channel, '_', medname,  '.png']);
+            exportgraphics(f2,gr2, 'Resolution', 300)
+        end
+    end
+end
 
 % Now here is the Grand Average ITC over all Subs per Channel
 if ismember('Group ITC', steps)

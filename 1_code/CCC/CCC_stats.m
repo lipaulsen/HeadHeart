@@ -359,6 +359,9 @@ if ismember ('Calc Single Subject CCC', steps)
             outputPDF = fullfile(results_dir, 'ccc', 'ss_perm' ,[subject,'_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'_pval=', num2str(signif_thresh),'.pdf']);
         end
 
+        %Intitalize the PermItcAllChan Variable
+        PermCccAllChan = zeros(numel(channels),numPerms, freqs, times);
+
 
         for c = 1:numel(fieldnames(CCCchans))
             comp = comps{c};
@@ -444,7 +447,7 @@ if ismember ('Calc Single Subject CCC', steps)
 
             % ZScoresAll(sub,c,:,:) = zscores; % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
             % PValAll(sub,c,:,:) = p_orig;  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-            %PermCccAll(sub,c,:,:,:) = PermPSIData; % SubjectxChannelxPermutationxFreqxTime
+            PermCccAllChan(c,:,:,:) = PermPSIData; % SubjectxChannelxPermutationxFreqxTime
 
 
             % f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
@@ -503,7 +506,7 @@ if ismember ('Calc Single Subject CCC', steps)
         if permstats
             %CCC.PERM.ZScoresAll = ZScoresAll;  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
             %CC.PERM.PValAll = PValAll; % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-            CCC.PermCcc = PermPSIData; %SubjectxChannelxPermutationxFreqxTime
+            CCC.PermCcc = PermPSIData; %ChannelxPermutationxFreqxTime
         end
         % Save CCC MAtrix of all Subjects and all Channels
         CCC.SR = SR;
@@ -636,7 +639,7 @@ if ismember('Plot SubAvg PermStats', steps)
 
         %ChanMeanZscores_avg = squeeze(mean(squeeze(CCC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
         %ChanMeanPVal_avg = squeeze(mean(squeeze(CCC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-        PermItcAll_avg = squeeze(mean(squeeze(CCC.PERM.PermCccAll(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
+        PermItcAll_avg = squeeze(mean(squeeze(CCC.PermCcc(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
         ItcAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
         RelItcAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
 

@@ -45,8 +45,8 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = true;
-oldsubs = false;
+newsubs = false;
+oldsubs = true;
 allsubs = false;
 
 % GOOD HEART STATUS
@@ -181,7 +181,7 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
-for sub = 1:numel(subjects)
+for sub = 5%:numel(subjects)
     % Extract the subject
     subject = subjects{sub};
 

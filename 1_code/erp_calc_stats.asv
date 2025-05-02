@@ -272,10 +272,10 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
 
             for pe = 1:numPerms % parfor
                 currSurrogateRpeaks = surrogate_rpeaks(pe, :);
-                [EvDataPerm] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, NewSR,  Fhp, Flp, baseline_win, FltPassDir);
+                [EvDataPerm] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, NewSR,  Fhp, Flp, EventTms);
 
                 EvDataAllTrsPerm(sub,c,pe,:) = squeeze(mean(EvDataPerm,1));
-                fprintf('perm = %d \n', pe)
+                fprintf('perm = %d \n', perm)
             end
 
 
@@ -591,7 +591,7 @@ disp('================= ERP DONE! =======================')
 
 
 
-function   [EvDataPerm] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, NewSR, Fhp, Flp, baseline_win, FltPassDir)
+function   [EvData] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, NewSR, Fhp, Flp)
 nEvent=length(surrogate_rpeaks);
 
 % HIGH PASS FILTER
@@ -613,8 +613,8 @@ if NewSR > 0
     NewSR=1.0/dtTime;
 end
 
-[EventTms,EvDataPerm,TmAxis]=GetEvTimeAndData(surrogate_rpeaks,ChDta,dtTime,tWidth,tOffset);
-[nEvs,nData]=size(EvDataPerm);
+[EventTms,EvData,TmAxis]=GetEvTimeAndData(surrogate_rpeaks,ChDta,dtTime,tWidth,tOffset);
+[nEvs,nData]=size(EvData);
 
 %fprintf('****************** Baseline Correction for %s %s med: %s ...****************\n', subject, channel, medname);
 % My baseline is the time window -0.3 to -0.1 s
@@ -626,8 +626,8 @@ bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
 % for every trial calc the mean of the baseline win
 % and subtract that from the entire epoch
 for t = 1:nEvs
-    baseline_mean = mean(EvDataPerm(t, bidx(1):bidx(end)),2);
-    EvDataPerm(t,:) = EvDataPerm(t,:)-baseline_mean;
+    baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
+    EvData(t,:) = EvData(t,:)-baseline_mean;
 end
 
 
