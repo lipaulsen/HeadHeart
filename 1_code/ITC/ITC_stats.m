@@ -103,7 +103,7 @@ show_plots = false;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Group ITC Load Chan', 'Plot SubAvg PermStats'}; % 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster', 
+steps = {'Correlation Group ITC'}; % 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster', 
 
 % Define Time Window
 tWidth   = 0.9;
@@ -137,8 +137,8 @@ BPRerefLw = true; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 % Flag if only EEG, STN or all channels
 allchans = false;
-onlyeeg = false;
-onlystn = true;
+onlyeeg = true;
+onlystn = false;
 
 disp("************* STARTING ITC *************");
 
@@ -500,9 +500,8 @@ max_chan = max(cellfun(@numel, FltSubsChansStn));
 %     end
 %     save(save_path, 'ITC', '-v7.3');
 %     fprintf('Saved ITC Data for all subs and channels to: %s\n', save_path);
-end
-
 fprintf('Done!')
+end
 
 % % PLOT THE AVERAGE ITC PER SUBJECT
 % if ismember('Plot SubAvg ITC', steps)
@@ -656,176 +655,95 @@ if ismember('Group ITC Save', steps)
             out_path = fullfile(data_dir, 'itc' ,'ss_chan', out_fname);
 
             % Extract per-channel data
-            ItcDataCh = squeeze(ItcDataSub(c,:,:));       %% <<< NEW
-            PermDataCh = squeeze(ItcPermSub(c,:,:,:));    %% <<< NEW
+            ItcDataCh = squeeze(ItcDataSub(c,:,:));       
+            PermDataCh = squeeze(ItcPermSub(c,:,:,:));    
 
             % Save to file (use -v7.3 for large arrays)
-            save(out_path, 'ItcDataCh', 'PermDataCh', 'SR', 'freqs', 'times');  %% <<< NEW
+            save(out_path, 'ItcDataCh', 'PermDataCh', 'SR', 'freqs', 'times');  
         end
     end
 end
 
-
-% ItcByName = struct();
-% PermByName = struct();
-%
-% for s = 1:numel(subjects)
-%     subject = subjects(s);
-%     fprintf('Loading ITC Data for subject %s\n', subject);
-%
-%     filelist = dir(fullfile(data_dir, 'itc', 'ss', [char(subject), '*']));
-%
-%     % Initialize empty
-%     ItcDataSub = [];
-%     ItcPermSub = [];
-%     ItcLabels = strings(0,1);
-%     ItcChannels = strings(0,1);
-%
-%     % --- Info about which BP reref electrode to use ---
-%     use_hi_L = subject_info(s).ITC_BPReref_L; % 1 = use Hi, 0 = use Lw
-%     use_hi_R = subject_info(s).ITC_BPReref_R;
-%
-%     % Expected reref as string
-%     if use_hi_L == 1; expected_L = 'Hi'; else expected_L = 'Lw'; end
-%     if use_hi_R == 1; expected_R = 'Hi'; else expected_R = 'Lw'; end
-%
-%     for i = 1:numel(filelist)
-%         fname = filelist(i).name;
-%         fullpath = fullfile(filelist(i).folder, fname);
-%         fprintf('Loading: %s\n', fname);
-%
-%         % Load the file
-%         load(fullpath, 'ITC', '-mat');
-%
-%         % --- Extract the key dynamically ---
-%         parts = split(fname, '_');
-%         BPkey = parts{5};
-%         STNkey = parts{4};
-%
-%         % --- Determine which channels to use ---
-%         if contains(STNkey, 'OnlySTN')
-%             channels = FltSubsOnlyStn{s};
-%         elseif contains(STNkey, 'OnlyEEG')
-%             channels = FltSubsOnlyEEG{s};
-%         else
-%             channels = FltSubsChansStn{s};  % all channels
-%         end
-%
-%         % --- Determine which reref this file contains ---
-%         if contains(BPkey, 'BPRerefHi')
-%             reref_type = 'Hi';
-%         elseif contains(BPkey, 'BPRerefLow')
-%             reref_type = 'Lw';
-%         elseif contains(BPkey, 'time')
-%             fprintf('This is an EEG file: %s\n', fname);
-%         end
-%
-%
-%         % --- Create mask: which channels to keep ---
-%         keep_idx = false(size(channels));
-%
-%         for ch_idx = 1:numel(channels)
-%             chan_name = channels{ch_idx};
-%
-%             if startsWith(chan_name, 'L')
-%                 % Left channel
-%                 if strcmp(reref_type, expected_L)
-%                     keep_idx(ch_idx) = true;
-%                 end
-%             elseif startsWith(chan_name, 'R')
-%                 % Right channel
-%                 if strcmp(reref_type, expected_R)
-%                     keep_idx(ch_idx) = true;
-%                 end
-%             else
-%                 % Assume it's an EEG channel — keep it
-%                 keep_idx(ch_idx) = true;
-%             end
-%         end
-%
-%         % --- Actually filter the data ---
-%         kept_channels = channels(keep_idx);
-%         ItcDataFiltered = ITC.ItcAll(keep_idx,:,:);
-%         ItcPermFiltered = ITC.PermItc(keep_idx,:,:,:);
-%
-%         % --- Append ---
-%         if isempty(ItcDataSub)
-%             ItcDataSub = ItcDataFiltered;
-%             ItcPermSub = ItcPermFiltered;
-%         else
-%             ItcDataSub = vertcat(ItcDataSub, ItcDataFiltered);
-%             ItcPermSub = vertcat(ItcPermSub, ItcPermFiltered);
-%         end
-%
-%         % Create label string per channel
-%         label_combined = strcat(string(BPkey), "_", string(STNkey));
-%
-%         % Store the label for each kept channel
-%         new_labels = repmat(label_combined, numel(kept_channels), 1);
-%
-%         if isempty(ItcLabels)
-%             ItcLabels = new_labels;
-%         else
-%             ItcLabels = [ItcLabels; new_labels];
-%         end
-%
-%         % Store the kept channels
-%         if isempty(ItcChannels)
-%             ItcChannels = kept_channels;
-%         else
-%             ItcChannels = [ItcChannels, kept_channels];
-%         end
-%     end
-%
-%     % % Mean the Perm data to reduce size
-%     ItcMeanPermSub = squeeze(mean(ItcPermSub,2));
-%
-%     for c = 1:numel(ItcChannels)
-%         ch_name = ItcChannels(c);
-%         ch_name = ch_name{1};
-%
-%         % Initialize if first time seeing this channel
-%         if ~isfield(ItcByName, ch_name)
-%             ItcByName.(ch_name) = NaN(numel(subjects), size(ItcDataSub, 2), size(ItcDataSub, 3));
-%             PermByName.(ch_name) = NaN(numel(subjects), size(ItcPermSub, 2), size(ItcPermSub, 3), size(ItcPermSub, 4));
-%         end
-%
-%         % Save per subject
-%         ItcByName.(ch_name)(s,:,:) = squeeze(ItcDataSub(c,:,:));
-%         PermByName.(ch_name)(s,:,:,:) = squeeze(ItcPermSub(c,:,:,:));
-%     end
-%
-%     % Save for this subject
-%     SR = ITC.SR;
-%     freqs = ITC.freqs;
-%     times = ITC.times;
-%     %ItcAllSubs(s,:,:,:) = ItcDataSub; % SubjectxChannelxFreqxTIme
-%     %ItcMeanPermAllSubs(s,:,:,:) = ItcMeanPermSub; % SubjectxChannelxPermxFreqxTime
-%     ItcAllSubsLabels{s} = ItcLabels;
-%     ItcAllSubsChannels{s} = ItcChannels;
-% end
-
-
 if ismember('Group ITC Load Chan', steps)
 
-    for s = 14:numel(subjects)
-        subject = subjects(s);
-        fprintf('Loading ITC Data for subject %s\n', subject);
+   all_files = dir(fullfile(data_dir,'itc', 'ss_chan', '*.mat'));
+   valid_idx = ~startsWith({all_files.name}, '._');
+   all_files = all_files(valid_idx);
 
-        filelist = dir(fullfile(data_dir, 'itc', 'ss', [char(subject), '*']));
+    % Extract all channel names
+    channel_names = strings(numel(all_files), 1);
+    for i = 1:numel(all_files)
+        fname = all_files(i).name;
+        parts = split(fname, '_');         % Example: 'sub01_LFP1.mat'
+        channel_names(i) = erase(parts{2}, '.mat');  % Get 'LFP1'
+    end
 
+    mapped_channels = strings(size(channel_names));
+    for i = 1:numel(channel_names)
+        chan =channel_names(i);
+        if startsWith(chan, 'L')
+            mapped_channels(i) = "STNleft";
+        elseif startsWith(chan, 'R')
+            mapped_channels(i) = "STNright";
+        else
+            mapped_channels(i) = chan;
+        end
+    end
 
-        channelnames = fieldnames(ItcByName);
-        for i = 1:numel(channelnames)
-            ch = channelnames{i};
+    % Get list of unique mapped channel names
+    unique_channels = unique(mapped_channels);
 
-            % Extract subject data
-            ItcData = squeeze(ItcByName.(ch));  % subjects x freqs x times
-            PermData = squeeze(PermByName.(ch)); % subjects x permutations x freqs x times
+    % Define EEG channel clusters
+    EEG_clusters = struct();
+    EEG_clusters.Frontal = ["F3", "F4", "Fz"];
+    EEG_clusters.Central = ["C3", "C4", "Cz"];
+    EEG_clusters.Parietal = ["P3", "P4", "Pz", "Oz"];
+
+    if ismember('Plot Single Chan', steps)
+        % Initialize output struct for averages
+        ITC_GroupAvg = struct();
+
+        % Loop over channels
+        for ch = 1:numel(unique_channels)
+            ch_name = unique_channels(ch);
+            fprintf('Processing channel: %s\n', ch_name);
+
+            % Determine which original channels match this group
+            if ch_name == "STNleft"
+                match_indices = startsWith(channel_names, 'L');
+            elseif ch_name == "STNright"
+                match_indices = startsWith(channel_names, 'R');
+            else
+                match_indices = channel_names == ch_name;
+            end
+
+            % Get matching files
+            files_ch = all_files(match_indices);
+
+            % Load all subjects' ITC data for this channel
+            ITC_allSubs_cell = {};
+            ITC_Perm_allSubs = {};
+            for f = 1:numel(files_ch)
+                load(fullfile(files_ch(f).folder, files_ch(f).name), 'ItcDataCh', 'PermDataCh', 'SR', 'freqs', 'times');
+                ITC_allSubs_cell{end+1} = ItcDataCh;  % [nFreqs x nTimes]
+                ITC_Perm_allSubs{end+1} = PermDataCh;
+            end
+
+            % Convert to 3D matrix: [nSubjects x nFreqs x nTimes]
+            nSubjects = numel(ITC_allSubs_cell);
+            [nFreqs, nTimes] = size(ITC_allSubs_cell{1});
+            [nPerm, nFqs, nTms] = size(ITC_Perm_allSubs{1});
+            ITC_allSubs = zeros(nSubjects, nFreqs, nTimes);
+            ITC_PermAvg_allsubs = zeros(nSubjects, nPerm, nFreqs, nTimes);
+
+            for s = 1:nSubjects
+                ITC_allSubs(s, :, :) = ITC_allSubs_cell{s};
+                ITC_PermAvg_allsubs(s,:,:,:) = ITC_Perm_allSubs{s};
+            end
 
             % Average over subjects
-            ItcAll_subavg = squeeze(mean(ItcData,1));  % freq x time
-            PermItcAll_avg = squeeze(mean(PermData,1));  % permutations x freq x time
+            ItcAll_subavg = squeeze(mean(ITC_allSubs,1));  % freq x time
+            PermItcAll_avg = squeeze(mean(ITC_PermAvg_allsubs,1));  % permutations x freq x time
 
             if ismember('Plot SubAvg ITC', steps)
                 fprintf('Plot ITC Averages \n');
@@ -833,7 +751,7 @@ if ismember('Group ITC Load Chan', steps)
                 f2=figure;
                 set(f2,'Position',[1949 123 1023 785]);
                 subplot(2,1,1)
-                plot(times, EvECG.EvData', 'Color', 'k'); hold on
+                plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
                 set(gca,'Position',[0.0900  0.6838 0.78 0.2])
                 xline(0, "--k", 'LineWidth', 2);
                 ylabel('Amplitude')
@@ -842,7 +760,7 @@ if ismember('Group ITC Load Chan', steps)
                 hold off
                 subplot(2,1,2)
                 set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
-                imagesc(times,freqs,ItcAll_subavg);axis xy;
+                imagesc(times(31:end),freqs(9:end),ItcAll_subavg);axis xy;
                 colormap('parula');
                 xline(0, "--k", 'LineWidth', 2);
                 col = colorbar;
@@ -892,8 +810,8 @@ if ismember('Group ITC Load Chan', steps)
                 f6=figure;
                 set(f6,'Position',[1949 123 1023 785]);
                 subplot(2,1,1)
-                plot(times(31:end), EvECG.EvData(31:end)', 'Color', 'k'); hold on
-                set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+                plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+                set(gca,'Position',[0.1300 0.5838 0.73 0.3])
                 xline(0, "--k", 'LineWidth', 2);
                 axis('tight')
                 ylabel('Amplitude (μV)')
@@ -902,7 +820,7 @@ if ismember('Group ITC Load Chan', steps)
 
 
                 subplot(2,1,2)
-                imagesc(times(31:end),freqs,ItcAll_subavg(:,31:end));axis xy;
+                imagesc(times(31:end),freqs(9:end),ItcAll_subavg(9:end,31:end));axis xy;
                 colormap('parula');
                 colorbar;
                 clims = clim;
@@ -912,12 +830,97 @@ if ismember('Group ITC Load Chan', steps)
                 xline(0, "--k", 'LineWidth', 2);
                 xlabel('Time (s)') % Add x-label
                 ylabel('Frequencies (Hz)') % Add y-label
-                title(sprintf(' Average ITC in %s, perm = %d, med = %s, p<%.4g', channel, numPerms, medname, signif_thresh))
+                title(sprintf(' Average ITC in %s, perm = %d, med = %s, p<%.4g, n=%d', ch_name, numPerms, medname, signif_thresh, nSubjects))
 
-                gr6 = fullfile('F:\HeadHeart\2_results\itc\group_perm' , ['AvgITC_', channel, '_', medname, '_perm=', num2str(numPerms), '.png']);
-                exportgraphics(f6,gr6, 'Resolution', 300)
+                gr6 = fullfile(results_dir, 'itc', Hz_dir, 'group_perm' , ['AvgITC_', char(ch_name), '_', medname, '_perm=', num2str(numPerms), '_n=', num2str(nSubjects), '.png']);
+                exportgraphics(f6, gr6, 'Resolution', 300)
 
             end
+        end
+    end
+    if ismember('Plot ITC Group Cluster', steps)
+        % ========= Cluster-level ITC analysis for EEG groups ==========
+        fprintf('\n Now calculating cluster-level EEG ITC...\n');
+
+        cluster_names = fieldnames(EEG_clusters);
+        for ci = 2:numel(cluster_names)
+            clus_name = cluster_names{ci};
+            clus_chans = EEG_clusters.(clus_name);
+
+            % Find matching file indices for channels in this cluster
+            match_indices = ismember(channel_names, clus_chans);
+            files_cluster = all_files(match_indices);
+
+            if isempty(files_cluster)
+                warning('No matching channels found for cluster %s', clus_name);
+                continue
+            end
+
+            % Load ITC and perm data for all matching files
+            ITC_allSubs_cell = {};
+            ITC_Perm_allSubs = {};
+            for f = 1:numel(files_cluster)
+                load(fullfile(files_cluster(f).folder, files_cluster(f).name), 'ItcDataCh', 'PermDataCh');
+                ITC_allSubs_cell{end+1} = ItcDataCh;
+                ITC_Perm_allSubs{end+1} = PermDataCh;
+            end
+
+            % Convert to 4D matrix: [nSubjects x nChannels x nFreqs x nTimes]
+            nSubjects = numel(ITC_allSubs_cell);
+            [nFreqs, nTimes] = size(ITC_allSubs_cell{1});
+            [nPerm, ~, ~] = size(ITC_Perm_allSubs{1});
+            nChs = numel(ITC_allSubs_cell);
+
+            ITC_matrix = zeros(nChs, nFreqs, nTimes);
+            PERM_matrix = zeros(nChs, nPerm, nFreqs, nTimes);
+
+            for c = 1:nChs
+                ITC_matrix(c,:,:) = ITC_allSubs_cell{c};
+                PERM_matrix(c,:,:,:) = ITC_Perm_allSubs{c};
+                fprintf('\n Now calculating chan %s\n', c);
+            end
+
+            % Average across EEG cluster channels
+            ItcAll_clusAvg = squeeze(mean(ITC_matrix,1));         % [freq x time]
+            PermItcAll_avg = squeeze(mean(PERM_matrix,1));        % [perm x freq x time]
+
+            % Z-scoring
+            perm_mean = squeeze(mean(PermItcAll_avg, 1));
+            perm_std  = squeeze(std(PermItcAll_avg, 1));
+            zscores_all = (ItcAll_clusAvg - perm_mean) ./ perm_std;
+            p_orig_all = 2 * (1 - normcdf(zscores_all, 0, 1));
+            signif_thresh = 0.005;
+            p_thresh_all = p_orig_all < signif_thresh;
+
+            f7=figure;
+            set(f7,'Position',[1949 123 1023 785]);
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            ylabel('Amplitude (μV)')
+            title(sprintf('Average ECG over all subjects, med: %s', medname))
+            hold off
+
+
+            subplot(2,1,2)
+            imagesc(times(31:end),freqs(9:end)',ItcAll_clusAvg(9:end,31:end));axis xy;
+            colormap('parula');
+            colorbar;
+            clims = clim;
+            hold on
+            contour(times(31:end), freqs(9:end)', p_thresh_all(9:end,31:end),  1, 'linecolor', 'k', 'linewidth', 1.1)
+            clim(clims);
+            xline(0, "--k", 'LineWidth', 2);
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            title(sprintf(' Average ITC in %s, perm = %d, med = %s, p<%.4g', clus_name, numPerms, medname, signif_thresh))
+
+            % Save
+            outname = fullfile(results_dir, 'itc', Hz_dir, 'group_perm', ...
+                ['ClusterAvgITC_', clus_name, '_', medname, '_perm=', num2str(numPerms), '.png']);
+            exportgraphics(f7, outname, 'Resolution', 300);
         end
     end
 end
@@ -1213,8 +1216,81 @@ if ismember('Plot Power',steps)
 
 end
 
+if ismember('Correlation Group ITC', steps)
+
+% === Define TF window ===
+tf_time_win = [0.1, 0.25];     % seconds
+tf_freq_win = [4, 7];          % Hz
+
+% === Load all data ===
+all_files = dir(fullfile(data_dir, 'itc', 'ss_chan', '*.mat'));
+valid_idx = ~startsWith({all_files.name}, '._');
+all_files = all_files(valid_idx);
+
+Itc_vals = [];
+Power_vals = [];
+Subject_ids = {};
+
+for i = 1:numel(all_files)
+    fpath = fullfile(all_files(i).folder, all_files(i).name);
+    load(fpath, 'ItcDataCh', 'PermDataCh', 'freqs', 'times');
+
+    freq_idx = find(freqs >= tf_freq_win(1) & freqs <= tf_freq_win(2));
+    time_idx = find(times >= tf_time_win(1) & times <= tf_time_win(2));
+
+    % --- ITC ---
+    mean_itc = mean(ItcDataCh(freq_idx, time_idx), 'all');
+
+    % --- Power ---
+    power_ch = abs(PermDataCh).^2;
+    mean_power = mean(mean(power_ch(:, freq_idx, time_idx), 3), 2); % mean over time
+    mean_power = mean(mean_power); % mean over permutations
+
+    Itc_vals(end+1) = mean_itc;
+    Power_vals(end+1) = mean_power;
+
+    parts = split(all_files(i).name, '_');
+    subj_id = parts{1};
+    Subject_ids{end+1} = subj_id;
+end
+
+% === Z-score within each subject ===
+unique_subs = unique(Subject_ids);
+z_itc = zeros(size(Itc_vals));
+z_pow = zeros(size(Power_vals));
+
+for s = 1:numel(unique_subs)
+    sub_idx = strcmp(Subject_ids, unique_subs{s});
+    z_itc(sub_idx) = zscore(Itc_vals(sub_idx));
+    z_pow(sub_idx) = zscore(Power_vals(sub_idx));
+end
+
+% === Pearson Correlation ===
+[rval, pval] = corr(z_itc(:), z_pow(:), 'type', 'Pearson');
+fprintf('Correlation (z-ITC vs z-Power): r = %.3f, p = %.4f\n', rval, pval);
+
+% === Bayesian Correlation ===
+addpath('path/to/BayesFactor');  % Change to actual BayesFactor toolbox path
+
+BF = bf_corr(z_itc(:), z_pow(:));
+inv_BF = 1 / BF;
+
+fprintf('Bayes Factor (JZS): BF = %.3f, Inverse BF = %.3f\n', BF, inv_BF);
+
+% === Scatter Plot ===
+figure;
+scatter(z_itc, z_pow, 60, 'filled', 'MarkerFaceAlpha', 0.6); hold on;
+lsline;  % regression line
+
+xlabel('Z-scored ITC');
+ylabel('Z-scored Spectral Power');
+title(sprintf('Correlation r = %.2f, p = %.4f, BF = %.2f', rval, pval, BF));
+grid on; box on;
+set(gca, 'FontSize', 12);
 
 
+
+end
 
 
 function   [ChsAllFrsTmPha] = time_lock_to_surrogate(ChDta, surrogate_rpeaks, SR, tWidth, tOffset, NewSR, Frqs, times, onlyeeg)
