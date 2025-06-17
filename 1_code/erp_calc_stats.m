@@ -141,7 +141,7 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
     % Extract the subject
     subject = subjects{sub};
 
-    fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+    fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects));
 
     pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
     files = dir(pattern);
@@ -155,6 +155,13 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
     % files = dir(pattern);
     % filename = fullfile(files(1).folder, files(1).name);
     % load(filename, 'EvECG');
+
+    % Load the the cleaned ECG R Peaks Data
+    fprintf('Loading ECG Data\n');
+    pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
+    files = dir(pattern);
+    filename = fullfile(files(1).folder, files(1).name);
+    load(filename, 'EvECG');
 
     SR = SmrData.SR;
     EventTms = SmrData.EvData.EvECGP_Cl;
@@ -330,7 +337,18 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
             end
 
             % Optional: Plot
-            figure;
+            f1=figure;
+            set(f1,'Position',[1949 123 1023 785]);
+            subplot(2,1,1)
+            plot(times, mean(EvECG.EvData,1), 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            ylabel('Amplitude')
+            axis('tight')
+            title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, medname))
+            hold off
+            
+            subplot(2,1,2)
             plot(mean(realHEP), 'b', 'LineWidth', 2); hold on;
             plot(mean(surrogateHEP), 'r', 'LineWidth', 2);
             for i = 1:length(sig_clusters)

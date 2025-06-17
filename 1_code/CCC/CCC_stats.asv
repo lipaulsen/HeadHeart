@@ -447,7 +447,7 @@ if ismember ('Calc Single Subject CCC', steps)
 
             % ZScoresAll(sub,c,:,:) = zscores; % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
             % PValAll(sub,c,:,:) = p_orig;  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-            %PermCccAll(sub,c,:,:,:) = PermPSIData; % SubjectxChannelxPermutationxFreqxTime
+            PermCccAllChan(c,:,:,:) = PermPSIData; % SubjectxChannelxPermutationxFreqxTime
 
 
             % f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
@@ -501,12 +501,39 @@ if ismember ('Calc Single Subject CCC', steps)
             exportgraphics(f5, outputPDF, 'Append', true);
             disp(['All figures saved to ', outputPDF]);
 
+            % Save CCC MAtrix of all Subjects and all Channels
+            CCC.SR = SR;
+            CCC.times = times;
+            CCC.freqs = freqs;
+            CCC.PermCcc = PermPSIData; %ChannelxPermutationxFreqxTime
+            CCC.CCC = CccAll(sub,c,:,:); %FreqxTime
+
+            if permstats & BPRerefHi & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan', [subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & BPRerefLw & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & onlyeeg
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans & BPRerefHi
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans & BPRerefLw
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=NONE','_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats
+                save_path = fullfile(data_dir, 'ccc', 'ss',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            else
+                save_path = fullfile(data_dir, 'ccc','ss', [subject,'_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+            end
+            save(save_path, 'CCC', '-v7.3');
+            fprintf('Saved CCC Data for sub %s and channels %s %s to: %s\n', subject, channel1, channel2, save_path);
+
         end
 
         if permstats
             %CCC.PERM.ZScoresAll = ZScoresAll;  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
             %CC.PERM.PValAll = PValAll; % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-            CCC.PermCcc = PermPSIData; %SubjectxChannelxPermutationxFreqxTime
+            CCC.PermCcc = PermPSIData; %ChannelxPermutationxFreqxTime
         end
         % Save CCC MAtrix of all Subjects and all Channels
         CCC.SR = SR;
@@ -533,7 +560,13 @@ if ismember ('Calc Single Subject CCC', steps)
             save_path = fullfile(data_dir, 'ccc','ss', [subject, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
         end
         save(save_path, 'CCC', '-v7.3');
-        fprintf('Saved CCC Data for all subs and channels to: %s\n', save_path);
+        fprintf('Saved CCC Data for sub %s and channels to: %s\n', subject, save_path);
+
+        % Free up some storage
+        clear ItcSub
+        clear RelItcSub
+        clear PermItcData
+        clear PermItcAllChan
     end
 
     % if permstats
@@ -639,7 +672,7 @@ if ismember('Plot SubAvg PermStats', steps)
 
         %ChanMeanZscores_avg = squeeze(mean(squeeze(CCC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
         %ChanMeanPVal_avg = squeeze(mean(squeeze(CCC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-        PermItcAll_avg = squeeze(mean(squeeze(CCC.PERM.PermCccAll(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
+        PermItcAll_avg = squeeze(mean(squeeze(CCC.PermCcc(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
         ItcAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
         RelItcAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
 

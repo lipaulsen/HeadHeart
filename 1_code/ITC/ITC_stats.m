@@ -103,7 +103,7 @@ show_plots = false;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Correlation Group ITC'}; %  'Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
+steps = {'Correlation Group ITC'}; %  'Plot Single Subject Power', 'Plot Power''Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
 
 % Define Time Window
 tWidth   = 0.9;
@@ -565,7 +565,7 @@ end
 if ismember('Group ITC Save', steps)
     fprintf('Load Data for Group ITC\n');
 
-    for s = 1:numel(subjects)
+    for s = 11:numel(subjects)
         subject = subjects(s);
         fprintf('Loading ITC Data for subject %s\n', subject);
 
@@ -972,114 +972,221 @@ end
 
 if ismember('Plot Power',steps)
     fprintf('Plot Power\n');
-    for sub = 1:numel(subjects)
 
-        % Extract the subject
-        subject = subjects{sub};
+    all_files = dir(fullfile(data_dir,'tfr', 'ss_chan', '*.mat'));
+    valid_idx = ~startsWith({all_files.name}, '._');
+    all_files = all_files(valid_idx);
 
-        % pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
-        % files = dir(pattern);
-        % filename = fullfile(files(1).folder, files(1).name);
-        % load(filename, 'TFR', '-mat');
-        if baseline & BPReref & BPRerefHi
-            fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefHiTit, '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        elseif baseline & BPReref & BPRerefLw
-            fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefLwTit, '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        elseif baseline & BPReref & BPRerefBest
-            fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefBestTit, '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        elseif baseline
-            fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*', '_BSL=', '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        else
-            fprintf('Loading TFR Data for %s\n', subject);
-            pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
-            files = dir(pattern);
-            filename = fullfile(files(1).folder, files(1).name);
-            load(filename, 'TFR', '-mat');
-        end
-
-        freqs = TFR.freqs;
-        times = TFR.times;
-
-        if allchans
-            channels = FltSubsChansStn{sub};
-        elseif onlyeeg
-            channels = FltSubsOnlyEEG{sub};
-        elseif onlystn
-            channels = FltSubsOnlyStn{sub};
-        end
-
-        for c = 1:numel(channels)
-
-            channel = channels{c};
-
-            pow_all(sub,c,:,:) = squeeze(mean(TFR.(channel).pow,1)); % Mean over all Trials
-        end
-
+    % Extract all channel names
+    channel_names = strings(numel(all_files), 1);
+    for i = 1:numel(all_files)
+        fname = all_files(i).name;
+        parts = split(fname, '_');         % Example: 'sub01_LFP1.mat'
+        channel_names(i) = erase(parts{2}, '.mat');  % Get 'LFP1'
     end
 
-    if ismember('Plot Plow Single Channels', steps)
-        % Get unique channel names across all subjects
-        if allchans
-            all_channels = unique([FltSubsChansStn{:}]); % Extract all channels present across subjects
-        elseif onlyeeg
-            all_channels = unique([FltSubsOnlyEEG{:}]);
-        elseif onlystn
-            all_channels = unique([FltSubsOnlyStn{:}]);
+    mapped_channels = strings(size(channel_names));
+    for i = 1:numel(channel_names)
+        chan =channel_names(i);
+        if startsWith(chan, 'L')
+            mapped_channels(i) = "STNleft";
+        elseif startsWith(chan, 'R')
+            mapped_channels(i) = "STNright";
+        else
+            mapped_channels(i) = chan;
+        end
+    end
+
+    % Get list of unique mapped channel names
+    unique_channels = unique(mapped_channels);
+
+    % Define EEG channel clusters
+    EEG_clusters = struct();
+    EEG_clusters.Frontal = ["F3", "F4", "Fz"];
+    EEG_clusters.Central = ["C3", "C4", "Cz"];
+    EEG_clusters.Parietal = ["P3", "P4", "Pz", "Oz"];
+
+    POW_GroupAvg = struct();
+
+    % Loop over channels
+    for ch = 11:numel(unique_channels)
+        ch_name = unique_channels(ch);
+        fprintf('Processing channel: %s\n', ch_name);
+
+        % Determine which original channels match this group
+        if ch_name == "STNleft"
+            match_indices = startsWith(channel_names, 'L');
+        elseif ch_name == "STNright"
+            match_indices = startsWith(channel_names, 'R');
+        else
+            match_indices = channel_names == ch_name;
         end
 
-        % Initialize storage for averaged power per channel
-        pow_channel_avg = nan(numel(all_channels), size(pow_all,3), size(pow_all,4));  % [channels, freqs, times]
+        % Get matching files
+        files_ch = all_files(match_indices);
 
-        % Loop through each unique channel
-        for ch = 1:numel(all_channels)
-            channel_name = all_channels{ch};
-            subject_pow = nan(numel(subjects), size(pow_all,3), size(pow_all,4));  % Store per subject
+        % Load all subjects' ITC data for this channel
+        POW_allSubs_cell = {};
+        for f = 1:numel(files_ch)
+            load(fullfile(files_ch(f).folder, files_ch(f).name), 'POW', 'freqs', 'times');
+            POW_allSubs_cell{end+1} = POW;  % [nFreqs x nTimes]
+        end
 
-            % Loop through subjects
-            for sub = 1:numel(subjects)
-                if allchans
-                    subject_channels = FltSubsChansStn{sub}; % Channels for this subject
-                elseif onlyeeg
-                    subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
-                elseif onlystn
-                    subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
-                end
+        % Convert to 3D matrix: [nSubjects x nFreqs x nTimes]
+        nSubjects = numel(POW_allSubs_cell);
+        [nFreqs, nTimes] = size(POW_allSubs_cell{1});
+        POW_allSubs = zeros(nSubjects, nFreqs, nTimes);
+
+        for s = 1:nSubjects
+            POW_allSubs(s, :, :) = POW_allSubs_cell{s};
+        end
+
+        % Average over subjects
+        POW_subavg = squeeze(mean(POW_allSubs,1));  % freq x time
 
 
-                chan_idx = find(strcmp(subject_channels, channel_name)); % Find index
+        if ismember('Plot Single Subject Power', steps)
+            for s = 1:nSubjects
+                subj = files_ch(s).name(1:5);
 
-                if ~isempty(chan_idx) % Ensure channel exists for subject
-                    subject_pow(sub, :, :) = squeeze(pow_all(sub, chan_idx, :, :));
-                end
+                f9=figure;
+                set(f9,'Position',[1949 123 1023 785]);
+                subplot(2,1,1)
+                plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+                set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+                xline(0, "--k", 'LineWidth', 2);
+                axis('tight')
+                ylabel('Amplitude (μV)')
+                title(sprintf('Average ECG over all Sub'))
+                hold off
+
+                subplot(2,1,2)
+                imagesc(times(31:end), freqs, POW_allSubs_cell{s});axis xy;
+                xlabel('Time (s)');
+                ylabel('Frequency (Hz)');
+                colormap('parula');
+                colorbar;
+                clims = clim;
+                % hold on
+                % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
+                % clim(clims);
+                xline(0, "--k", 'LineWidth', 2);
+                title(sprintf('Power for %s in %s, med = %s', subj, ch_name,  medname));
+
+                gr9 = fullfile(results_dir, 'power', Hz_dir, 'ss' , ['POW_', char(subj), '_', char(ch_name), '_', medname,'.png']);
+                exportgraphics(f9,gr9, 'Resolution', 300)
             end
-
-            % Compute mean over subjects (ignoring NaNs where channels are missing)
-            pow_channel_avg(ch, :, :) = squeeze(mean(subject_pow, 1, 'omitnan'));
         end
 
-        % Extract frequency and time axes
-        times = TFR.times;
-        freqs = TFR.freqs;
 
-        % Plot time-frequency power for each channel
-        figure;
-        for ch = 1:numel(all_channels)
+        %for sub = 1:numel(subjects)
+
+        % % Extract the subject
+        % subject = subjects{sub};
+        %
+        % % pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
+        % % files = dir(pattern);
+        % % filename = fullfile(files(1).folder, files(1).name);
+        % % load(filename, 'TFR', '-mat');
+        % if baseline & BPReref & BPRerefHi
+        %     fprintf('Loading TFR Data for %s\n', subject);
+        %     pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefHiTit, '*']);
+        %     files = dir(pattern);
+        %     filename = fullfile(files(1).folder, files(1).name);
+        %     load(filename, 'TFR', '-mat');
+        % elseif baseline & BPReref & BPRerefLw
+        %     fprintf('Loading TFR Data for %s\n', subject);
+        %     pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefLwTit, '*']);
+        %     files = dir(pattern);
+        %     filename = fullfile(files(1).folder, files(1).name);
+        %     load(filename, 'TFR', '-mat');
+        % elseif baseline & BPReref & BPRerefBest
+        %     fprintf('Loading TFR Data for %s\n', subject);
+        %     pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject,  '_TFR-EPOCH_', medname ,'_Rest_', BPRerefBestTit, '*']);
+        %     files = dir(pattern);
+        %     filename = fullfile(files(1).folder, files(1).name);
+        %     load(filename, 'TFR', '-mat');
+        % elseif baseline
+        %     fprintf('Loading TFR Data for %s\n', subject);
+        %     pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*', '_BSL=', '*']);
+        %     files = dir(pattern);
+        %     filename = fullfile(files(1).folder, files(1).name);
+        %     load(filename, 'TFR', '-mat');
+        % else
+        %     fprintf('Loading TFR Data for %s\n', subject);
+        %     pattern = fullfile(data_dir, 'tfr', Hz_dir, [subject, '_TFR-EPOCH_', medname, '*']);
+        %     files = dir(pattern);
+        %     filename = fullfile(files(1).folder, files(1).name);
+        %     load(filename, 'TFR', '-mat');
+        % end
+
+        %     freqs = TFR.freqs;
+        %     times = TFR.times;
+        %
+        %     if allchans
+        %         channels = FltSubsChansStn{sub};
+        %     elseif onlyeeg
+        %         channels = FltSubsOnlyEEG{sub};
+        %     elseif onlystn
+        %         channels = FltSubsOnlyStn{sub};
+        %     end
+        %
+        %     for c = 1:numel(channels)
+        %
+        %         channel = channels{c};
+        %
+        %         pow_all(sub,c,:,:) = squeeze(mean(TFR.(channel).pow,1)); % Mean over all Trials
+        %     end
+        %
+        % end
+
+        if ismember('Plot Plow Single Channels', steps)
+            % % Get unique channel names across all subjects
+            % if allchans
+            %     all_channels = unique([FltSubsChansStn{:}]); % Extract all channels present across subjects
+            % elseif onlyeeg
+            %     all_channels = unique([FltSubsOnlyEEG{:}]);
+            % elseif onlystn
+            %     all_channels = unique([FltSubsOnlyStn{:}]);
+            % end
+            %
+            % % Initialize storage for averaged power per channel
+            % pow_channel_avg = nan(numel(all_channels), size(pow_all,3), size(pow_all,4));  % [channels, freqs, times]
+            %
+            % % Loop through each unique channel
+            % for ch = 1:numel(all_channels)
+            %     channel_name = all_channels{ch};
+            %     subject_pow = nan(numel(subjects), size(pow_all,3), size(pow_all,4));  % Store per subject
+            %
+            %     % Loop through subjects
+            %     for sub = 1:numel(subjects)
+            %         if allchans
+            %             subject_channels = FltSubsChansStn{sub}; % Channels for this subject
+            %         elseif onlyeeg
+            %             subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
+            %         elseif onlystn
+            %             subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
+            %         end
+            %
+            %
+            %         chan_idx = find(strcmp(subject_channels, channel_name)); % Find index
+            %
+            %         if ~isempty(chan_idx) % Ensure channel exists for subject
+            %             subject_pow(sub, :, :) = squeeze(pow_all(sub, chan_idx, :, :));
+            %         end
+            %     end
+            %
+            %     % Compute mean over subjects (ignoring NaNs where channels are missing)
+            %     pow_channel_avg(ch, :, :) = squeeze(mean(subject_pow, 1, 'omitnan'));
+            % end
+            %
+            % % Extract frequency and time axes
+            % times = TFR.times;
+            % freqs = TFR.freqs;
+
+            % Plot time-frequency power for each channel
+            % figure;
+            % for ch = 1:numel(all_channels)
 
             f7=figure;
             set(f7,'Position',[1949 123 1023 785]);
@@ -1087,10 +1194,13 @@ if ismember('Plot Power',steps)
             plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
             set(gca,'Position',[0.1300 0.5838 0.71 0.3])
             xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            ylabel('Amplitude (μV)')
             title(sprintf('Average ECG over all Sub'))
             hold off
+
             subplot(2,1,2)
-            imagesc(times(31:end), freqs, squeeze(pow_channel_avg(ch,31:end,:)));axis xy;
+            imagesc(times(31:end), freqs, POW_subavg);axis xy;
             xlabel('Time (s)');
             ylabel('Frequency (Hz)');
             colormap('parula');
@@ -1100,108 +1210,180 @@ if ismember('Plot Power',steps)
             % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
             % clim(clims);
             xline(0, "--k", 'LineWidth', 2);
-            title(sprintf('Average Power in %s, med = %s', all_channels{ch},  medname ));
+            title(sprintf('Average Power in %s, med = %s, n= %d', ch_name,  medname, nSubjects));
 
-            if BPReref & BPRerefHi
-                gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefHiTit ,'_',medname, '.png']);
-            elseif BPReref & BPRerefLw
-                gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefLwTit ,'_',medname, '.png']);
-            end
+
+            % if BPReref & BPRerefHi
+            %     gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefHiTit ,'_',medname, '.png']);
+            % elseif BPReref & BPRerefLw
+            %     gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefLwTit ,'_',medname, '.png']);
+            % end
+            gr7 = fullfile(results_dir, 'power', Hz_dir, 'group' , ['AvgPOW_', char(ch_name), '_', medname, '_n=', num2str(nSubjects), '.png']);
             exportgraphics(f7,gr7, 'Resolution', 300)
         end
     end
 
     if ismember('Plot Power Cluster', steps)
+        % 
+        % % Define clusters
+        % clusters = ["Frontal", "Central", "Parietal", "STNleft", "STNright"];
+        % Frontal = ["F3", "F4", "Fz"];
+        % Central = ["C3", "C4", "Cz"];
+        % Parietal = ["P3", "P4", "Pz"];
+        % STNleft = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
+        % STNright = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"];
+        % 
+        % % Store in a struct for easy access
+        % clusterMap = struct('Frontal', Frontal, 'Central', Central, 'Parietal', Parietal, 'STNleft', STNleft, 'STNright', STNright);
 
-        % Define clusters
-        clusters = ["Frontal", "Central", "Parietal", "STNleft", "STNright"];
-        Frontal = ["F3", "F4", "Fz"];
-        Central = ["C3", "C4", "Cz"];
-        Parietal = ["P3", "P4", "Pz"];
-        STNleft = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
-        STNright = ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"];
+        fprintf('\n Now calculating cluster-level EEG ITC...\n');
 
-        % Store in a struct for easy access
-        clusterMap = struct('Frontal', Frontal, 'Central', Central, 'Parietal', Parietal, 'STNleft', STNleft, 'STNright', STNright);
+        cluster_names = fieldnames(EEG_clusters);
+        for ci = 3:numel(cluster_names)
+            clus_name = cluster_names{ci};
+            clus_chans = EEG_clusters.(clus_name);
 
-        % Initialize storage for cluster-averaged power
-        pow_cluster_avg = nan(numel(clusters), size(pow_all,3), size(pow_all,4)); % [clusters, freqs, times]
+            % Find matching file indices for channels in this cluster
+            match_indices = ismember(channel_names, clus_chans);
+            files_cluster = all_files(match_indices);
 
-        if allchans
-            start = 1; numofcluster = numel(clusters);
-        elseif onlyeeg
-            start = 1; numofcluster = 3;
-        elseif onlystn
-            start = 4; numofcluster = 5;
-        end
+            % if isempty(files_cluster)
+            %     warning('No matching channels found for cluster %s', clus_name);
+            %     continue
+            % end
 
-        % Loop through clusters
-        for cl = start : numofcluster %numel(clusters)
-            cluster_name = clusters(cl);
-            cluster_chans = clusterMap.(cluster_name);  % Get channel list for this cluster
-
-            subject_pow = nan(numel(subjects), size(pow_all,3), size(pow_all,4)); % Store avg per subject
-
-            % Loop through subjects
-            for sub = 1:numel(subjects)
-
-                if allchans
-                    subject_channels = FltSubsChansStn{sub}; % Channels for this subject
-                elseif onlyeeg
-                    subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
-                elseif onlystn
-                    subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
-                end
-
-                % Find indices of channels that belong to the cluster
-                cluster_idx = find(ismember(subject_channels, cluster_chans));
-
-                if ~isempty(cluster_idx)  % Ensure at least one matching channel exists
-                    % Average power across cluster channels for this subject
-                    subject_pow(sub, :, :) = squeeze(mean(pow_all(sub, cluster_idx, :, :), 2));
-                end
+            % Load ITC and perm data for all matching files
+            POW_allSubs_cell = {};
+            for f = 1:numel(files_cluster)
+                load(fullfile(files_cluster(f).folder, files_cluster(f).name), 'POW', 'freqs', 'times');
+                POW_allSubs_cell{end+1} = POW;
             end
 
-            % Average across subjects
-            pow_cluster_avg(cl, :, :) = squeeze(mean(subject_pow, 1, 'omitnan'));
-        end
+            % Convert to 4D matrix: [nSubjects x nChannels x nFreqs x nTimes]
+            nSubjects = numel(POW_allSubs_cell);
+            [nFreqs, nTimes] = size(POW_allSubs_cell{1});
+            nChs = numel(POW_allSubs_cell);
 
-        % Extract frequency and time axes
-        times = TFR.times;
-        freqs = TFR.freqs;
+            POW_matrix = zeros(nChs, nFreqs, nTimes);
 
-        % Plot time-frequency power for each cluster
-        figure;
-        for cl = 1:numel(clusters)
+            for c = 1:nChs
+                POW_matrix(c,:,:) = POW_allSubs_cell{c};
+                fprintf('\n Now calculating chan %s\n', c);
+            end
+
+            % Average across EEG cluster channels
+            POWAll_clusAvg = squeeze(mean(POW_matrix,1));         % [freq x time]
 
             f8=figure;
             set(f8,'Position',[1949 123 1023 785]);
             subplot(2,1,1)
             plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
-            set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
             xline(0, "--k", 'LineWidth', 2);
-            title(sprintf('Average ECG over all Sub'))
+            axis('tight')
+            ylabel('Amplitude (μV)')
+            title(sprintf('Average ECG over all subjects, med: %s', medname))
             hold off
+
+
             subplot(2,1,2)
-            imagesc(times(31:end), freqs, squeeze(pow_cluster_avg(cl,31:end,:))); axis xy;
-            xlabel('Time (s)');
-            ylabel('Frequency (Hz)');
+            imagesc(times(31:end),freqs(9:end)',POWAll_clusAvg(9:end,31:end));axis xy;
             colormap('parula');
             colorbar;
             clims = clim;
-            % hold on
-            % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
-            % clim(clims);
+            %hold on
+            %contour(times(31:end), freqs(9:end)', p_thresh_all(9:end,31:end),  1, 'linecolor', 'k', 'linewidth', 1.1)
+            %clim(clims);
             xline(0, "--k", 'LineWidth', 2);
-            title(sprintf('Average  Power in %s, med = %s', clusters{cl},  medname ))
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            title(sprintf(' Average Power in %s, med = %s', clus_name, medname))
 
-            if BPReref & BPRerefHi
-                gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefHiTit , '_', medname, '.png']);
-            elseif BPReref & BPRerefLw
-                gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefLwTit , '_', medname, '.png']);
-            end
-            exportgraphics(f8,gr8, 'Resolution', 300)
+            % Save
+            gr8 = fullfile(results_dir, 'power', Hz_dir, 'group', ...
+                ['ClusterAvgPOW_', clus_name, '_', medname, '.png']);
+            exportgraphics(f8, gr8, 'Resolution', 300);
         end
+   
+
+        % Initialize storage for cluster-averaged power
+        % pow_cluster_avg = nan(numel(clusters), size(pow_all,3), size(pow_all,4)); % [clusters, freqs, times]
+        % 
+        % if allchans
+        %     start = 1; numofcluster = numel(clusters);
+        % elseif onlyeeg
+        %     start = 1; numofcluster = 3;
+        % elseif onlystn
+        %     start = 4; numofcluster = 5;
+        % end
+        % 
+        % % Loop through clusters
+        % for cl = start : numofcluster %numel(clusters)
+        %     cluster_name = clusters(cl);
+        %     cluster_chans = clusterMap.(cluster_name);  % Get channel list for this cluster
+        % 
+        %     subject_pow = nan(numel(subjects), size(pow_all,3), size(pow_all,4)); % Store avg per subject
+        % 
+        %     % Loop through subjects
+        %     for sub = 1:numel(subjects)
+        % 
+        %         if allchans
+        %             subject_channels = FltSubsChansStn{sub}; % Channels for this subject
+        %         elseif onlyeeg
+        %             subject_channels = FltSubsOnlyEEG{sub}; % Channels for this subject
+        %         elseif onlystn
+        %             subject_channels = FltSubsOnlyStn{sub}; % Channels for this subject
+        %         end
+        % 
+        %         % Find indices of channels that belong to the cluster
+        %         cluster_idx = find(ismember(subject_channels, cluster_chans));
+        % 
+        %         if ~isempty(cluster_idx)  % Ensure at least one matching channel exists
+        %             % Average power across cluster channels for this subject
+        %             subject_pow(sub, :, :) = squeeze(mean(pow_all(sub, cluster_idx, :, :), 2));
+        %         end
+        %     end
+        % 
+        %     % Average across subjects
+        %     pow_cluster_avg(cl, :, :) = squeeze(mean(subject_pow, 1, 'omitnan'));
+        % end
+        % 
+        % % Extract frequency and time axes
+        % times = TFR.times;
+        % freqs = TFR.freqs;
+
+        % Plot time-frequency power for each cluster
+        % figure;
+        % for cl = 1:numel(clusters)
+        % 
+        %     f8=figure;
+        %     set(f8,'Position',[1949 123 1023 785]);
+        %     subplot(2,1,1)
+        %     plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+        %     set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+        %     xline(0, "--k", 'LineWidth', 2);
+        %     title(sprintf('Average ECG over all Sub'))
+        %     hold off
+        %     subplot(2,1,2)
+        %     imagesc(times(31:end), freqs, squeeze(pow_cluster_avg(cl,31:end,:))); axis xy;
+        %     xlabel('Time (s)');
+        %     ylabel('Frequency (Hz)');
+        %     colormap('parula');
+        %     colorbar;
+        %     clims = clim;
+        %     % hold on
+        %     % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
+        %     % clim(clims);
+        %     xline(0, "--k", 'LineWidth', 2);
+        %     title(sprintf('Average  Power in %s, med = %s', clusters{cl},  medname ))
+        % 
+        %     if BPReref & BPRerefHi
+        %         gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefHiTit , '_', medname, '.png']);
+        %     elseif BPReref & BPRerefLw
+        %         gr8 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', clusters{cl}, '_', BPRerefLwTit , '_', medname, '.png']);
+        %     end
+        %     exportgraphics(f8,gr8, 'Resolution', 300)
+        % end
     end
 
 
@@ -1263,7 +1445,7 @@ end
 if ismember('Group TFR Power Save', steps)
     fprintf('Load Data for Group TFR Power\n');
 
-    for s = 13:numel(subjects)
+    for s = 11:numel(subjects)
         subject = subjects(s);
         fprintf('Loading TFR Data for subject %s\n', subject);
 
@@ -1363,7 +1545,7 @@ if ismember('Correlation Group ITC', steps)
 
     % === Define TF window ===
     tf_time_win = [0.1, 0.25];     % seconds
-    tf_freq_win = [2, 5];          % Hz
+    tf_freq_win = [2, 4];          % Hz
 
     freq_idx = find(freqs >= tf_freq_win(1) & freqs <= tf_freq_win(2));
     time_idx = find(times >= tf_time_win(1) & times <= tf_time_win(2));
@@ -1386,9 +1568,11 @@ if ismember('Correlation Group ITC', steps)
 
     [Itc_eeg, Power_eeg, Subs_eeg] = process_type(eeg_itc_files, eeg_pow_files, 'EEG', freq_idx, time_idx);
     [Itc_lfp, Power_lfp, Subs_lfp] = process_type(lfp_itc_files, lfp_pow_files, 'LFP', freq_idx, time_idx);
+    [Itc_all, Power_all, Subs_all] = process_type(all_files, pow_files, 'ALL', freq_idx, time_idx);
 
-    [rval_eeg, pval_eeg, z_itc_eeg, z_pow_eeg] = analyze_itc_power_corr(Itc_eeg, Power_eeg, Subs_eeg, 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', 'ITC-POW_PearsonCorr_EEG');
-    [rval_lfp, pval_lfp, z_itc_lfp, z_pow_lfp] = analyze_itc_power_corr(Itc_lfp, Power_lfp, Subs_lfp, 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', 'ITC-POW_PearsonCorr_LFP');
+    [rval_eeg, pval_eeg, z_itc_eeg, z_pow_eeg] = analyze_itc_power_corr(Itc_eeg, Power_eeg, Subs_eeg, 'Type', 'EEG', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_EEG_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
+    [rval_lfp, pval_lfp, z_itc_lfp, z_pow_lfp] = analyze_itc_power_corr(Itc_lfp, Power_lfp, Subs_lfp, 'Type', 'LFP', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_LFP_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
+    [rval_all, pval_all, z_itc_all, z_pow_all] = analyze_itc_power_corr(Itc_all, Power_all, Subs_all, 'Type', 'ALL', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_ALL_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
 
 
     % % === Z-score within each subject ===
@@ -1478,11 +1662,15 @@ function [rval, pval, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_val
     addParameter(p, 'DoBayes', false, @islogical);
     addParameter(p, 'SavePath', '', @ischar);
     addParameter(p, 'SaveName', '', @ischar);
+    addParameter(p, 'Type', '', @ischar);
+    addParameter(p, 'Kind', '', @ischar);
     parse(p, varargin{:});
     plot_title = p.Results.PlotTitle;
     do_bayes = p.Results.DoBayes;
-     save_path = p.Results.SavePath;
+    save_path = p.Results.SavePath;
     save_name = p.Results.SaveName;
+    type_label = p.Results.Type;
+    kind_label = p.Results.Kind;
     
 
     % Initialize
@@ -1493,12 +1681,12 @@ function [rval, pval, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_val
     % Z-score within each subject
     for s = 1:numel(unique_subs)
         sub_idx = strcmp(Subject_ids, unique_subs{s});
-        if sum(sub_idx) >= 3
+        if sum(sub_idx) >= 30
             z_itc(sub_idx) = zscore(Itc_vals(sub_idx));
             z_pow(sub_idx) = zscore(Power_vals(sub_idx));
         else
-            z_itc(sub_idx) = NaN;
-            z_pow(sub_idx) = NaN;
+            z_itc(sub_idx) = Itc_vals(sub_idx);
+            z_pow(sub_idx) = Power_vals(sub_idx);
             warning('Only one data point for subject %s — skipping z-scoring.', unique_subs{s});
         end
     end
@@ -1508,18 +1696,31 @@ function [rval, pval, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_val
     z_itc = z_itc(valid_idx);
     z_pow = z_pow(valid_idx);
 
-    % Pearson correlation
-    [rval, pval] = corr(z_itc(:), z_pow(:), 'type', 'Pearson');
-    fprintf('Pearson Correlation: r = %.3f, p = %.6f\n', rval, pval);
+    switch kind_label
+        case 'Pearson' % Pearson correlation
+            [rval, pval] = corr(z_itc(:), z_pow(:), 'type', 'Pearson');
+            fprintf('Pearson Correlation: r = %.3f, p = %.6f\n', rval, pval);
+        case 'Spearman' % Spearman correlation
+            [rval, pval] = corr(z_itc(:), z_pow(:), 'type', 'Spearman');
+            fprintf('Spearman Correlation: r = %.3f, p = %.6f\n', rval, pval);
+        otherwise
+            warning('Unexpected Correlation Type.') 
+    end
 
     
     % Plot
     figure;
     scatter(z_itc, z_pow, 60, 'filled', 'MarkerFaceAlpha', 0.6); hold on;
     lsline;
+    if sum(sub_idx) >= 30
     xlabel('Z-scored ITC');
-    ylabel('Z-scored Spectral Power');
-    title(sprintf('%s\nr = %.2f, p = %.4f', plot_title, rval, pval));
+    ylabel('Z-scored Spectral Power (µV/Hz)');
+    else
+    xlabel('ITC');
+    ylabel('Spectral Power (µV/Hz)');
+    plot_title = 'Correlation: ITC vs Power';
+    end
+    title(sprintf('%s %s %s\nr = %.3f, p = %.4f', kind_label, plot_title, type_label, rval, pval));
     grid on; box on;
     set(gca, 'FontSize', 12);
 
@@ -1540,8 +1741,6 @@ function [rval, pval, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_val
             warning('Failed to save plot: %s', ME.message);
         end
     end
-
-
 end
 
 

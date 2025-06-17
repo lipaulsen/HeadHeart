@@ -501,6 +501,33 @@ if ismember ('Calc Single Subject CCC', steps)
             exportgraphics(f5, outputPDF, 'Append', true);
             disp(['All figures saved to ', outputPDF]);
 
+            % Save CCC MAtrix of all Subjects and all Channels
+            CCC.SR = SR;
+            CCC.times = times;
+            CCC.freqs = freqs;
+            CCC.PermCcc = PermPSIData; %ChannelxPermutationxFreqxTime
+            CCC.CCC = CccAll(sub,c,:,:); %FreqxTime
+
+            if permstats & BPRerefHi & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan', [subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & BPRerefLw & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & onlyeeg
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans & BPRerefHi
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans & BPRerefLw
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats & allchans
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=NONE','_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif permstats
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+            else
+                save_path = fullfile(data_dir, 'ccc','ss_chan', [subject,'_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+            end
+            save(save_path, 'CCC', '-v7.3');
+            fprintf('Saved CCC Data for sub %s and channels %s %s to: %s\n', subject, channel1, channel2, save_path);
+
         end
 
         if permstats
@@ -533,7 +560,13 @@ if ismember ('Calc Single Subject CCC', steps)
             save_path = fullfile(data_dir, 'ccc','ss', [subject, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
         end
         save(save_path, 'CCC', '-v7.3');
-        fprintf('Saved CCC Data for all subs and channels to: %s\n', save_path);
+        fprintf('Saved CCC Data for sub %s and all channels to: %s\n', subject, save_path);
+
+        % Free up some storage
+        clear ItcSub
+        clear RelItcSub
+        clear PermItcData
+        clear PermItcAllChan
     end
 
     % if permstats
