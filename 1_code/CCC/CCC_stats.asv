@@ -40,9 +40,9 @@ MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
-newsubs = false;
+newsubs = true;
 oldsubs = false;
-allsubs = true;
+allsubs = false;
 
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
@@ -91,6 +91,9 @@ end
 
 %=========================================================================
 
+% Define if plots are to be shown
+show_plots = true;
+
 %flag if baseline is on or off
 baseline = true;
 
@@ -130,7 +133,7 @@ permstats = true;
 numPerms = 1000;
 surrogate = true;
 trials = false;
-plots = true;
+plots = false;
 CCC = [];
 signif_thresh = 0.05;
 
