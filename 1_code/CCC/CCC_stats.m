@@ -1,4 +1,4 @@
-% function [] = sub_ITC_stats(subjects, data_dir, results_dir)
+% function [] = sub_CCC_stats(subjects, data_dir, results_dir)
 
 %% Epoching and Time Locking Data for HeadHeart
 
@@ -95,7 +95,7 @@ end
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Calc Single Subject CCC', 'PermStats'}; %'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power'
+steps = {'Group CCC Load Chan', 'Plot SubAvg CCC', 'Plot SubAvg PermStats'}; %'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power'
 
 % ipsilateral
 CCCchans.Comp1 = {'STNl', 'C3'};
@@ -343,7 +343,7 @@ if ismember ('Calc Single Subject CCC', steps)
                 title(sprintf('CCC PSI for %s, %s - %s, med= %s', subject, channel1, channel2, medname))
 
 
-                %gr1 = fullfile('F:\HeadHeart\2_results\ccc\ss' , [subject, '_', medname, '_ITC_', channel, '.png']);
+                %gr1 = fullfile('F:\HeadHeart\2_results\ccc\ss' , [subject, '_', medname, '_CCC_', channel, '.png']);
                 %exportgraphics(f1,gr1, 'Resolution', 300)
                 exportgraphics(f1, outputPDF1, 'Append', true);
             end
@@ -360,7 +360,7 @@ if ismember ('Calc Single Subject CCC', steps)
                 outputPDF = fullfile(results_dir, 'ccc', 'ss_perm' ,[subject,'_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'_pval=', num2str(signif_thresh),'.pdf']);
             end
 
-            %Intitalize the PermItcAllChan Variable
+            %Intitalize the PermCccAllChan Variable
             %PermCccAllChan = zeros(numel(channels),numPerms, freqs, times);
 
 
@@ -385,11 +385,11 @@ if ismember ('Calc Single Subject CCC', steps)
                 end
 
 
-                %[ITCzscores]=ITC_permutation_test(FrsTmItc, relFrsTmItcAll, IBI.(medname){1}, numPerms, freqs, time_bins, SR, TFR.(channel).phase);
+                %[CCCzscores]=CCC_permutation_test(FrsTmCcc, relFrsTmCccAll, IBI.(medname){1}, numPerms, freqs, time_bins, SR, TFR.(channel).phase);
                 fprintf('************ Calculating CCC for %s in %s and %s **************** \n', subject, channel1, channel2);
 
                 % Intitialize variables
-                %permuted_ITCs = zeros([numPerms, size(FrsTmItc, 1), size(FrsTmItc, 2)]);
+                %permuted_CCCs = zeros([numPerms, size(FrsTmCcc, 1), size(FrsTmCcc, 2)]);
                 [nTrials, nFreq, nTms] = size(TFR.(chan1).phase);
 
                 % Get the raw channel data
@@ -452,7 +452,7 @@ if ismember ('Calc Single Subject CCC', steps)
 
 
                 % f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
-                % histogram(PermItcData);
+                % histogram(PermCccData);
                 % hold on
                 % histogram(squeeze(CccAll(sub,c,:,:)));
                 % %title(sprintf('Perm CCC and Original CCC Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
@@ -465,7 +465,7 @@ if ismember ('Calc Single Subject CCC', steps)
                 % histogram(p_orig);
                 % %title(sprintf('P Val Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
 
-                %itc_zscores_thresh = (zscores > 2) | (zscores < -2);
+                %ccc_zscores_thresh = (zscores > 2) | (zscores < -2);
 
                 f5 = figure;
                 set(f5,'Position',[159 50 1122 774.5000]);
@@ -496,7 +496,7 @@ if ismember ('Calc Single Subject CCC', steps)
                 ylabel('Frequencies (Hz)') % Add y-label
                 hold off
 
-                % outputPDF = fullfile('F:\HeadHeart\2_results\ccc' , [subject, '_ITC-PermStats_chan=', channel, '_med=', medname, '_perm=', num2str(numPerms), ...
+                % outputPDF = fullfile('F:\HeadHeart\2_results\ccc' , [subject, '_CCC-PermStats_chan=', channel, '_med=', medname, '_perm=', num2str(numPerms), ...
                 %     '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '_pval=', num2str(signif_thresh),'.pdf']);
                 % exportgraphics(f5,gr5, 'Resolution', 300)
                 exportgraphics(f5, outputPDF, 'Append', true);
@@ -566,10 +566,10 @@ if ismember ('Calc Single Subject CCC', steps)
         % fprintf('Saved CCC Data for sub %s and all channels to: %s\n', subject, save_path);
 
         % Free up some storage
-        clear ItcSub
-        clear RelItcSub
-        clear PermItcData
-        clear PermItcAllChan
+        clear CccSub
+        clear RelCccSub
+        clear PermCccData
+        clear PermCccAllChan
     end
 
     % if permstats
@@ -609,6 +609,203 @@ if ismember ('Calc Single Subject CCC', steps)
     % fprintf('Saved CCC Data for all subs and channels to: %s\n', save_path);
 end
 
+if ismember('Group CCC Load Chan', steps)
+
+    all_files = dir(fullfile(data_dir,'ccc', 'ss_chan', '*.mat'));
+    valid_idx = ~startsWith({all_files.name}, '._');
+    all_files = all_files(valid_idx);
+
+    % Extract all channel names
+    %channel_names = strings(numel(all_files), 1);
+    for i = 1:numel(all_files)
+        fname = all_files(i).name;
+        parts = split(fname, '_');         % Example: 'sub01_LFP1.mat'
+        channel_names{i} = {parts{2}, parts{3}};  % Get 'LFP1'
+    end
+
+    % Initialize output struct for averages
+    CCC_GroupAvg = struct();
+
+    % Loop over channels
+    comps = fieldnames(CCCchans);
+    for c = 1:numel(comps)
+        compname = comps{c};
+        chans = CCCchans.(compname);
+        chanA = chans{1};
+        chanB = chans{2};
+        fprintf('Processing comp: %s - %s\n', chanA, chanB);
+
+        % check for match
+        files_comp = all_files(contains({all_files.name}, chanA) & contains({all_files.name}, chanB));  % ←←← CHANGED
+
+        nSubjects = numel(files_comp);
+        CCC_allSubs_cell = {};
+        CCC_Perm_allSubs = {};
+
+        for f = 1:numel(files_comp)
+            load(fullfile(files_comp(f).folder, files_comp(f).name), 'CCC');
+            CCC_allSubs_cell{end+1} = CCC.CCC;  % [nFreqs x nTimes]
+            CCC_Perm_allSubs{end+1} = CCC.PermCcc;
+            times = CCC.times;
+            freqs = CCC.freqs;
+            SR = CCC.SR;
+        end
+
+        % Convert to 3D matrix: [nSubjects x nFreqs x nTimes]
+        nSubjects = numel(CCC_allSubs_cell);
+        [nFreqs, nTimes] = size(CCC_allSubs_cell{1});
+        [nPerm, nFqs, nTms] = size(CCC_Perm_allSubs{1});
+        CCC_allSubs = zeros(nSubjects, nFreqs, nTimes);
+        CCC_PermAvg_allsubs = zeros(nSubjects, nPerm, nFreqs, nTimes);
+
+        for s = 1:nSubjects
+            CCC_allSubs(s, :, :) = CCC_allSubs_cell{s};
+            CCC_PermAvg_allsubs(s,:,:,:) = CCC_Perm_allSubs{s};
+        end
+
+        % Average over subjects
+        CccAll_subavg = squeeze(mean(CCC_allSubs,1));  % freq x time
+        PermCccAll_avg = squeeze(mean(CCC_PermAvg_allsubs,1));  % permutations x freq x time
+
+        if ismember('Plot SubAvg CCC', steps)
+            fprintf('Plot CCC Averages \n');
+
+            f2=figure;
+            set(f2,'Position',[1949 123 1023 785]);
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+            set(gca,'Position',[0.0900  0.6838 0.78 0.2])
+            xline(0, "--k", 'LineWidth', 2);
+            ylabel('Amplitude')
+            axis('tight')
+            title(sprintf('Average ECG over all subjects, medication: %s', medname))
+            hold off
+            subplot(2,1,2)
+            set(gca,'Position',[0.0900 0.1200 0.8498 0.4612])
+            imagesc(times(31:end),freqs(9:end),CccAll_subavg);axis xy;
+            colormap('parula');
+            xline(0, "--k", 'LineWidth', 2);
+            col = colorbar;
+            col.Label.String = 'CCC Values'; % Add title to colorbar
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            title(sprintf('Average CCC for %s - %s, med: %s, HP: %s', chanA, chanB, medname, Hz_dir))
+
+            gr2 = fullfile(results_dir, 'ccc' ,'group', ['CCC_', chanA, '_', chanB, '_', medname, '_n=', nSubjects, '.png']);
+            exportgraphics(f2,gr2, 'Resolution', 300)
+
+        end
+
+        if ismember('Plot SubAvg PermStats',steps)
+            fprintf('Plot CCC Averages with permutation stats \n');
+
+            % %ChanMeanZscores_avg = squeeze(mean(squeeze(CCC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
+            % %ChanMeanPVal_avg = squeeze(mean(squeeze(CCC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
+            % PermCccAll_avg = squeeze(mean(squeeze(CCC.PERM.PermCccAll(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
+            % CccAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
+            % %RelCccAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
+
+            % Step 1: Compute z-scores
+            diff_sum_perm_mean_all = squeeze(mean(PermCccAll_avg,1)); % Mean of the permutation distribution
+            diff_sum_perm_std_all = squeeze(std(PermCccAll_avg,1)); % Standard deviation of permutation distribution
+
+            % diffPerm_mean(1,:,:) = diff_sum_perm_mean;
+            % diffPerm_std(1,:,:)  = diff_sum_perm_std;
+
+            zscores_all = (CccAll_subavg - diff_sum_perm_mean_all) ./ diff_sum_perm_std_all ;
+            %zscores_perm = (PermCccData - diffPerm_mean) ./ diffPerm_std;
+            p_orig_all = 2 * (1 - normcdf(zscores_all, 0, 1));
+            signif_thresh =0.05;
+            p_thresh_all = p_orig_all < signif_thresh;
+
+            % [maxVal, maxInd] = max(CccAll_subavg(:));
+            % [row, col] = ind2sub(size(CccAll_subavg), maxInd);
+            % isTrueInMask = p_thresh_all(maxInd);
+            % figure
+            % imagesc(times, freqs, CccAll_subavg);axis xy;
+            % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
+            % % x = times(31 + col - 1);    % times(31) is x for col=1, so add (col-1)
+            % % y = freqs(9 + row - 1);     % freqs(9) is y for row=1, so add (row-1)
+            % hold on;
+            % plot(times(col), freqs(row), 'ro', 'MarkerSize', 10, 'LineWidth', 2);
+            %
+            %
+            % % Maske als binäres Bild behandeln
+            % [L, numRegions] = bwlabel(p_thresh_all);
+            %
+            % % Region ermitteln, die den Maximalpunkt enthält
+            % targetRegion = L(row, col);  % Label der Region mit maxVal [5]
+            % % Alle Pixel der Zielregion
+            % regionPixels = (L == targetRegion);
+            %
+            % % Frequenzband (Zeilen)
+            % freqRows = find(any(regionPixels, 2));  % Zeilen mit True-Werten
+            % freqBand = [min(freqRows), max(freqRows)];  % [Startzeile, Endzeile]
+            %
+            % % Zeitbereich (Spalten)
+            % timeCols = find(any(regionPixels, 1));  % Spalten mit True-Werten
+            % timeRange = [min(timeCols), max(timeCols)];  % [Startspalte, Endspalte]
+            % % Frequenzband (Bezug auf freqs(9:end))
+            % freqValues = freqs(9 - 1 + freqBand);  % [Start-Frequenz, End-Frequenz]
+            %
+            % % Zeitbereich (Bezug auf times(31:end))
+            % timeValues = times(31 - 1 + timeRange);  % [Startzeit, Endzeit
+            %
+            % figure
+            % imagesc(times(31:end), freqs(9:end), CccAll_subavg(9:end,31:end));axis xy;
+            % contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
+            % hold on
+            % rectangle('Position', [timeValues(1), freqValues(1), ...
+            %     timeValues(2)-timeValues(1), freqValues(2)-freqValues(1)], ...
+            %     'EdgeColor', 'r', 'LineWidth', 2);
+            % hold off;
+            %
+
+
+            % figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
+            % histogram(PermCccAll_avg);
+            % hold on
+            % histogram(CccAll_subavg);
+
+            % figure;
+            % subplot(2,1,1);
+            % histogram(ChanMeanZscores_avg);
+            % subplot(2,1,2);
+            % histogram(ChanMeanPVal_avg);
+
+            f6=figure;
+            set(f6,'Position',[1949 123 1023 785]);
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            ylabel('Amplitude (μV)')
+            title(sprintf('Average ECG over all subjects, med: %s', medname))
+            hold off
+
+
+            subplot(2,1,2)
+            imagesc(times(31:end),freqs(9:end),CccAll_subavg(9:end,31:end));axis xy;
+            colormap('parula');
+            colorbar;
+            clims = clim;
+            hold on
+            contour(times, freqs, p_thresh_all,  1, 'linecolor', 'k', 'linewidth', 1.1)
+            clim(clims);
+            xline(0, "--k", 'LineWidth', 2);
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            title(sprintf(' Average CCC in %s, perm = %d, med = %s, p<%.4g, n=%d', ch_name, numPerms, medname, signif_thresh, nSubjects))
+
+            gr6 = fullfile(results_dir, 'ccc', Hz_dir, 'group_perm' , ['AvgCCC_', char(ch_name), '_', medname, '_perm=', num2str(numPerms), '_n=', num2str(nSubjects), '.png']);
+            exportgraphics(f6, gr6, 'Resolution', 300)
+
+        end
+        clear CCC_allSubs_cell CCC_Perm_allSubs CCC_allSubs CCC_PermAvg_allsubs
+    end
+end
+
 
 % PLOT THE AVERAGE CCC PER SUBJECT
 if ismember('Plot SubAvg CCC', steps)
@@ -629,8 +826,8 @@ if ismember('Plot SubAvg CCC', steps)
         channels = {'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'Pz', 'STNl', 'STNr'};
         channel = channels{c};
 
-        ItcAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
-        RelItcAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
+        CccAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
+        RelCccAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
 
         if plots
             f2=figure;
@@ -642,13 +839,13 @@ if ismember('Plot SubAvg CCC', steps)
             title(sprintf('Average ECG over all subjects, medication: %s', medname))
             hold off
             subplot(2,1,2)
-            imagesc(times,freqs,ItcAll_subavg);axis xy;
+            imagesc(times,freqs,CccAll_subavg);axis xy;
             colormap('jet');
             xline(0, "--k", 'LineWidth', 2);
             colorbar;
             title(sprintf('Average CCC for %s, med: %s', channel, medname))
 
-            gr2 = fullfile('F:\HeadHeart\2_results\ccc' , ['ITC_', channel, '_', medname,  '.png']);
+            gr2 = fullfile('F:\HeadHeart\2_results\ccc' , ['CCC_', channel, '_', medname,  '.png']);
             exportgraphics(f2,gr2, 'Resolution', 300)
         end
     end
@@ -675,19 +872,19 @@ if ismember('Plot SubAvg PermStats', steps)
 
         %ChanMeanZscores_avg = squeeze(mean(squeeze(CCC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
         %ChanMeanPVal_avg = squeeze(mean(squeeze(CCC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
-        PermItcAll_avg = squeeze(mean(squeeze(CCC.PermCcc(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
-        ItcAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
-        RelItcAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
+        PermCccAll_avg = squeeze(mean(squeeze(CCC.PermCcc(:,c,:,:,:)),1)); %SubjectxChannelxPermutationxFreqxTime, Mean over all Subjects in one channel
+        CccAll_subavg = squeeze(mean(squeeze(CCC.CccAll(:,c,:,:)),1));
+        RelCccAll_subavg = squeeze(mean(squeeze(CCC.RelCccAll(:,c,:,:)),1));
 
         % Step 1: Compute z-scores
-        diff_sum_perm_mean_all = squeeze(mean(PermItcAll_avg,1)); % Mean of the permutation distribution
-        diff_sum_perm_std_all = squeeze(std(PermItcAll_avg,1)); % Standard deviation of permutation distribution
+        diff_sum_perm_mean_all = squeeze(mean(PermCccAll_avg,1)); % Mean of the permutation distribution
+        diff_sum_perm_std_all = squeeze(std(PermCccAll_avg,1)); % Standard deviation of permutation distribution
 
         % diffPerm_mean(1,:,:) = diff_sum_perm_mean;
         % diffPerm_std(1,:,:)  = diff_sum_perm_std;
 
-        zscores_all = (ItcAll_subavg - diff_sum_perm_mean_all) ./ diff_sum_perm_std_all ;
-        %zscores_perm = (PermItcData - diffPerm_mean) ./ diffPerm_std;
+        zscores_all = (CccAll_subavg - diff_sum_perm_mean_all) ./ diff_sum_perm_std_all ;
+        %zscores_perm = (PermCccData - diffPerm_mean) ./ diffPerm_std;
         p_orig_all = 2 * (1 - normcdf(zscores_all, 0, 1));
         signif_thresh =0.005;
         p_thresh_all = p_orig_all < signif_thresh;
@@ -695,9 +892,9 @@ if ismember('Plot SubAvg PermStats', steps)
 
 
         % figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
-        % histogram(PermItcAll_avg);
+        % histogram(PermCccAll_avg);
         % hold on
-        % histogram(ItcAll_subavg);
+        % histogram(CccAll_subavg);
 
         % figure;
         % subplot(2,1,1);
@@ -718,7 +915,7 @@ if ismember('Plot SubAvg PermStats', steps)
 
 
         subplot(2,1,2)
-        imagesc(times(31:end),freqs,ItcAll_subavg(:,31:end));axis xy;
+        imagesc(times(31:end),freqs,CccAll_subavg(:,31:end));axis xy;
         colormap('parula');
         colorbar;
         clims = clim;
@@ -730,7 +927,7 @@ if ismember('Plot SubAvg PermStats', steps)
         ylabel('Frequencies (Hz)') % Add y-label
         title(sprintf(' Average CCC in %s, perm = %d, med = %s, p<%.4g', channel, numPerms, medname, signif_thresh))
 
-        gr6 = fullfile('F:\HeadHeart\2_results\ccc\group_perm' , ['AvgITC_', channel, '_', medname, '_perm=', num2str(numPerms), '.png']);
+        gr6 = fullfile('F:\HeadHeart\2_results\ccc\group_perm' , ['AvgCCC_', channel, '_', medname, '_perm=', num2str(numPerms), '.png']);
         exportgraphics(f6,gr6, 'Resolution', 300)
 
 
