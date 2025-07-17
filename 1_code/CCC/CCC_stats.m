@@ -176,7 +176,7 @@ if ismember ('Calc Single Subject CCC', steps)
     % ZScoresAll = zeros(nSub, numel(channels), 141, 271);
     % PValAll = zeros(nSub, numel(channels), 141, 271);
 
-    for sub = 1:numel(subjects)
+    for sub = 12:numel(subjects)
 
         % Extract the subject
         subject = subjects{sub};
@@ -451,11 +451,15 @@ if ismember ('Calc Single Subject CCC', steps)
                 %PermCccAllChan(c,:,:,:) = PermPSIData; % SubjectxChannelxPermutationxFreqxTime
 
 
-                % f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
-                % histogram(PermCccData);
-                % hold on
-                % histogram(squeeze(CccAll(sub,c,:,:)));
-                % %title(sprintf('Perm CCC and Original CCC Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
+                 f3 = figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
+                 histogram(PermCccData);
+                 title(sprintf('Perm CCC Distribution for %s in %s - %s, perms: %d', subject, channel1, channel2, numPerms))
+                 exportgraphics(f3, outputPDF, 'Append', true);
+                 f4 = figure; 
+                 histogram(squeeze(CccAll(sub,c,:,:)));
+                 title(sprintf('Original CCC Distribution for %s in %s - %s', subject, channel1, channel2, numPerms))
+                 exportgraphics(f4, outputPDF, 'Append', true);
+                 %title(sprintf('Perm CCC and Original CCC Dist for %s in %s, perms: %d, med: %s', subject, channel, numPerms, medname))
                 %
                 % f4 = figure;
                 % subplot(2,1,1);
@@ -691,13 +695,140 @@ if ismember('Group CCC Load Chan', steps)
             ylabel('Frequencies (Hz)') % Add y-label
             title(sprintf('Average CCC for %s - %s, med: %s, HP: %s', chanA, chanB, medname, Hz_dir))
 
-            gr2 = fullfile(results_dir, 'ccc' ,'group', ['CCC_', chanA, '_', chanB, '_', medname, '_n=', nSubjects, '.png']);
+            gr2 = fullfile(results_dir, 'ccc' ,'group', ['CCC_', chanA, '_', chanB, '_', medname, '_n=', num2str(nSubjects), '.png']);
             exportgraphics(f2,gr2, 'Resolution', 300)
 
         end
 
         if ismember('Plot SubAvg PermStats',steps)
             fprintf('Plot CCC Averages with permutation stats \n');
+
+            nSubjects = numel(CCC_allSubs_cell);
+            z_thresh = 1.64;  % z-score threshold
+            min_cluster_size = 5;  % to ignore small noise clusters
+
+            ClusterMaps = cell(1, nSubjects);  % Store binary cluster maps per subject
+
+            for subj = 1:nSubjects
+                % Load real and permuted CCC data
+                real_map = CCC_allSubs_cell{subj};                     % [nFreq x nTime]
+                perm_maps = CCC_Perm_allSubs{subj};                    % [nPerm x nFreq x nTime]
+
+                % Get sizes
+                [nPerm, nFreq, nTime] = size(perm_maps);
+
+                % Compute mean and std across permutations
+                perm_mean = squeeze(mean(perm_maps, 1));  % [nFreq x nTime]
+                perm_std  = squeeze(std(perm_maps, 0, 1)); % [nFreq x nTime]
+
+                % Z-score real data
+                z_map = (real_map - perm_mean) ./ perm_std;
+
+                % Threshold map
+                bin_map = z_map > z_thresh;
+
+                % Find clusters
+                CC = bwconncomp(bin_map);
+
+                % Compute cluster stats for real data
+                cluster_stats_real = zeros(1, CC.NumObjects);
+                for i = 1:CC.NumObjects
+                    cluster_stats_real(i) = sum(z_map(CC.PixelIdxList{i}));
+                end
+
+                % Null distribution of max cluster stats
+                max_cluster_stats_perm = zeros(1, nPerm);
+                for p = 1:nPerm
+                    perm_z = (squeeze(perm_maps(p,:,:)) - perm_mean) ./ perm_std;
+                    perm_bin = perm_z > z_thresh;
+                    perm_CC = bwconncomp(perm_bin);
+                    perm_stats = zeros(1, perm_CC.NumObjects);
+                    for k = 1:perm_CC.NumObjects
+                        perm_stats(k) = sum(perm_z(perm_CC.PixelIdxList{k}));
+                    end
+                    if ~isempty(perm_stats)
+                        max_cluster_stats_perm(p) = max(perm_stats);
+                    else
+                        max_cluster_stats_perm(p) = 0;
+                    end
+                end
+
+                % Significance threshold
+                cluster_thresh = prctile(max_cluster_stats_perm, 95);
+
+                % Keep significant clusters
+                signif_map = false(size(z_map));
+                for i = 1:CC.NumObjects
+                    if cluster_stats_real(i) > cluster_thresh && numel(CC.PixelIdxList{i}) >= min_cluster_size
+                        signif_map(CC.PixelIdxList{i}) = true;
+                    end
+                end
+
+                ClusterMaps{subj} = signif_map;  % store binary cluster map
+            end
+
+            nSubjects = numel(ClusterMaps);
+            [nFreqs, nTimes] = size(ClusterMaps{1});
+            nPerm = size(CCC_Perm_allSubs{1}, 1);  % assumed same for all
+
+            z_thresh = 1.64;  % threshold for z-scoring individual permutations
+            min_cluster_size = 5;  % discard tiny clusters
+
+            % Step 1: Get the real group-level cluster count map
+            RealGroupMap = zeros(nFreqs, nTimes);
+            for subj = 1:nSubjects
+                RealGroupMap = RealGroupMap + double(ClusterMaps{subj});
+            end
+
+            % Step 2: Start permutation loop
+            PermGroupMaps = zeros(nPerm, nFreqs, nTimes);  % [nPerm x nFreqs x nTimes]
+
+            for p = 1:nPerm
+                TempMap = zeros(nFreqs, nTimes);  % One permuted group map
+
+                for subj = 1:nSubjects
+                    % Get permuted CCC map for this permutation
+                    perm_map = squeeze(CCC_Perm_allSubs{subj}(p,:,:));  % [nFreq x nTime]
+
+                    % Use subject's full perm distribution to z-score
+                    perm_mean = squeeze(mean(CCC_Perm_allSubs{subj}, 1));
+                    perm_std  = squeeze(std(CCC_Perm_allSubs{subj}, 0, 1));
+
+                    perm_z = (perm_map - perm_mean) ./ perm_std;
+                    bin_map = perm_z > z_thresh;
+
+                    % Find clusters
+                    CC = bwconncomp(bin_map);
+                    perm_signif = false(nFreqs, nTimes);
+
+                    for k = 1:CC.NumObjects
+                        if numel(CC.PixelIdxList{k}) >= min_cluster_size
+                            perm_signif(CC.PixelIdxList{k}) = true;
+                        end
+                    end
+
+                    TempMap = TempMap + double(perm_signif);
+                end
+
+                PermGroupMaps(p,:,:) = TempMap;
+            end
+
+            % Step 3: Compute p-value map
+            p_values = zeros(nFreqs, nTimes);
+            for f = 1:nFreqs
+                for t = 1:nTimes
+                    real_val = RealGroupMap(f, t);
+                    null_dist = squeeze(PermGroupMaps(:, f, t));
+                    p_values(f, t) = mean(null_dist >= real_val);  % proportion of perms exceeding real
+                end
+            end
+
+            % Step 4: Threshold to get final significant group cluster map
+            alpha = 0.05;
+            GroupClusterMap = p_values < alpha;  % logical map for contour
+
+            % === Optional: You could also apply FDR correction here ===
+
 
             % %ChanMeanZscores_avg = squeeze(mean(squeeze(CCC.PERM.ZScoresAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC ZScores)
             % %ChanMeanPVal_avg = squeeze(mean(squeeze(CCC.PERM.PValAll(:,c,:,:)),1));  % SubjectxChannelxFreqxTime (Last two are CCC PVals)
@@ -762,10 +893,12 @@ if ismember('Group CCC Load Chan', steps)
             %
 
 
-            % figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
-            % histogram(PermCccAll_avg);
-            % hold on
-            % histogram(CccAll_subavg);
+            figure; % Sanity check that the distributions are normalized and overlapping so that my null hypothesis actually reflects my data
+            histogram(PermCccAll_avg);
+            hold on
+            histogram(CccAll_subavg);
+            figure; 
+            histogram(zscores_all);
 
             % figure;
             % subplot(2,1,1);
