@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot SS ERP', 'ERP stats'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats'
+steps = {'Plot SS ERP'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -439,6 +439,31 @@ for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYM
 
     end
 end
+
+% Save the Group level ERP Data 
+
+if permstats
+    ERP.Perm = EvDataAllTrsAvgPerm;
+end
+ERP.EvDataAllAvgTrs = EvDataAllAvgTrs;
+ERP.EvDataAll = EvDataAll;
+ERP.EvDataAllAvgTrsZScore = EvDataAllAvgTrsZScore;
+
+
+if MedOn & allsubs
+    save_path = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_', medname , '_Subs=', num2str(numel(subjects)), '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(SR),'_HP=', num2str(freqs(1)) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+elseif permstats
+    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+elseif permstats & BPRerefHi
+    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+elseif permstats & BPRerefLw
+    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
+else
+    save_path = fullfile(data_dir, 'ccc','ss_chan', [subject,'_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+end
+save(save_path, 'ERP', '-v7.3');
+fprintf('Saved ERP Group Data to: %s\n', save_path);
+
 
 %% ============== Plotting ERPs GROUP LEVEL=========================
 % Channel combination needs to be created

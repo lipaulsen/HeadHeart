@@ -95,7 +95,7 @@ end
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Group CCC Load Chan', 'Plot SubAvg CCC', 'Plot SubAvg PermStats'}; %'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power'
+steps = {'Group CCC Load Chan'}; %'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power', 'Plot SubAvg PermStats'
 
 % ipsilateral
 CCCchans.Comp1 = {'STNl', 'C3'};
@@ -670,6 +670,32 @@ if ismember('Group CCC Load Chan', steps)
         % Average over subjects
         CccAll_subavg = squeeze(mean(CCC_allSubs,1));  % freq x time
         PermCccAll_avg = squeeze(mean(CCC_PermAvg_allsubs,1));  % permutations x freq x time
+        
+        f8 = figure;
+        histogram(CccAll_subavg,  'FaceColor','b');
+        title(sprintf('Average CCC Histogram for %s - %s, med: %s', chanA, chanB, medname))
+        ylabel('Number of Points')
+        xlabel('CCC Values (0-1)')
+        gr8 = fullfile(results_dir, 'ccc' ,'ccc_perm_distributions', ['CCC_', chanA, '_', chanB, '_', medname, '_n=', num2str(nSubjects), 'distibution_histogram.png']);
+        exportgraphics(f8,gr8, 'Resolution', 300)
+
+        f9 = figure;
+        histogram(PermCccAll_avg,  'FaceColor','r');
+        title(sprintf('Average CCC Perm Histogram for %s - %s, med: %s', chanA, chanB, medname))
+        ylabel('Number of Points')
+        xlabel('CCC Perm Values (0-1)')
+        gr9 = fullfile(results_dir, 'ccc' ,'ccc_perm_distributions', ['CCC_Perm_', chanA, '_', chanB, '_', medname, '_n=', num2str(nSubjects), 'distibution_histogram.png']);
+        exportgraphics(f9,gr9, 'Resolution', 300)
+
+        f10 = figure;
+        histogram(PermCccAll_avg, 'FaceColor','r');
+        hold on
+        histogram(CccAll_subavg,  'FaceColor','b');
+        title(sprintf('Average CCC and Perm Histogram for %s - %s, med: %s', chanA, chanB, medname))
+        ylabel('Number of Points')
+        xlabel('CCC Values (0-1)')
+        gr10 = fullfile(results_dir, 'ccc' ,'ccc_perm_distributions', ['CCC_vs_Perm_', chanA, '_', chanB, '_', medname, '_n=', num2str(nSubjects), 'distibution_histogram.png']);
+        exportgraphics(f10,gr10, 'Resolution', 300)
 
         if ismember('Plot SubAvg CCC', steps)
             fprintf('Plot CCC Averages \n');
