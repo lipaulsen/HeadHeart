@@ -40,14 +40,14 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = true;
-MedOff = false;
+MedOn = false;
+MedOff = true;
 
 % SUBJECT STATUS
 % only one can be true at all times
 newsubs = false;
-oldsubs = true;
-allsubs = false;
+oldsubs = false;
+allsubs = true;
 
 % GOOD HEART STATUS
 % patients with arrithmyia have been excluded after their ECG was
@@ -181,7 +181,7 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
-for sub = 5%:numel(subjects)
+for sub = 4:numel(subjects)
     % Extract the subject
     subject = subjects{sub};
 

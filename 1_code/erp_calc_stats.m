@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot SS ERP'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats'
+steps = {'Clustering'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -125,6 +125,14 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
+% Flag if only EEG, STN or all channels
+allchans = false;
+onlyeeg = false;
+onlystn = true;
+flags = [allchans, onlyeeg, onlystn];
+names = {'allchans', 'onlyeeg', 'onlystn'};
+channame = names{flags};
+
 fprintf('Loading AVG ECG Data\n');
 if strcmp(medname, 'MedOn')
     pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=11_', '*']);
@@ -139,330 +147,550 @@ max_chan = max(cellfun(@numel, FltSubsChansStn));
 %EvDataAllTrsPerm = zeros(numel(subjects), max_chan, numPerms, 350, 271);
 EvDataAllAvgTrsPerm = zeros(numel(subjects), max_chan, numPerms, 271);
 
-for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
-    % Extract the subject
-    subject = subjects{sub};
+if ismember('ERP SS Calc', steps)
+    for sub = 1:numel(subjects) % BE AWARE THAT THIS EXCLUDES PATIENTS WITH ARRITHYMIAS
+        % Extract the subject
+        subject = subjects{sub};
 
-    fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects));
+        fprintf('Loading Data of subject %s number %i of %i\n', subject, sub, numel(subjects));
 
-    pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
-    files = dir(pattern);
-    filename = fullfile(files(1).folder, files(1).name);
-    load(filename, 'SmrData');
-    % Load subject data
-    % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
-    % load(subject_data, 'SmrData');
+        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'SmrData');
+        % Load subject data
+        % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
+        % load(subject_data, 'SmrData');
 
-    % pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
-    % files = dir(pattern);
-    % filename = fullfile(files(1).folder, files(1).name);
-    % load(filename, 'EvECG');
+        % pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
+        % files = dir(pattern);
+        % filename = fullfile(files(1).folder, files(1).name);
+        % load(filename, 'EvECG');
 
-    % Load the the cleaned ECG R Peaks Data
-    fprintf('Loading ECG Data\n');
-    pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
-    files = dir(pattern);
-    filename = fullfile(files(1).folder, files(1).name);
-    load(filename, 'EvECG');
+        % Load the the cleaned ECG R Peaks Data
+        fprintf('Loading ECG Data\n');
+        pattern = fullfile(data_dir, 'ecg', 'ss' ,[subject, '_EpochECGEvData_', medname, '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'EvECG');
 
-    SR = SmrData.SR;
-    EventTms = SmrData.EvData.EvECGP_Cl;
+        SR = SmrData.SR;
+        EventTms = SmrData.EvData.EvECGP_Cl;
 
-    channels = FltSubsChansStn{sub};
-
-    for el = 1:numel(channels)
-        chanidx(el,:) = find(strcmp(FltSubsChansRaw{sub},channels{el}));
-    end
-
-    for c = 1:numel(channels)
-
-        if ~BPReref
-            channel = FltSubsChansRaw{sub}{chanidx(c)};
-        else
-            channel = channels{c};
+        if allchans
+            channels = FltSubsChansStn{sub};
+        elseif onlyeeg
+            channels = FltSubsOnlyEEG{sub};
+        elseif onlystn
+            channels = FltSubsOnlyStn{sub};
         end
 
-        %% ==================== EPOCH DATA ==========================
-        fprintf('****************** EPOCH for %s %s...****************\n', subject, channel);
+        %channels = FltSubsChansStn{sub};
 
-        if BPReref & BPRerefHi
-            ChDta = SmrData.WvDataBPRerefHi(c, :);
-        elseif BPReref & BPRerefLw
-            ChDta = SmrData.WvDataBPRerefLow(c, :);
-        elseif BPReref & BPRerefBest
-            ChDta = SmrData.WvDataBPRerefLow(c, :); % Hier filter oder vielleicht doch schon im Preprocessing später!!
-        else
-            ChDta = SmrData.WvDataCleaned(c, :);
+        for el = 1:numel(channels)
+            chanidx(el,:) = find(strcmp(FltSubsChansRaw{sub},channels{el}));
         end
 
-        % HIGH PASS FILTER
-        if Fhp > 0
-            ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but',FltPassDir); % twopass
-        end
-        if Flp > 0
-            ChDta = ft_preproc_lowpassfilter(ChDta, SR, Flp, 4, 'but',FltPassDir);
-        end
+        for c = 1:numel(channels)
 
-        % DOWNSASMPLE
-        if NewSR > 0
-            FsOrigin=SR;
-            if  FsOrigin ~=  NewSR
-                [fsorig, fsres] = rat(FsOrigin/NewSR);
-                ChDta=resample(ChDta,fsres,fsorig);
-                dtTime=1/NewSR;
-            end
-            NewSR=1.0/dtTime;
-        end
-
-        [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);
-        [nEvs,nData]=size(EvData);
-
-        %% ============== BASELINE CORRECTION ======================
-
-        if baseline
-
-            fprintf('****************** Baseline Correction for %s %s med: %s ...****************\n', subject, channel, medname);
-            % My baseline is the time window -0.3 to -0.1 s
-            % before my Rpeak of every trial
-
-            % Find the the indices for the basseline window
-            bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
-
-            % for every trial calc the mean of the baseline win
-            % and subtract that from the entire epoch
-            for t = 1:nEvs
-                baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
-                EvData(t,:) = EvData(t,:)-baseline_mean;
+            if ~BPReref
+                channel = FltSubsChansRaw{sub}{chanidx(c)};
+            else
+                channel = channels{c};
             end
 
-        end
+            %% ==================== EPOCH DATA ==========================
+            fprintf('****************** EPOCH for %s %s...****************\n', subject, channel);
 
-        EvDataAllAvgTrs(sub,c,:) = squeeze(mean(EvData,1));
-        EvDataAll(sub,c,:,:) = EvData;
-
-        %% Z Score the Ev Data
-        % As the basleine has already been taken the data is alreadu
-        % around 0 but I want it to have the same std as well so I will
-        % do that here
-
-        BslStd = std(EvData(:,bidx(1):bidx(end)), 0, 2);
-        BslStd(BslStd == 0) = eps; % Replace zero std with a small value
-
-        % Normalize ERPData
-        EvData_zscored = EvData ./ BslStd;
-
-        EvDataAllAvgTrsZScore(sub,c,:) = squeeze(mean(EvData_zscored,1));
-
-
-
-        %% ================= PERMUATATION STATISTICS ================
-        if ismember('ERP stats', steps)
-
-            fprintf('************ Calculating Perm Stats for %s in %s **************** \n', subject, channel);
-
-            % prep for the surrogate data
-            chan_idx = find(strcmp(channels, channel)); % Find index
-            % Get the raw channel data
-            ChDta = SmrData.WvDataCleaned(chan_idx, :);
-            oldSR = SmrData.SR;
-
-            % % Pre-generate surrogate R-peaks outside of the parfor loops
-            % surrogate_rpeaks = zeros(numPerms, length(EventTms));
-            % for p = 1:numPerms
-            %     surrogate_rpeaks(p, :) = EventTms + (rand(1, length(EventTms)) - 0.15);
-            % end
-
-            % Define safe jitter range (in seconds)
-            jitter_range = 0.15;
-            % Convert margins from your time window to seconds
-            buffer_start = abs(tOffset);          
-            buffer_end = tWidth - abs(tOffset);   
-            % Define signal duration in seconds
-            signal_dur_sec = length(ChDta) / oldSR;
-            % Calculate valid min and max jittered R-peak time in seconds
-            min_time = buffer_start;
-            max_time = signal_dur_sec - buffer_end;
-            % Pre-allocate
-            surrogate_rpeaks = zeros(numPerms, length(EventTms));
-
-            for p = 1:numPerms
-                jitter = (rand(1, length(EventTms)) - 0.2) * 2 * jitter_range;
-                temp = EventTms + jitter;
-                % Clip to keep within valid time bounds
-                temp(temp < min_time) = min_time;
-                temp(temp > max_time) = max_time;
-                surrogate_rpeaks(p, :) = temp;
+            if BPReref & BPRerefHi
+                ChDta = SmrData.WvDataBPRerefHi(c, :);
+            elseif BPReref & BPRerefLw
+                ChDta = SmrData.WvDataBPRerefLow(c, :);
+            elseif BPReref & BPRerefBest
+                ChDta = SmrData.WvDataBPRerefLow(c, :); % Hier filter oder vielleicht doch schon im Preprocessing später!!
+            else
+                ChDta = SmrData.WvDataCleaned(c, :);
             end
 
-
-            startTime = datetime('now');
-            disp(['Start Time: ', datestr(startTime)]);
-
-            for pe = 1:numPerms % parfor
-                currSurrogateRpeaks = surrogate_rpeaks(pe, :);
-                [EvDataPerm] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, NewSR,  Fhp, Flp, baseline_win, FltPassDir);
-
-                %EvDataAllAvgTrsPerm(sub,c,pe,:) = squeeze(mean(EvDataPerm,1));
-                %EvDataAllTrsPerm(sub,c, pe ,:,:) = EvDataPerm;
-                EvDataAllTrsPerm(pe ,:,:) = EvDataPerm;
-                fprintf('perm = %d \n', pe)
+            % HIGH PASS FILTER
+            if Fhp > 0
+                ChDta=ft_preproc_highpassfilter(ChDta,SR,Fhp,4,'but',FltPassDir); % twopass
+            end
+            if Flp > 0
+                ChDta = ft_preproc_lowpassfilter(ChDta, SR, Flp, 4, 'but',FltPassDir);
             end
 
-            endTime = datetime('now'); disp(['End Time: ', datestr(endTime)]);
-            % Calculate elapsed time
-            elapsedTime = endTime - startTime; disp(['Elapsed Time: ', char(elapsedTime)]);
-
-            % mean over perm
-            EvDataAllTrsAvgPerm = squeeze(mean(EvDataAllTrsPerm,1));
-            EvDataAllSQ = squeeze(EvDataAll(sub, c, : ,:));
-
-            % Step 2: Compute observed t-values (real vs surrogate) at each timepoint
-            tvals = zeros(1, length(TmAxis));
-            for t = 1:length(TmAxis)
-                [~,~,~,stats] = ttest2(EvDataAllSQ(:,t), EvDataAllTrsAvgPerm(:,t));
-                tvals(t) = stats.tstat;
+            % DOWNSASMPLE
+            if NewSR > 0
+                FsOrigin=SR;
+                if  FsOrigin ~=  NewSR
+                    [fsorig, fsres] = rat(FsOrigin/NewSR);
+                    ChDta=resample(ChDta,fsres,fsorig);
+                    dtTime=1/NewSR;
+                end
+                NewSR=1.0/dtTime;
             end
 
-            % Step 3: Find clusters above threshold (e.g., |t| > 2, corresponding to p < 0.05)
-            alpha = 0.05;
-            threshold = tinv(1 - alpha, 349); % adjust for your sample size
-            cluster_labels = bwlabel(abs(tvals) > threshold);
-            obs_clusters = regionprops(cluster_labels, abs(tvals), 'Area', 'PixelIdxList', 'MeanIntensity');
+            [EventTms,EvData,TmAxis]=GetEvTimeAndData(EventTms,ChDta,dtTime,tWidth,tOffset);
+            [nEvs,nData]=size(EvData);
 
-            % Compute cluster statistics (sum of t-values within each cluster)
-            obs_cluster_stats = arrayfun(@(c) sum(abs(tvals(c.PixelIdxList))), obs_clusters);
-            %obs_cluster_stats = [arrayfun(@(c) sum(abs(tvals(c.PixelIdxList))), obs_clusters)];
+            %% ============== BASELINE CORRECTION ======================
+
+            if baseline
+
+                fprintf('****************** Baseline Correction for %s %s med: %s ...****************\n', subject, channel, medname);
+                % My baseline is the time window -0.3 to -0.1 s
+                % before my Rpeak of every trial
+
+                % Find the the indices for the basseline window
+                bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
+
+                % for every trial calc the mean of the baseline win
+                % and subtract that from the entire epoch
+                for t = 1:nEvs
+                    baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
+                    EvData(t,:) = EvData(t,:)-baseline_mean;
+                end
+
+            end
+
+            EvDataAllAvgTrs(sub,c,:) = squeeze(mean(EvData,1)); % sub, chan, Average over Epochs
+            if ismember('ERP stats', steps)
+                EvDataAll(sub,c,:,:) = EvData;
+            end
+
+            %% Z Score the Ev Data
+            % As the basleine has already been taken the data is alreadu
+            % around 0 but I want it to have the same std as well so I will
+            % do that here
+
+            BslStd = std(EvData(:,bidx(1):bidx(end)), 0, 2);
+            BslStd(BslStd == 0) = eps; % Replace zero std with a small value
+
+            % Normalize ERPData
+            EvData_zscored = EvData ./ BslStd;
+
+            EvDataAllAvgTrsZScore(sub,c,:) = squeeze(mean(EvData_zscored,1));
 
 
-            % Step 4: Permutation test
-            allHEP = cat(1, squeeze(EvDataAll(sub, c, : ,:)), EvDataAllTrsAvgPerm(:,:)); % [2*n Trials x timepoints]
-            labels = [ones(nEvs,1); zeros(nEvs,1)];
-            max_perm_cluster_stats = zeros(numPerms,1);
 
-            for p = 1:numPerms
-                perm_labels = labels(randperm(length(labels)));
-                perm_real = allHEP(perm_labels==1,:);
-                perm_surr = allHEP(perm_labels==0,:);
-                perm_tvals = zeros(1, length(TmAxis));
+            %% ================= PERMUATATION STATISTICS ================
+            if ismember('ERP stats', steps)
+
+                fprintf('************ Calculating Perm Stats for %s in %s **************** \n', subject, channel);
+
+                % prep for the surrogate data
+                chan_idx = find(strcmp(channels, channel)); % Find index
+                % Get the raw channel data
+                ChDta = SmrData.WvDataCleaned(chan_idx, :);
+                oldSR = SmrData.SR;
+
+                % % Pre-generate surrogate R-peaks outside of the parfor loops
+                % surrogate_rpeaks = zeros(numPerms, length(EventTms));
+                % for p = 1:numPerms
+                %     surrogate_rpeaks(p, :) = EventTms + (rand(1, length(EventTms)) - 0.15);
+                % end
+
+                % Define safe jitter range (in seconds)
+                jitter_range = 0.15;
+                % Convert margins from your time window to seconds
+                buffer_start = abs(tOffset);
+                buffer_end = tWidth - abs(tOffset);
+                % Define signal duration in seconds
+                signal_dur_sec = length(ChDta) / oldSR;
+                % Calculate valid min and max jittered R-peak time in seconds
+                min_time = buffer_start;
+                max_time = signal_dur_sec - buffer_end;
+                % Pre-allocate
+                surrogate_rpeaks = zeros(numPerms, length(EventTms));
+
+                for p = 1:numPerms
+                    jitter = (rand(1, length(EventTms)) - 0.2) * 2 * jitter_range;
+                    temp = EventTms + jitter;
+                    % Clip to keep within valid time bounds
+                    temp(temp < min_time) = min_time;
+                    temp(temp > max_time) = max_time;
+                    surrogate_rpeaks(p, :) = temp;
+                end
+
+
+                startTime = datetime('now');
+                disp(['Start Time: ', datestr(startTime)]);
+
+                for pe = 1:numPerms % parfor
+                    currSurrogateRpeaks = surrogate_rpeaks(pe, :);
+                    [EvDataPerm] = time_lock_to_surrogate(ChDta, currSurrogateRpeaks, oldSR, tWidth, tOffset, NewSR,  Fhp, Flp, baseline_win, FltPassDir);
+
+                    %EvDataAllAvgTrsPerm(sub,c,pe,:) = squeeze(mean(EvDataPerm,1));
+                    %EvDataAllTrsPerm(sub,c, pe ,:,:) = EvDataPerm;
+                    EvDataAllTrsPerm(pe ,:,:) = EvDataPerm;
+                    fprintf('perm = %d \n', pe)
+                end
+
+                endTime = datetime('now'); disp(['End Time: ', datestr(endTime)]);
+                % Calculate elapsed time
+                elapsedTime = endTime - startTime; disp(['Elapsed Time: ', char(elapsedTime)]);
+
+                % mean over perm
+                EvDataAllTrsAvgPerm = squeeze(mean(EvDataAllTrsPerm,1));
+                EvDataAllSQ = squeeze(EvDataAll(sub, c, : ,:));
+
+                % Step 2: Compute observed t-values (real vs surrogate) at each timepoint
+                tvals = zeros(1, length(TmAxis));
                 for t = 1:length(TmAxis)
-                    [~,~,~,stats] = ttest2(perm_real(:,t), perm_surr(:,t));
-                    perm_tvals(t) = stats.tstat;
+                    [~,~,~,stats] = ttest2(EvDataAllSQ(:,t), EvDataAllTrsAvgPerm(:,t));
+                    tvals(t) = stats.tstat;
                 end
-                % Find clusters in permuted data
-                perm_cluster_labels = bwlabel(abs(perm_tvals) > threshold);
-                perm_clusters = regionprops(perm_cluster_labels, abs(perm_tvals), 'Area', 'PixelIdxList', 'MeanIntensity');
-                if ~isempty(perm_clusters)
-                    perm_cluster_stats = arrayfun(@(c) sum(abs(perm_tvals(c.PixelIdxList))), perm_clusters);
-                    max_perm_cluster_stats(p) = max(perm_cluster_stats);
-                else
-                    max_perm_cluster_stats(p) = 0;
+
+                % Step 3: Find clusters above threshold (e.g., |t| > 2, corresponding to p < 0.05)
+                alpha = 0.05;
+                threshold = tinv(1 - alpha, 349); % adjust for your sample size
+                cluster_labels = bwlabel(abs(tvals) > threshold);
+                obs_clusters = regionprops(cluster_labels, abs(tvals), 'Area', 'PixelIdxList', 'MeanIntensity');
+
+                % Compute cluster statistics (sum of t-values within each cluster)
+                obs_cluster_stats = arrayfun(@(c) sum(abs(tvals(c.PixelIdxList))), obs_clusters);
+                %obs_cluster_stats = [arrayfun(@(c) sum(abs(tvals(c.PixelIdxList))), obs_clusters)];
+
+
+                % Step 4: Permutation test
+                allHEP = cat(1, squeeze(EvDataAll(sub, c, : ,:)), EvDataAllTrsAvgPerm(:,:)); % [2*n Trials x timepoints]
+                labels = [ones(nEvs,1); zeros(nEvs,1)];
+                max_perm_cluster_stats = zeros(numPerms,1);
+
+                for p = 1:numPerms
+                    perm_labels = labels(randperm(length(labels)));
+                    perm_real = allHEP(perm_labels==1,:);
+                    perm_surr = allHEP(perm_labels==0,:);
+                    perm_tvals = zeros(1, length(TmAxis));
+                    for t = 1:length(TmAxis)
+                        [~,~,~,stats] = ttest2(perm_real(:,t), perm_surr(:,t));
+                        perm_tvals(t) = stats.tstat;
+                    end
+                    % Find clusters in permuted data
+                    perm_cluster_labels = bwlabel(abs(perm_tvals) > threshold);
+                    perm_clusters = regionprops(perm_cluster_labels, abs(perm_tvals), 'Area', 'PixelIdxList', 'MeanIntensity');
+                    if ~isempty(perm_clusters)
+                        perm_cluster_stats = arrayfun(@(c) sum(abs(perm_tvals(c.PixelIdxList))), perm_clusters);
+                        max_perm_cluster_stats(p) = max(perm_cluster_stats);
+                    else
+                        max_perm_cluster_stats(p) = 0;
+                    end
                 end
+
+                % Step 5: Determine significance of observed clusters
+                pvals = arrayfun(@(c) mean(max_perm_cluster_stats >= c), obs_cluster_stats);
+
+                % Output significant clusters and their time indices
+                sig_clusters = find(pvals < 0.05);
+                for i = 1:length(sig_clusters)
+                    idx = obs_clusters(sig_clusters(i)).PixelIdxList;
+                    fprintf('Significant cluster at timepoints: %s\n', mat2str(idx));
+                end
+
+                outputPDF1 = fullfile(results_dir, 'ss_chan', [subject, '_', channel, '_ERP_med=', medname, ...
+                    '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '.pdf']);
+
+                % Optional: Plot
+                f1=figure;
+                set(f1,'Position',[1949 123 1023 785]);
+                subplot(2,1,1)
+                plot(times, mean(EvECG.EvData,1), 'Color', 'k'); hold on
+                set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+                xline(0, "--k", 'LineWidth', 2);
+                ylabel('Amplitude')
+                axis('tight')
+                title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, medname))
+                hold off
+
+                subplot(2,1,2)
+                plot(mean(realHEP), 'b', 'LineWidth', 2); hold on;
+                plot(mean(surrogateHEP), 'r', 'LineWidth', 2);
+                for i = 1:length(sig_clusters)
+                    idx = obs_clusters(sig_clusters(i)).PixelIdxList;
+                    area(idx, mean(realHEP(:,idx)), 'FaceColor', [0.8 0.8 0.8], 'EdgeColor', 'none');
+                end
+                legend('Real HEP','Surrogate HEP','Significant cluster');
+                xlabel('Time (samples)');
+                ylabel('Amplitude (\muV)');
+                title('HEP Permutation Cluster Test');
+
+                exportgraphics(f1, outputPDF1, 'Append', true);
+            end
+        end
+        %% ============== Plotting ERPs SUBJECT LEVEL=========================
+        if show_plots
+            fprintf('Plotting ERPs for subject %s\n', subject);
+            f1 = figure; % initialize Figure
+            set(f1, 'Position', [100, 100, 1920, 1080]);
+            for chan = 1:numel(channels)
+                channel = channels{chan};
+
+                row = ceil(chan / 3); % Calculate the row number
+                col = mod(chan - 1, 3) + 1; % Calculate the column number
+                subplot(3, 3, (row - 1) * 3 + col)
+
+                % Plot the ERP per channel for 1 subj
+                plot(TmAxis(31:end), squeeze(EvDataAllAvgTrsZScore(sub, chan, 31:end))', 'Color', 'k'); hold on
+                xline(0, "--k", 'LineWidth', 2);
+                title(sprintf('ERP in %s', channel))
+                axis("tight");
+                hold off
+                % Set Labels
+                xlabel('Time (ms)');
+                ylabel('Amplitude (uV)');
             end
 
-            % Step 5: Determine significance of observed clusters
-            pvals = arrayfun(@(c) mean(max_perm_cluster_stats >= c), obs_cluster_stats);
-
-            % Output significant clusters and their time indices
-            sig_clusters = find(pvals < 0.05);
-            for i = 1:length(sig_clusters)
-                idx = obs_clusters(sig_clusters(i)).PixelIdxList;
-                fprintf('Significant cluster at timepoints: %s\n', mat2str(idx));
+            if BPReref & BPRerefHi
+                sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefHiTit)); % Major Title
+                gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefHiTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+            elseif BPReref & BPRerefLw
+                sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefLwTit)); % Major Title
+                gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefLwTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+            elseif  BPReref & BPRerefBest
+                sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefBestTit)); % Major Title
+                gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefBestTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
+            else
+                sgtitle(sprintf('ERPs for Subject %s - All Channels with %s', subject, medname)); % Major Title
+                gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
             end
+            exportgraphics(f1, gr1, "Resolution",300);
 
-             outputPDF1 = fullfile(results_dir, 'ss_chan', [subject, '_', channel, '_ERP_med=', medname, ...
-            '_win=-', num2str(tOffset),'to', num2str(tWidth-tOffset),'_BSL=', num2str(baseline), '.pdf']);
-
-            % Optional: Plot
-            f1=figure;
-            set(f1,'Position',[1949 123 1023 785]);
-            subplot(2,1,1)
-            plot(times, mean(EvECG.EvData,1), 'Color', 'k'); hold on
-            set(gca,'Position',[0.1300 0.5838 0.71 0.3])
-            xline(0, "--k", 'LineWidth', 2);
-            ylabel('Amplitude')
-            axis('tight')
-            title(sprintf('Average ECG for %s in %s, medication: %s', subject, channel, medname))
-            hold off
-
-            subplot(2,1,2)
-            plot(mean(realHEP), 'b', 'LineWidth', 2); hold on;
-            plot(mean(surrogateHEP), 'r', 'LineWidth', 2);
-            for i = 1:length(sig_clusters)
-                idx = obs_clusters(sig_clusters(i)).PixelIdxList;
-                area(idx, mean(realHEP(:,idx)), 'FaceColor', [0.8 0.8 0.8], 'EdgeColor', 'none');
-            end
-            legend('Real HEP','Surrogate HEP','Significant cluster');
-            xlabel('Time (samples)');
-            ylabel('Amplitude (\muV)');
-            title('HEP Permutation Cluster Test');
-
-            exportgraphics(f1, outputPDF1, 'Append', true);
         end
     end
-    %% ============== Plotting ERPs SUBJECT LEVEL=========================
-    if show_plots
-        fprintf('Plotting ERPs for subject %s\n', subject);
-        f1 = figure; % initialize Figure
-        set(f1, 'Position', [100, 100, 1920, 1080]);
-        for chan = 1:numel(channels)
-            channel = channels{chan};
 
-            row = ceil(chan / 3); % Calculate the row number
-            col = mod(chan - 1, 3) + 1; % Calculate the column number
-            subplot(3, 3, (row - 1) * 3 + col)
+    % Save the Group level ERP Data
 
-            % Plot the ERP per channel for 1 subj
-            plot(TmAxis(31:end), squeeze(EvDataAllAvgTrsZScore(sub, chan, 31:end))', 'Color', 'k'); hold on
-            xline(0, "--k", 'LineWidth', 2);
-            title(sprintf('ERP in %s', channel))
-            axis("tight");
-            hold off
-            % Set Labels
-            xlabel('Time (ms)');
-            ylabel('Amplitude (uV)');
-        end
+    if ismember('ERP stats', steps)
+        ERP.Perm = EvDataAllTrsAvgPerm;
+    end
+    ERP.EvDataAllAvgTrs = EvDataAllAvgTrs;
+    ERP.EvDataAllAvgTrsZScore = EvDataAllAvgTrsZScore;
 
-        if BPReref & BPRerefHi
-            sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefHiTit)); % Major Title
-            gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefHiTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
-        elseif BPReref & BPRerefLw
-            sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefLwTit)); % Major Title
-            gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefLwTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
-        elseif  BPReref & BPRerefBest
-            sgtitle(sprintf('ERPs for Subject %s - All Channels with %s, %s', subject, medname, BPRerefBestTit)); % Major Title
-            gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_', BPRerefBestTit ,'_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
-        else
-            sgtitle(sprintf('ERPs for Subject %s - All Channels with %s', subject, medname)); % Major Title
-            gr1 = fullfile(results_dir, 'erp', 'ss', [ subject, '_ERP_sep-channels_', medname, '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(NewSR),'_HP=', num2str(Fhp), '_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.png']);
-        end
-        exportgraphics(f1, gr1, "Resolution",300);
 
+    if allsubs & onlyeeg
+        save_path = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_EEG_', medname , '_Subs=', num2str(numel(subjects)), '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(SR),'_HP=', num2str(Fhp) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+    elseif allsubs & onlystn
+        save_path = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_STN_', medname , '_Subs=', num2str(numel(subjects)), '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(SR),'_HP=', num2str(Fhp) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+    else allsubs
+        save_path = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_ALL_', medname , '_Subs=', num2str(numel(subjects)), '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(SR),'_HP=', num2str(Fhp) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
+    end
+    save(save_path, 'ERP', '-v7.3');
+    fprintf('Saved ERP Group Data to: %s\n', save_path);
+
+    clear EvDataAllAvgTrs EvDataAllAvgTrsZScore 
+
+end
+
+%% ================== HIERARCHICAL CLUSTERING ======================
+
+if ismember('Clustering', steps)
+
+    % if strcmp(channame, 'allsubs')
+    %     chantag = 'ALL';
+    % elseif strcmp(channame, 'onlyeeg')
+    %     chantag = 'EEG';
+    % else strcmp(channame, 'onlystn')
+    %     chantag = 'STN';
+    % end
+    chantags = {'EEG', 'STN', 'ALL'};
+
+    fprintf('Loading ERP Group Data \n');
+    pattern = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_', '*']);
+    files = dir(pattern);
+    for i = 1:length(files)
+        filename = fullfile(files(i).folder, files(i).name);
+        fname = files(i).name;
+        parts = split(fname, '_');
+        chantag = parts{3};
+        medname = parts{4};
+        load(filename, 'ERP');
+        % Save in new struct 
+        CLUS.(medname).(chantag).EvDataAllAvgTrs = ERP.EvDataAllAvgTrs;
+    end
+
+    for s = 3:length(chantags)
+        chantag = chantags{s};
+        % nClusters = 5; % EEG = 5, STN = 5, ALL = 5
+        % flipped_clusters = [5];  % EEG bei 5 Clus = 5, STN 4 bei Clus = 5, ALL 5 bei Clus 5
+        % plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info) % For Med On only
+        nClusters = 4; % EEG = 4, STN = 4, 
+        flipped_clusters = [];  % EEG nix, STN nix, 
+        plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters)    % For Med Off only
+        % nClusters = 6;
+        % flipped_clusters = [];  % adjust as needed
+        % plot_clustered_HEPs(CLUS, 'both', chantag, nClusters, flipped_clusters)   % For side-by-side comparison
+    end
+
+end
+
+function plot_clustered_HEPs(CLUS, condition, chantag, nClusters, flipped_clusters, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info)
+% Inputs:
+%   CLUS: struct with fields like CLUS.MedOn.EvDataAllAvgTrs
+%   condition: 'on', 'off', or 'both'
+
+% Parameters
+time = linspace(-0.1, 0.6, size(CLUS.MedOn.(chantag).EvDataAllAvgTrs, 3));  % time vector
+
+% Load data based on input
+switch lower(condition)
+    case 'on'
+        data_on = CLUS.MedOn.(chantag).EvDataAllAvgTrs;  % [sub, chan, time]
+        titles = {'MedOn'};
+    case 'off'
+        data_off = CLUS.MedOff.(chantag).EvDataAllAvgTrs;
+        titles = {'MedOff'};
+    case 'both'
+        data_on = CLUS.MedOn.(chantag).EvDataAllAvgTrs;
+        data_off = CLUS.MedOff.(chantag).EvDataAllAvgTrs;
+        titles = {'MedOn', 'MedOff'};
+    otherwise
+        error('Condition must be "on", "off", or "both"');
+end
+
+% Process single or both conditions
+for iCond = 1:length(titles)
+    thisTitle = lower(strrep(titles{iCond}, ' ', ''));  % converts 'med on' → 'medon'
+
+    switch thisTitle
+        case 'medon'
+            data = data_on;
+            sub2remove = [6];
+            data(sub2remove, :, :) = [];
+        case 'medoff'
+            data = data_off;
+            sub2remove = [5];
+            data(sub2remove, :, :) = [];
+        otherwise
+            error('Unknown condition title: %s', titles{iCond});
+    end
+
+    [nSub, nChans, nTime] = size(data);
+    reshaped = reshape(data, nSub * nChans, nTime);  % [waveforms x time]
+
+    % subject_index = floor((108 - 1) / nChans) + 1;
+    % channel_index = mod(108 - 1, nChans) + 1;
+
+    % Remove NaNs
+    reshaped = reshaped(~any(isnan(reshaped), 2), :);
+
+    % remove outliers
+    switch thisTitle
+        case 'medon'
+            rowsToRemove = []; % ALL = 118, 104, 96, 110, 103, 108, 107, All with Sub 6 out 97, 89, 104
+            reshaped(rowsToRemove, :) = [];
+        case 'medoff'
+            rowsToRemove = [62,24,60,59,58,57,56,55,54,53,52,51,50]; % EEG 27, STN 7,16, ALL with sub 5 removed 62,24,60,59,58
+            reshaped(rowsToRemove, :) = [];
+    end
+    
+    % Clustering
+    D = pdist(reshaped, 'euclidean');
+    Z = linkage(D, 'ward');
+    labels = cluster(Z, 'maxclust', nClusters);
+
+    %plot_dendogram(Z, reshaped, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info, chantag, titles)
+    f3=figure;
+    dendrogram(Z);
+    gr3 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', 'dendrogram', ['Dendrogram_', char(titles), '_', char(chantag), '.png']);
+    exportgraphics(f3, gr3,"Resolution", 300);
+
+    % Polarity correction
+    for cl = flipped_clusters
+        reshaped(labels == cl, :) = -reshaped(labels == cl, :);
+    end
+
+    f1 = figure;
+    set(f1,'Position',[1 59 1440 738]);
+    % Plotting
+    for cl = 1:nClusters
+        subplot(nClusters, length(titles), (cl-1)*length(titles) + iCond);
+        idx = labels == cl;
+        m = mean(reshaped(idx,:),1);
+        e = std(reshaped(idx,:),0,1)/sqrt(sum(idx));
+        fill([time fliplr(time)], [m+e fliplr(m-e)], 'b', 'FaceAlpha',0.2, 'EdgeColor','none'); hold on;
+        plot(time, m, 'b', 'LineWidth', 1.5);
+        title([titles{iCond} ' - Cluster ' num2str(cl) ', N=' num2str(sum(idx))]);
+        xlabel('Time (s)');
+        ylabel('Amplitude');
+        grid on;
+    end
+    gr1 = fullfile( '/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    exportgraphics(f1, gr1, "Resolution", 300)
+
+    % Create one figure for all clusters in current condition
+    f2 = figure; hold on;
+    set(f2,'Position',[1 59 1440 738]);
+    plotHandles = gobjects(nClusters, 1); 
+    for cl = 1:nClusters
+        idx = labels == cl;
+        m = mean(reshaped(idx,:), 1);
+        e = std(reshaped(idx,:), 0, 1) / sqrt(sum(idx));
+        % Shaded area for SEM
+        fill([time, fliplr(time)], [m+e, fliplr(m-e)], 'k', 'FaceAlpha', 0.2, 'EdgeColor', 'none');  % Default gray; replaced by color below
+        % Plot mean line (color auto-cycles)
+        plotHandles(cl) = plot(time, m, 'LineWidth', 1.5);
+    end
+    xlabel('Time (s)');
+    ylabel('Amplitude');
+    title([titles{iCond} ' - HEP Clusters - ' chantag ]);
+    legend(plotHandles, compose('Cluster %d', 1:nClusters), 'Location', 'northeastoutside');
+    grid on;
+    box on;
+
+    gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    exportgraphics(f2, gr2, "Resolution", 300)
+
+end
+end
+
+function [labels_dendo] = plot_dendogram(Z, reshaped, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info, chantag, titles)
+
+if strcmp(titles, 'MedOn')  % All Subs that are MedOn
+    subjects = string({subject_info([subject_info.MedOn] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOn] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOn] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOn] == 1);
+elseif strcmp(titles, 'MedOff') % All Subs that are MedOff
+    subjects = string({subject_info([subject_info.MedOff] == 1).ID});
+    FltSubsChansStn = AllSubsChansStn([subject_info.MedOff] == 1);
+    FltSubsOnlyStn = AllSubsOnlyStn([subject_info.MedOff] == 1);
+    FltSubsOnlyEEG = AllSubsOnlyEEG([subject_info.MedOff] == 1);
+end
+
+% Filter channels
+if strcmp(chantag, 'ALL')
+    channels = FltSubsChansStn;
+elseif strcmp(chantag, 'EEG')
+    channels = FltSubsOnlyEEG;
+elseif strcmp(chantag, 'STN')
+    channels = FltSubsOnlyStn;
+end
+
+% Generate labels
+labels_dendo = {};
+for iSub = 1:length(subjects)
+    sub = subjects{iSub};
+    chans = channels{iSub};
+    for iChan = 1:numel(chans)
+        labels_dendo{end+1} = sprintf('%s-%s', sub, chans{iChan});
     end
 end
 
-% Save the Group level ERP Data 
+% Output dimensions for reshaping 
+valid_idx = ~any(isnan(reshaped), 2);
+labels_dendo = labels_dendo(valid_idx);  % column
 
-if permstats
-    ERP.Perm = EvDataAllTrsAvgPerm;
+figure;  % create new figure
+dendrogram(Z, 0, 'Labels', labels_dendo);
+title(sprintf('Dendrogram - %s - %s', chantag, titles), 'Interpreter', 'none');
+xtickangle(45);
+
+% Create filename from condition and chantag
+filename = fullfiles('Volumes','LP3', 'HeadHeart', '0_data','erp', 'group', 'dendogram', ['Dendrogram_', char(titles), '_', char(chantag), '.png']);
+saveas(gcf, filename);  % save figure as PNG
+
 end
-ERP.EvDataAllAvgTrs = EvDataAllAvgTrs;
-ERP.EvDataAll = EvDataAll;
-ERP.EvDataAllAvgTrsZScore = EvDataAllAvgTrsZScore;
-
-
-if MedOn & allsubs
-    save_path = fullfile(data_dir, 'erp', 'group', ['ERP_Group-Data_', medname , '_Subs=', num2str(numel(subjects)), '_EP=',num2str(TmAxis(1)), 'to', num2str(TmAxis(end)),'s_DS=', num2str(SR),'_HP=', num2str(freqs(1)) ,'_BSL=', num2str(baseline_win(1)),'to', num2str(baseline_win(2)),'s.mat']);
-elseif permstats
-    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-elseif permstats & BPRerefHi
-    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-elseif permstats & BPRerefLw
-    save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_perm=', num2str(numPerms),'_HP=', num2str(freqs(1)) ,'.mat']);
-else
-    save_path = fullfile(data_dir, 'ccc','ss_chan', [subject,'_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
-end
-save(save_path, 'ERP', '-v7.3');
-fprintf('Saved ERP Group Data to: %s\n', save_path);
 
 
 %% ============== Plotting ERPs GROUP LEVEL=========================
