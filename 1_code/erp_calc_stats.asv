@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Clustering'}; % ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc'
+steps = {'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -509,14 +509,21 @@ if ismember('Clustering', steps)
         CLUS.(medname).(chantag).EvDataAllAvgTrs = ERP.EvDataAllAvgTrs;
     end
 
-    for s = 3:length(chantags)
+    for s = 3%:length(chantags)
         chantag = chantags{s};
-        % nClusters = 5; % EEG = 5, STN = 5, ALL = 5
-        % flipped_clusters = [5];  % EEG bei 5 Clus = 5, STN 4 bei Clus = 5, ALL 5 bei Clus 5
-        % plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info) % For Med On only
-        nClusters = 6; % EEG = 4, STN = 4, 
-        flipped_clusters = [];  % EEG nix, STN nix, 
-        plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters)    % For Med Off only
+        nClusters = 6; % EEG = 5, STN = 5, ALL = 6
+        flipped_clusters = [1,2,3];  % EEG bei 5 Clus = 5, STN 4 bei Clus = 5, ALL 1,2,3 bei Clus = 6
+        [reshaped_on] = plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AVGECG) % For Med On only 
+        Cluster.(chantag).MedOn = reshaped_on;
+
+        nClusters = 5; % EEG = 4, STN = 5, All = 5 
+        flipped_clusters = [5];  % EEG nix, STN nix, All = 5 bei clos =5
+        [reshaped_off] = plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters, AVGECG)    % For Med Off only
+        varname_off = sprintf('reshaped_%s_MedOff', chantag);
+        Cluster.(chantag).MedOff = reshaped_off;
+
+        save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag,'_MedOn_MedOff.mat']), 'Cluster', '-v7.3')
+        clear Cluster
         % nClusters = 6;
         % flipped_clusters = [];  % adjust as needed
         % plot_clustered_HEPs(CLUS, 'both', chantag, nClusters, flipped_clusters)   % For side-by-side comparison
@@ -524,13 +531,164 @@ if ismember('Clustering', steps)
 
 end
 
-function plot_clustered_HEPs(CLUS, condition, chantag, nClusters, flipped_clusters, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info)
+if ismember('Plot Mean Clustering by Med', steps)
+
+    chantags = {'EEG', 'STN', 'ALL'};
+
+    for s = 1:length(chantags)
+        chantag = chantags{s};
+
+        fprintf('Loading %s Cluster Data \n' ,chantag);
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag, '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster');
+
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_on = fields{contains(fields, 'MedOn')};
+        field_off = fields{contains(fields, 'MedOff')};
+        
+        % Mean + SEM 
+        cluster_on_mean = mean(Cluster.(field_on),1);
+        cluster_on_sem = std(Cluster.(field_on)) / sqrt(length(Cluster.(field_on)));
+
+        cluster_off_mean = mean(Cluster.(field_off),1);
+        cluster_off_sem = std(Cluster.(field_off),1) / sqrt(length(Cluster.(field_off)));
+
+
+        % Create one figure for all clusters in current condition
+        f2 = figure; hold on;
+        set(f2,'Position',[1 59 1440 738]);
+        subplot(2,1,1)
+        plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
+        set(gca,'Position',[0.13 0.7 0.69 0.25])
+        xline(0, "--k", 'LineWidth', 2);
+        ylabel('Amplitude')
+        axis('tight')
+        title(sprintf('Average ECG'))
+
+        subplot(2,1,2)
+        hold on
+        t = AVGECG.times(31:end)';
+        % --- MedOn shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [cluster_on_mean(31:end) + cluster_on_sem(31:end), ...
+            fliplr(cluster_on_mean(31:end) - cluster_on_sem(31:end))], ...
+            [0.2 0.6 1], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % blue-ish
+        h1 = plot(t, cluster_on_mean(31:end), 'Color', [0 0.3 0.9], 'LineWidth', 2);
+
+        % --- MedOff shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [cluster_off_mean(31:end) + cluster_off_sem(31:end), ...
+            fliplr(cluster_off_mean(31:end) - cluster_off_sem(31:end))], ...
+            [1 0.4 0.4], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % red-ish
+        h2 = plot(t, cluster_off_mean(31:end), 'Color', [0.9 0.1 0.1], 'LineWidth', 2);
+
+        xline(0, "--k", 'LineWidth', 2);
+        xlabel('Time (s)');
+        ylabel('Amplitude');
+        title(['HEP Comparison MedOn vs MedOff - ' chantag]);
+        legend([h1 h2], {'MedOn', 'MedOff'}, 'Location', 'northeastoutside');
+        set(gca, 'Position', [0.13 0.1 0.778 0.5]);
+        grid on;
+        box on;
+
+        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
+        exportgraphics(f2, gr2, "Resolution", 300)
+    end
+end
+
+if ismember('Plot Mean Clustering by Method', steps)
+
+    meds = ['MedOn'; 'MedOff'];
+
+    for m = 1:length(meds)
+        med = meds(m);
+
+        fprintf('Loading EEG Cluster Data \n');
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_EEG', '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster');
+
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_eeg = fields{contains(fields, meds)};
+        %field_eeg_off = fields{contains(fields, 'MedOff')};
+
+        % Mean + SEM EEG
+        cluster_eeg_mean = mean(Cluster.(field_eeg_on),1);
+        cluster_eeg_sem = std(Cluster.(field_eeg_on)) / sqrt(length(Cluster.(field_eeg_on)));
+        % cluster_off_eeg_mean = mean(Cluster.(field_eeg_off),1);
+        % cluster_off_eeg_sem = std(Cluster.(field_eeg_off),1) / sqrt(length(Cluster.(field_eeg_off)));
+
+        fprintf('Loading STN Cluster Data \n');
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_STN', '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster')
+
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_stn_on = fields{contains(fields, med)};
+        %field_stn_off = fields{contains(fields, 'MedOff')};
+
+        % Mean + SEM STN
+        cluster_stn_mean = mean(Cluster.(field_stn_on),1);
+        cluster_stn_sem = std(Cluster.(field_stn_on)) / sqrt(length(Cluster.(field_stn_on)));
+        %cluster_off_stn_mean = mean(Cluster.(field_stn_off),1);
+        %cluster_off_stn_sem = std(Cluster.(field_stn_off),1) / sqrt(length(Cluster.(field_stn_off)));
+
+        % Create one figure for all clusters in current condition
+        f2 = figure; hold on;
+        set(f2,'Position',[1 59 1440 738]);
+        subplot(2,1,1)
+        plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
+        set(gca,'Position',[0.13 0.7 0.778 0.25])
+        xline(0, "--k", 'LineWidth', 2);
+        ylabel('Amplitude')
+        axis('tight')
+        title(sprintf('Average ECG'))
+
+        subplot(2,1,2)
+        hold on
+        t = AVGECG.times(31:end)';
+        % --- STN MedOn shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [cluster_stn_mean(31:end) + cluster_stn_sem(31:end), ...
+            fliplr(cluster_stn_mean(31:end) - cluster_stn_sem(31:end))], ...
+            [0.2 0.6 1], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % blue-ish
+        h1 = plot(t, cluster_stn_mean(31:end), 'Color', [0 0.3 0.9], 'LineWidth', 2);
+
+        % --- EEG Med On shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [cluster_eeg_mean(31:end) + cluster_eeg_sem(31:end), ...
+            fliplr(cluster_eeg_mean(31:end) - cluster_eeg_sem(31:end))], ...
+            [1 0.4 0.4], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % red-ish
+        h2 = plot(t, cluster_eeg_mean(31:end), 'Color', [0.9 0.1 0.1], 'LineWidth', 2);
+
+        xline(0, "--k", 'LineWidth', 2);
+        xlabel('Time (s)');
+        ylabel('Amplitude');
+        title(['HEP Comparison EEG vs STN, Med: %s', med]);
+        legend([h1 h2], {'STN', 'EEG'}, 'Location', 'northeastoutside');
+        set(gca, 'Position', [0.13 0.1 0.778 0.5]);
+        grid on;
+        box on;
+
+        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        exportgraphics(f2, gr2, "Resolution", 300)
+    end
+end
+
+function [reshaped] = plot_clustered_HEPs(CLUS, condition, chantag, nClusters, flipped_clusters, AVGECG)
 % Inputs:
 %   CLUS: struct with fields like CLUS.MedOn.EvDataAllAvgTrs
 %   condition: 'on', 'off', or 'both'
 
 % Parameters
-time = linspace(-0.1, 0.6, size(CLUS.MedOn.(chantag).EvDataAllAvgTrs, 3));  % time vector
+time = linspace(-0.3, 0.6, size(CLUS.MedOn.(chantag).EvDataAllAvgTrs, 3));  % time vector
 
 % Load data based on input
 switch lower(condition)
@@ -555,11 +713,11 @@ for iCond = 1:length(titles)
     switch thisTitle
         case 'medon'
             data = data_on;
-            sub2remove = [6];
+            sub2remove = [6]; % All 6 Stn 6
             data(sub2remove, :, :) = [];
         case 'medoff'
             data = data_off;
-            sub2remove = [5];
+            sub2remove = [5]; %  All 5
             data(sub2remove, :, :) = [];
         otherwise
             error('Unknown condition title: %s', titles{iCond});
@@ -567,20 +725,21 @@ for iCond = 1:length(titles)
 
     [nSub, nChans, nTime] = size(data);
     reshaped = reshape(data, nSub * nChans, nTime);  % [waveforms x time]
+    reshaped_copy = reshaped;
 
     % subject_index = floor((108 - 1) / nChans) + 1;
     % channel_index = mod(108 - 1, nChans) + 1;
 
     % Remove NaNs
-    reshaped = reshaped(~any(isnan(reshaped), 2), :);
+    reshaped = reshaped(~any(isnan(reshaped), 2) & ~all(reshaped == 0, 2), :);
 
     % remove outliers
     switch thisTitle
         case 'medon'
-            rowsToRemove = []; % ALL = 118, 104, 96, 110, 103, 108, 107, All with Sub 6 out 97, 89, 104
+            rowsToRemove = [96,90,82,6]; % ALL = 118, 104, 96, 110, 103, 108, 107, All with Sub 6 out 96,90,82,6
             reshaped(rowsToRemove, :) = [];
         case 'medoff'
-            rowsToRemove = []; % EEG 27, STN 7,16, ALL with sub 5 removed 62,24,60,59,58
+            rowsToRemove = [62,61,24]; % EEG 27, STN 16,7 ALL with sub 5 removed 62,61,24  optional: 60,63,71
             reshaped(rowsToRemove, :) = [];
     end
     
@@ -589,11 +748,11 @@ for iCond = 1:length(titles)
     Z = linkage(D, 'ward');
     labels = cluster(Z, 'maxclust', nClusters);
 
-    %plot_dendogram(Z, reshaped, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info, chantag, titles)
-    f3=figure;
-    dendrogram(Z);
-    gr3 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', 'dendrogram', ['Dendrogram_', char(titles), '_', char(chantag), '.png']);
-    exportgraphics(f3, gr3,"Resolution", 300);
+    % %plot_dendogram(Z, reshaped, AllSubsChansStn, AllSubsOnlyStn, AllSubsOnlyEEG, subject_info, chantag, titles)
+    % f3=figure;
+    % dendrogram(Z);
+    % gr3 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', 'dendrogram', ['Dendrogram_', char(titles), '_', char(chantag), '.png']);
+    % exportgraphics(f3, gr3,"Resolution", 300);
 
     % Polarity correction
     for cl = flipped_clusters
@@ -615,30 +774,45 @@ for iCond = 1:length(titles)
         ylabel('Amplitude');
         grid on;
     end
-    gr1 = fullfile( '/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    gr1 = fullfile( '/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_',char(chantag), '_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
     exportgraphics(f1, gr1, "Resolution", 300)
 
     % Create one figure for all clusters in current condition
     f2 = figure; hold on;
     set(f2,'Position',[1 59 1440 738]);
+    subplot(2,1,1)
+    plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
+    set(gca,'Position',[0.13 0.7 0.69 0.25])
+    xline(0, "--k", 'LineWidth', 2);
+    ylabel('Amplitude')
+    axis('tight')
+    title(sprintf('Average ECG, Med: %s', char(titles)))
+
+    subplot(2,1,2)
+    hold on
     plotHandles = gobjects(nClusters, 1); 
     for cl = 1:nClusters
         idx = labels == cl;
+        ninclus(cl) = sum(idx);
         m = mean(reshaped(idx,:), 1);
         e = std(reshaped(idx,:), 0, 1) / sqrt(sum(idx));
         % Shaded area for SEM
-        fill([time, fliplr(time)], [m+e, fliplr(m-e)], 'k', 'FaceAlpha', 0.2, 'EdgeColor', 'none');  % Default gray; replaced by color below
+        meplus = m+e;
+        meminus = m-e;
+        fill([time(31:end), fliplr(time(31:end))], [meplus(31:end), fliplr(meminus(31:end))], 'k', 'FaceAlpha', 0.2, 'EdgeColor', 'none');  % Default gray; replaced by color below
         % Plot mean line (color auto-cycles)
-        plotHandles(cl) = plot(time, m, 'LineWidth', 1.5);
+        plotHandles(cl) = plot(time(31:end), m(31:end), 'LineWidth', 1.5);
+        set(gca,'Position',[0.13 0.1 0.778 0.5])
+        xline(0, "--k", 'LineWidth', 2);
     end
     xlabel('Time (s)');
     ylabel('Amplitude');
     title([titles{iCond} ' - HEP Clusters - ' chantag ]);
-    legend(plotHandles, compose('Cluster %d', 1:nClusters), 'Location', 'northeastoutside');
+    legend(plotHandles, compose('Cluster %d, N = %d', (1:nClusters)', ninclus(:)), 'Location', 'northeastoutside');
     grid on;
     box on;
 
-    gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_',char(chantag) ,'_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
     exportgraphics(f2, gr2, "Resolution", 300)
 
 end
