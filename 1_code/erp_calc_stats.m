@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
+steps = {'Clustering', 'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -511,17 +511,68 @@ if ismember('Clustering', steps)
 
     for s = 3%:length(chantags)
         chantag = chantags{s};
+%% =========================== Med On ===============================
+        switch chantag
+            case 'EEG'
+                channels = AllSubsOnlyEEG([subject_info.MedOn] == 1);
+            case 'STN'
+                channels = AllSubsOnlyStn([subject_info.MedOn] == 1);
+            case 'ALL'
+                channels = AllSubsChansStn([subject_info.MedOn] == 1);
+        end
+
+        Subject = {};
+        Condition   = {};
+        Channel = {};
+        % create subject x condition x channel map Med On
+            for subj = 1:numel(subjects)
+                chans = channels{subj};
+                for ch = 1:numel(chans)
+                    Subject{end+1,1}   = subjects(subj);
+                    Condition{end+1,1}   = 'MedOn';
+                    Channel{end+1,1} = chans{ch};
+                end
+            end
+        clusterTable = table(Subject, Condition, Channel);
+
+
         nClusters = 6; % EEG = 5, STN = 5, ALL = 6
         flipped_clusters = [1,2,3];  % EEG bei 5 Clus = 5, STN 4 bei Clus = 5, ALL 1,2,3 bei Clus = 6
-        [reshaped_on] = plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AVGECG) % For Med On only 
+        [IdxTable, clusterTable, reshaped_on] = plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AVGECG, clusterTable) % For Med On only 
         Cluster.(chantag).MedOn = reshaped_on;
+        Cluster.(chantag).Map_Med_On = clusterTable;
 
+        %% ===================== Med Off ==============================0
+        switch chantag
+            case 'EEG'
+                channels = AllSubsOnlyEEG([subject_info.MedOff] == 1);
+            case 'STN'
+                channels = AllSubsOnlyStn([subject_info.MedOff] == 1);
+            case 'ALL'
+                channels = AllSubsChansStn([subject_info.MedOff] == 1);
+        end
+
+        Subject = {};
+        Condition   = {};
+        Channel = {};
+        % create subject x condition x channel map Med On
+            for subj = 1:numel(subjects)
+                chans = channels{subj};
+                for ch = 1:numel(chans)
+                    Subject{end+1,1}   = subjects(subj);
+                    Condition{end+1,1}   = 'MedOn';
+                    Channel{end+1,1} = chans{ch};
+                end
+            end
+        clusterTable = table(Subject, Condition, Channel);
+       
         nClusters = 5; % EEG = 4, STN = 5, All = 5 
         flipped_clusters = [5];  % EEG nix, STN nix, All = 5 bei clos =5
-        [reshaped_off] = plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters, AVGECG)    % For Med Off only
-        varname_off = sprintf('reshaped_%s_MedOff', chantag);
+        [IdxTable, clusterTable, reshaped_off] = plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters, AVGECG, clusterTable)    % For Med Off only
         Cluster.(chantag).MedOff = reshaped_off;
+        Cluster.(chantag).Map_Med_Off = clusterTable;
 
+%% ============================= Save ===================================
         save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag,'_MedOn_MedOff.mat']), 'Cluster', '-v7.3')
         clear Cluster
         % nClusters = 6;
@@ -682,7 +733,7 @@ if ismember('Plot Mean Clustering by Method', steps)
     end
 end
 
-function [reshaped] = plot_clustered_HEPs(CLUS, condition, chantag, nClusters, flipped_clusters, AVGECG)
+function [IdxTable, clusterTable, reshaped] = plot_clustered_HEPs(CLUS, condition, chantag, nClusters, flipped_clusters, AVGECG, clusterTable)
 % Inputs:
 %   CLUS: struct with fields like CLUS.MedOn.EvDataAllAvgTrs
 %   condition: 'on', 'off', or 'both'
@@ -715,10 +766,18 @@ for iCond = 1:length(titles)
             data = data_on;
             sub2remove = [6]; % All 6 Stn 6
             data(sub2remove, :, :) = [];
+            uniqueSubs = unique(ClusterTable.Subject, 'stable');
+            subjectNameToRemove = uniqueSubs{sub2remove};
+            rmidx = find(strcmp(ClusterTable.Subject, subjectNameToRemove));
+            ClusterTable(rmidx, :) = [];
         case 'medoff'
             data = data_off;
             sub2remove = [5]; %  All 5
             data(sub2remove, :, :) = [];
+            uniqueSubs = unique(ClusterTable.Subject, 'stable');
+            subjectNameToRemove = uniqueSubs{sub2remove};
+            rmidx = find(strcmp(ClusterTable.Subject, subjectNameToRemove));
+            ClusterTable(rmidx, :) = [];
         otherwise
             error('Unknown condition title: %s', titles{iCond});
     end
@@ -727,20 +786,37 @@ for iCond = 1:length(titles)
     reshaped = reshape(data, nSub * nChans, nTime);  % [waveforms x time]
     reshaped_copy = reshaped;
 
+    % Make mapping table
+    idxMap = [];
+    for subj = 1:nSub
+        for chan = 1:nChans
+            idxMap = [idxMap; subj, chan];
+            if ~isempty(sub2remove)
+               rmidx = find(idxMap(:,1)==sub2remove);
+               idxMap(rmidx,:) = [];
+            end
+        end
+    end
+
     % subject_index = floor((108 - 1) / nChans) + 1;
     % channel_index = mod(108 - 1, nChans) + 1;
 
     % Remove NaNs
+    zero_idx = find(any(isnan(reshaped), 2) | all(reshaped == 0, 2));
     reshaped = reshaped(~any(isnan(reshaped), 2) & ~all(reshaped == 0, 2), :);
+    idxMap(zero_idx,:) = [];
+
 
     % remove outliers
     switch thisTitle
         case 'medon'
-            rowsToRemove = [96,90,82,6]; % ALL = 118, 104, 96, 110, 103, 108, 107, All with Sub 6 out 96,90,82,6
+            rowsToRemove = [96,90,82,6]; % All with Sub 6 out 96,90,82,6
             reshaped(rowsToRemove, :) = [];
+            idxMap(rowsToRemove,:) = [];
         case 'medoff'
-            rowsToRemove = [62,61,24]; % EEG 27, STN 16,7 ALL with sub 5 removed 62,61,24  optional: 60,63,71
+            rowsToRemove = [62,61,24]; % EEG 27, STN 16,7 ALL with sub 5 removed 62,61,24  
             reshaped(rowsToRemove, :) = [];
+            idxMap(rowsToRemove,:) = [];
     end
     
     % Clustering
@@ -753,6 +829,12 @@ for iCond = 1:length(titles)
     % dendrogram(Z);
     % gr3 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', 'dendrogram', ['Dendrogram_', char(titles), '_', char(chantag), '.png']);
     % exportgraphics(f3, gr3,"Resolution", 300);
+
+    % Create logical array marking flipped clusters
+    isFlipped = ismember(labels, flipped_clusters);
+
+    IdxTable = table(idxMap(:,1), idxMap(:,2), labels, isFlipped, ...
+    'VariableNames', {'Subject', 'Channel', 'Cluster', 'Flipped'});
 
     % Polarity correction
     for cl = flipped_clusters
