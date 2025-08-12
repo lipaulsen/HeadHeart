@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Clustering', 'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
+steps = {'Plot Mean Clustering by Med', 'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -512,6 +512,7 @@ if ismember('Clustering', steps)
     for s = 3%:length(chantags)
         chantag = chantags{s};
 %% =========================== Med On ===============================
+        subjects = string({subject_info([subject_info.MedOn] == 1).ID});
         switch chantag
             case 'EEG'
                 channels = AllSubsOnlyEEG([subject_info.MedOn] == 1);
@@ -524,25 +525,39 @@ if ismember('Clustering', steps)
         Subject = {};
         Condition   = {};
         Channel = {};
-        % create subject x condition x channel map Med On
+
+        for chan = 1:max(cellfun(@numel, channels))   % max number of channels across subjects
             for subj = 1:numel(subjects)
-                chans = channels{subj};
-                for ch = 1:numel(chans)
-                    Subject{end+1,1}   = subjects(subj);
-                    Condition{end+1,1}   = 'MedOn';
-                    Channel{end+1,1} = chans{ch};
+                chansForThisSubj = channels{subj};
+                if chan <= numel(chansForThisSubj)    % only add if subject has this channel
+                    Subject{end+1,1}   = subjects{subj};
+                    Condition{end+1,1} = {'MedOn'};
+                    Channel{end+1,1}   = chansForThisSubj{chan};
                 end
             end
+        end
         clusterTable = table(Subject, Condition, Channel);
+        if strcmp(chantag, 'EEG')
+            KS29_EEG_rm = find(strcmp(clusterTable.Subject, 'KS29'));
+            clusterTable(KS29_EEG_rm, :) = [];
+        elseif strcmp(chantag, 'ALL')
+            KS29_EEG_rm = find(strcmp(clusterTable.Subject, 'KS29'));
+            clusterTable(KS29_EEG_rm(1:end-2), :) = [];
+        elseif strcmp(chantag, 'STN')
+            KS29_EEG_rm = find(strcmp(clusterTable.Subject, 'KS29'));
+            clusterTable(KS29_EEG_rm, :) = [];
+        end
 
-
-        nClusters = 6; % EEG = 5, STN = 5, ALL = 6
-        flipped_clusters = [1,2,3];  % EEG bei 5 Clus = 5, STN 4 bei Clus = 5, ALL 1,2,3 bei Clus = 6
+        nClusters =6; % EEG = 5, STN = 4, ALL = 6
+        flipped_clusters = [1,2,3];  % EEG bei 5 Clus = 5, STN 3 bei Clus = 4, ALL 1,2,3 bei Clus = 6
         [IdxTable, clusterTable, reshaped_on] = plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AVGECG, clusterTable) % For Med On only 
-        Cluster.(chantag).MedOn = reshaped_on;
-        Cluster.(chantag).Map_Med_On = clusterTable;
+        Cluster.MedOn = reshaped_on;
+        clusterTable.Cluster = IdxTable.Cluster;
+        clusterTable.Flipped = IdxTable.Flipped;
+        Cluster.Map_Med_On = clusterTable;
 
         %% ===================== Med Off ==============================0
+        subjects = string({subject_info([subject_info.MedOff] == 1).ID});
         switch chantag
             case 'EEG'
                 channels = AllSubsOnlyEEG([subject_info.MedOff] == 1);
@@ -556,21 +571,25 @@ if ismember('Clustering', steps)
         Condition   = {};
         Channel = {};
         % create subject x condition x channel map Med On
+        for chan = 1:max(cellfun(@numel, channels))   % max number of channels across subjects
             for subj = 1:numel(subjects)
-                chans = channels{subj};
-                for ch = 1:numel(chans)
-                    Subject{end+1,1}   = subjects(subj);
-                    Condition{end+1,1}   = 'MedOn';
-                    Channel{end+1,1} = chans{ch};
+                chansForThisSubj = channels{subj};
+                if chan <= numel(chansForThisSubj)    % only add if subject has this channel
+                    Subject{end+1,1}   = subjects{subj};
+                    Condition{end+1,1} = {'MedOff'};
+                    Channel{end+1,1}   = chansForThisSubj{chan};
                 end
             end
+        end
         clusterTable = table(Subject, Condition, Channel);
        
-        nClusters = 5; % EEG = 4, STN = 5, All = 5 
+        nClusters = 5; % EEG = 5, STN = 5, All = 5 
         flipped_clusters = [5];  % EEG nix, STN nix, All = 5 bei clos =5
         [IdxTable, clusterTable, reshaped_off] = plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters, AVGECG, clusterTable)    % For Med Off only
-        Cluster.(chantag).MedOff = reshaped_off;
-        Cluster.(chantag).Map_Med_Off = clusterTable;
+        Cluster.MedOff = reshaped_off;
+        clusterTable.Cluster = IdxTable.Cluster;
+        clusterTable.Flipped = IdxTable.Flipped;
+        Cluster.Map_Med_Off = clusterTable;
 
 %% ============================= Save ===================================
         save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag,'_MedOn_MedOff.mat']), 'Cluster', '-v7.3')
@@ -645,7 +664,8 @@ if ismember('Plot Mean Clustering by Med', steps)
         grid on;
         box on;
 
-        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
+        %gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
         exportgraphics(f2, gr2, "Resolution", 300)
     end
 end
@@ -728,7 +748,8 @@ if ismember('Plot Mean Clustering by Method', steps)
         grid on;
         box on;
 
-        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        % gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
         exportgraphics(f2, gr2, "Resolution", 300)
     end
 end
@@ -764,20 +785,24 @@ for iCond = 1:length(titles)
     switch thisTitle
         case 'medon'
             data = data_on;
-            sub2remove = [6]; % All 6 Stn 6
+            sub2remove = []; % All 6 Stn 6
             data(sub2remove, :, :) = [];
-            uniqueSubs = unique(ClusterTable.Subject, 'stable');
-            subjectNameToRemove = uniqueSubs{sub2remove};
-            rmidx = find(strcmp(ClusterTable.Subject, subjectNameToRemove));
-            ClusterTable(rmidx, :) = [];
+            if ~isempty(sub2remove)
+                uniqueSubs = unique(clusterTable.Subject, 'stable');
+                subjectNameToRemove = uniqueSubs{sub2remove};
+                rmidx = find(strcmp(clusterTable.Subject, subjectNameToRemove));
+                clusterTable(rmidx, :) = [];
+            end
         case 'medoff'
             data = data_off;
-            sub2remove = [5]; %  All 5
+            sub2remove = []; %  All 5
             data(sub2remove, :, :) = [];
-            uniqueSubs = unique(ClusterTable.Subject, 'stable');
-            subjectNameToRemove = uniqueSubs{sub2remove};
-            rmidx = find(strcmp(ClusterTable.Subject, subjectNameToRemove));
-            ClusterTable(rmidx, :) = [];
+            if ~isempty(sub2remove)
+                uniqueSubs = unique(clusterTable.Subject, 'stable');
+                subjectNameToRemove = uniqueSubs{sub2remove};
+                rmidx = find(strcmp(clusterTable.Subject, subjectNameToRemove));
+                clusterTable(rmidx, :) = [];
+            end
         otherwise
             error('Unknown condition title: %s', titles{iCond});
     end
@@ -786,37 +811,34 @@ for iCond = 1:length(titles)
     reshaped = reshape(data, nSub * nChans, nTime);  % [waveforms x time]
     reshaped_copy = reshaped;
 
-    % Make mapping table
-    idxMap = [];
-    for subj = 1:nSub
-        for chan = 1:nChans
-            idxMap = [idxMap; subj, chan];
-            if ~isempty(sub2remove)
-               rmidx = find(idxMap(:,1)==sub2remove);
-               idxMap(rmidx,:) = [];
-            end
-        end
-    end
+    % Sanity check function for the reshaoed order 
+    % L = 3 + (271-1) * (nSub*nChans);   % L is linear index into data(:)
+    % [s,c,tt] = ind2sub([nSub, nChans, nTime], L);
 
-    % subject_index = floor((108 - 1) / nChans) + 1;
-    % channel_index = mod(108 - 1, nChans) + 1;
+    % Make mapping table
+   idxMap = [repmat((1:nSub)', nChans, 1), kron((1:nChans)', ones(nSub,1))];
 
     % Remove NaNs
     zero_idx = find(any(isnan(reshaped), 2) | all(reshaped == 0, 2));
     reshaped = reshaped(~any(isnan(reshaped), 2) & ~all(reshaped == 0, 2), :);
     idxMap(zero_idx,:) = [];
 
+    if height(clusterTable) ~= length(idxMap)
+    warning('Length of Cluster Table and IdxMap is different -> check')
+    end
 
     % remove outliers
     switch thisTitle
         case 'medon'
-            rowsToRemove = [96,90,82,6]; % All with Sub 6 out 96,90,82,6
+            rowsToRemove = [7, 20, 89, 97, 98, 104, 110]; % EEG 7,20 ALL 7, 20, 89, 97, 98, 104, 110
             reshaped(rowsToRemove, :) = [];
             idxMap(rowsToRemove,:) = [];
+            clusterTable(rowsToRemove,:) = [];
         case 'medoff'
-            rowsToRemove = [62,61,24]; % EEG 27, STN 16,7 ALL with sub 5 removed 62,61,24  
+            rowsToRemove = [27, 68,69, 70, 77 ]; % EEG 27, STN 16,7 ALL 27, 68,69, 70, 77 
             reshaped(rowsToRemove, :) = [];
             idxMap(rowsToRemove,:) = [];
+            clusterTable(rowsToRemove,:) = [];
     end
     
     % Clustering
@@ -856,8 +878,9 @@ for iCond = 1:length(titles)
         ylabel('Amplitude');
         grid on;
     end
-    gr1 = fullfile( '/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_',char(chantag), '_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
-    exportgraphics(f1, gr1, "Resolution", 300)
+    %gr1 = fullfile( '/Volumes','LP3', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_',char(chantag), '_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    gr1 = fullfile( 'E:', 'HeadHeart', '2_results','erp', 'clustering', [ 'Hierarchical-Clustering_Single_HEP_',char(chantag), '_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    %exportgraphics(f1, gr1, "Resolution", 300)
 
     % Create one figure for all clusters in current condition
     f2 = figure; hold on;
@@ -894,8 +917,9 @@ for iCond = 1:length(titles)
     grid on;
     box on;
 
-    gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_',char(chantag) ,'_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
-    exportgraphics(f2, gr2, "Resolution", 300)
+    %gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_',char(chantag) ,'_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    gr2 = fullfile('E:','HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_All_HEP_',char(chantag) ,'_', char(titles), '_nClusters=', num2str(nClusters), '_nflippedcluster=', num2str(flipped_clusters),'.png']);
+    %exportgraphics(f2, gr2, "Resolution", 300)
 
 end
 end
