@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot Mean Clustering by Med', 'Plot Mean Clustering by Method'}; % 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
+steps = {'Plot Signif Clustering by Method', 'Plot Signif Clustering by Med'}; %'Plot Signif Clustering by Med', 'Plot Signif Clustering by Method', 'Plot Mean Clustering by Method', 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -509,7 +509,7 @@ if ismember('Clustering', steps)
         CLUS.(medname).(chantag).EvDataAllAvgTrs = ERP.EvDataAllAvgTrs;
     end
 
-    for s = 2%:length(chantags)
+    for s = 3%:length(chantags)
         chantag = chantags{s};
 %% =========================== Med On ===============================
         subjects = string({subject_info([subject_info.MedOn] == 1).ID});
@@ -548,8 +548,8 @@ if ismember('Clustering', steps)
             clusterTable(KS29_EEG_rm, :) = [];
         end
 
-        nClusters = 4; % EEG = 5, STN = 4, ALL = 6
-        flipped_clusters = [3];  % EEG bei 5 Clus = 5, STN 3 bei Clus = 4, ALL 1,2,3 bei Clus = 6
+        nClusters =6; % EEG = 5, STN = 4, ALL = 6
+        flipped_clusters = [1,2,3];  % EEG bei 5 Clus = 5, STN 3 bei Clus = 4, ALL 1,2,3 bei Clus = 6
         [IdxTable, clusterTable, reshaped_on] = plot_clustered_HEPs(CLUS, 'on', chantag, nClusters, flipped_clusters, AVGECG, clusterTable) % For Med On only 
         Cluster.MedOn = reshaped_on;
         clusterTable.Cluster = IdxTable.Cluster;
@@ -584,12 +584,12 @@ if ismember('Clustering', steps)
         clusterTable = table(Subject, Condition, Channel);
        
         nClusters = 5; % EEG = 5, STN = 5, All = 5 
-        flipped_clusters = [];  % EEG nix, STN nix, All = 5 bei clos =5
+        flipped_clusters = [5];  % EEG nix, STN nix, All = 5 bei clos =5
         [IdxTable, clusterTable, reshaped_off] = plot_clustered_HEPs(CLUS, 'off', chantag, nClusters, flipped_clusters, AVGECG, clusterTable)    % For Med Off only
         Cluster.MedOff = reshaped_off;
         clusterTable.Cluster = IdxTable.Cluster;
         clusterTable.Flipped = IdxTable.Flipped;
-        Cluster.(chantag).Map_Med_Off = clusterTable;
+        Cluster.Map_Med_Off = clusterTable;
 
 %% ============================= Save ===================================
         save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag,'_MedOn_MedOff.mat']), 'Cluster', '-v7.3')
@@ -664,8 +664,150 @@ if ismember('Plot Mean Clustering by Med', steps)
         grid on;
         box on;
 
-        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
+        %gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_HEP_',char(chantag),'.png']);
         exportgraphics(f2, gr2, "Resolution", 300)
+    end
+end
+
+if ismember('Plot Signif Clustering by Med', steps)
+
+    chantags = {'EEG', 'STN', 'ALL'};
+
+    for s = 3:length(chantags)
+        chantag = chantags{s};
+
+        fprintf('Loading %s Cluster Data \n' ,chantag);
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_', chantag, '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster');
+
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_on = fields{contains(fields, 'MedOn')};
+        field_off = fields{contains(fields, 'MedOff')};
+        subs_on = Cluster.Map_Med_On.Subject; 
+        subs_off = Cluster.Map_Med_Off.Subject;
+        raw_data_on = Cluster.(field_on);
+        raw_data_off = Cluster.(field_off);
+
+         % Get unique subjects
+        usubs_on = unique(subs_on);
+        usubs_off = unique(subs_off);
+
+        % Preallocate subject × time matrices
+        data_on = nan(numel(usubs_on), size(raw_data_on, 2));
+        data_off  = nan(numel(usubs_off), size(raw_data_off, 2));
+
+        % Average across channels within subject
+        for si = 1:numel(usubs_on)
+            data_on(si,:) = mean(raw_data_on(strcmp(subs_on, usubs_on{si}), :), 1); 
+        end
+        for so = 1:numel(usubs_off)
+            data_off(so,:) = mean(raw_data_off(strcmp(subs_off, usubs_off{so}), :), 1);
+        end
+
+        %optional save
+         save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_ON_OFF_Mean-by-Sub_4Perm_',chantag,'.mat']), 'data_on', 'data_off', '-v7.3')
+
+         [common_subs, idx_on, idx_off] = intersect(usubs_on, usubs_off);
+
+         data_on_common = data_on(idx_on, :);
+         data_off_common = data_off(idx_off, :);
+
+         % Mean + SEM
+         data_on_mean = mean(data_on_common,1);
+         data_on_sem = std(data_on_common) / sqrt(length(data_on_common));
+
+         data_off_mean = mean(data_off_common,1);
+         data_off_sem = std(data_off_common,1) / sqrt(length(data_off_common));
+
+         nSubj_on = size(data_on_common,1);
+         nSubj_off = size(data_off_common,1);
+         nTime = size(data_on_common,2);
+         pvals = nan(1, nTime);
+
+         for t = 1:nTime
+             [~, pvals(t)] = ttest(data_on_common(:,t), data_off_common(:,t));
+         end
+         sig_time = find(pvals < 0.05);
+         sig_times = AVGECG.times(sig_time);
+         % apply FDR correction across all time points
+         pvals_fdr = mafdr(pvals, 'BHFDR', true);
+         sig_timepoints = find(pvals_fdr < 0.05);
+        
+         f2 = figure; hold on;
+        set(f2,'Position',[1 59 1440 738]);
+        subplot(2,1,1)
+        plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
+        set(gca,'Position',[0.13 0.7 0.778 0.25])
+        xline(0, "--k", 'LineWidth', 2);
+        ylabel('Amplitude')
+        axis('tight')
+        title(sprintf('Average ECG'))
+
+        subplot(2,1,2); hold on
+        t = AVGECG.times(31:end)';
+
+        % --- MedOn shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [data_on_mean(31:end) + data_on_sem(31:end), ...
+            fliplr(data_on_mean(31:end) - data_on_sem(31:end))], ...
+            [0.2 0.6 1], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+        h1 = plot(t, data_on_mean(31:end), 'Color', [0 0.3 0.9], 'LineWidth', 2);
+
+        % --- MedOff shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [data_off_mean(31:end) + data_off_sem(31:end), ...
+            fliplr(data_off_mean(31:end) - data_off_sem(31:end))], ...
+            [1 0.4 0.4], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+        h2 = plot(t, data_off_mean(31:end), 'Color', [0.9 0.1 0.1], 'LineWidth', 2);
+
+        % --- Variables for significance detection ---
+        is_significant = pvals(31:end) < 0.05; % logical vector
+        ybounds = [min([data_on_mean data_off_mean], [], 'all'), ...
+            max([data_on_mean data_off_mean], [], 'all')];
+
+        % Make sure vectors are row shape
+        is_significant = reshape(is_significant, 1, length(is_significant));
+        t = reshape(t, 1, length(t));
+
+        if length(t) ~= length(is_significant)
+            error('t and Significance vectors must have same length.')
+        end
+
+        % --- Find significant time start/stop ---
+        sig_onset = find(diff(is_significant) == 1) + 1; % where significant period starts
+        sig_offset = find(diff(is_significant) == -1);   % where significant period stops
+
+        % Fix end cases
+        if is_significant(1)
+            sig_onset = [1 sig_onset];
+        end
+        if is_significant(end)
+            sig_offset = [sig_offset length(is_significant)];
+        end
+
+        % --- Plot significance shading (drawn first so it’s behind SEM lines) ---
+        for k = 2:length(sig_onset)
+            fill([t(sig_onset(k)) t(sig_offset(k)) ...
+                t(sig_offset(k)) t(sig_onset(k))], ...
+                [ybounds(1) ybounds(1) ybounds(2) ybounds(2)], ...
+                'k', 'FaceAlpha', 0.2, 'EdgeAlpha', 0.2);
+        end
+
+        xline(0, "--k", 'LineWidth', 2);
+        xlabel('Time (s)');
+        ylabel('Amplitude');
+        title(['HEP Comparison MedOn vs MedOff - ' chantag]);
+        legend([h1 h2], {'MedOn', 'MedOff'}, 'Location', 'northeastoutside');
+        set(gca, 'Position', [0.13 0.1 0.778 0.5]);
+        grid on; box on;
+
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_SIGNIF_Comparison_MedOn-MedOff_HEP_',char(chantag),'.png']);
+        exportgraphics(f2, gr2, "Resolution", 300)
+
     end
 end
 
@@ -747,8 +889,199 @@ if ismember('Plot Mean Clustering by Method', steps)
         grid on;
         box on;
 
-        gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        % gr2 = fullfile('/Volumes','LP3', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_Comparison_STN_EEG_HEP_',char(med),'.png']);
         exportgraphics(f2, gr2, "Resolution", 300)
+    end
+end
+
+if ismember('Plot Signif Clustering by Method', steps)
+    meds = {'MedOn' 'MedOff'};
+    for m = 2:length(meds)
+        med = meds{m};
+
+        fprintf('Loading EEG Cluster Data \n');
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_EEG', '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster');
+        subs_eeg = Cluster.Map_Med_Off.Subject; % currently always MedOn - Change for Med OFF !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_eeg = fields{contains(fields, med)};
+        raw_data_eeg = Cluster.(field_eeg);
+
+        fprintf('Loading STN Cluster Data \n');
+        pattern = fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_Flipped_STN', '*']);
+        files = dir(pattern);
+        filename = fullfile(files(1).folder, files(1).name);
+        load(filename, 'Cluster')
+        subs_stn = Cluster.Map_Med_Off.Subject; % currently always MedOn - Change for Med OFF !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        % Filter correct field
+        fields = fieldnames(Cluster);
+        field_stn = fields{contains(fields, med)};
+        raw_data_stn = Cluster.(field_stn);
+
+        % Get unique subjects
+        usubs_eeg = unique(subs_eeg);
+        usubs_stn = unique(subs_stn);
+        if strcmp(med, 'MedOff')
+            [common_subs, idx_on, idx_off] = intersect(usubs_eeg, usubs_stn);
+            data_on_common = data_on(idx_on, :);
+            data_off_common = data_off(idx_off, :);
+        end
+
+        % Preallocate subject × time matrices
+        data_eeg = nan(numel(usubs), size(raw_data_eeg, 2));
+        data_stn  = nan(numel(usubs), size(raw_data_stn, 2));
+
+        % Average across channels within subject
+        for si = 1:numel(usubs)
+            data_eeg(si,:) = mean(raw_data_eeg(strcmp(subs_eeg, usubs{si}), :), 1);
+            data_stn(si,:) = mean(raw_data_stn(strcmp(subs_stn, usubs{si}), :), 1);
+        end
+
+        % Mean + SEM EEG
+        data_eeg_mean = mean(data_eeg,1);
+        data_eeg_sem = std(data_eeg) / sqrt(length(data_eeg));
+        % Mean + SEM STN
+        data_stn_mean = mean(data_stn,1);
+        data_stn_sem = std(data_stn) / sqrt(length(data_stn));
+
+        %optional save
+        % save(fullfile(data_dir, 'erp', 'group', 'clustering', ['Cluster_Data_EEG_STN_Mean-by-Sub_4Perm', med,'.mat']), 'data_eeg', 'data_stn', '-v7.3')
+
+        nSubj = size(data_eeg,1);
+        nTime = size(data_eeg,2);
+        pvals = nan(1, nTime);
+
+        for t = 1:nTime
+            [~, pvals(t)] = ttest(data_eeg(:,t), data_stn(:,t));
+        end
+        sig_time = find(pvals < 0.05);
+        sig_times = AVGECG.times(sig_time);
+        % apply FDR correction across all time points
+        pvals_fdr = mafdr(pvals, 'BHFDR', true);
+        sig_timepoints = find(pvals_fdr < 0.05);
+
+         % Create one figure for all clusters in current condition
+        f2 = figure; hold on;
+        set(f2,'Position',[1 59 1440 738]);
+        subplot(2,1,1)
+        plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
+        set(gca,'Position',[0.13 0.7 0.778 0.25])
+        xline(0, "--k", 'LineWidth', 2);
+        ylabel('Amplitude')
+        axis('tight')
+        title(sprintf('Average ECG'))
+
+        subplot(2,1,2)
+        hold on
+        t = AVGECG.times(31:end)';
+        % --- STN MedOn shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [data_stn_mean(31:end) + data_stn_sem(31:end), ...
+            fliplr(data_stn_mean(31:end) - data_stn_sem(31:end))], ...
+            [0.2 0.6 1], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % blue-ish
+        h1 = plot(t, data_stn_mean(31:end), 'Color', [0 0.3 0.9], 'LineWidth', 2);
+
+        % --- EEG Med On shaded SEM + line ---
+        fill([t, fliplr(t)], ...
+            [data_eeg_mean(31:end) + data_eeg_sem(31:end), ...
+            fliplr(data_eeg_mean(31:end) - data_eeg_sem(31:end))], ...
+            [1 0.4 0.4], 'FaceAlpha', 0.3, 'EdgeColor', 'none');  % red-ish
+        h2 = plot(t, data_eeg_mean(31:end), 'Color', [0.9 0.1 0.1], 'LineWidth', 2);
+
+         % --- Variables for significance detection ---
+        is_significant = pvals(31:end) < 0.05; % logical vector
+        ybounds = [min([data_eeg_mean data_eeg_mean], [], 'all'), ...
+            max([data_eeg_mean data_stn_mean], [], 'all')];
+
+        % Make sure vectors are row shape
+        is_significant = reshape(is_significant, 1, length(is_significant));
+        t = reshape(t, 1, length(t));
+
+        if length(t) ~= length(is_significant)
+            error('t and Significance vectors must have same length.')
+        end
+
+        % --- Find significant time start/stop ---
+        sig_onset = find(diff(is_significant) == 1) + 1; % where significant period starts
+        sig_offset = find(diff(is_significant) == -1);   % where significant period stops
+
+        % Fix end cases
+        if is_significant(1)
+            sig_onset = [1 sig_onset];
+        end
+        if is_significant(end)
+            sig_offset = [sig_offset length(is_significant)];
+        end
+
+        % --- Plot significance shading (drawn first so it’s behind SEM lines) ---
+        for k = 2:length(sig_onset)
+            fill([t(sig_onset(k)) t(sig_offset(k)) ...
+                t(sig_offset(k)) t(sig_onset(k))], ...
+                [ybounds(1) ybounds(1) ybounds(2) ybounds(2)], ...
+                'k', 'FaceAlpha', 0.2, 'EdgeAlpha', 0.2);
+        end
+
+        xline(0, "--k", 'LineWidth', 2);
+        xlabel('Time (s)');
+        ylabel('Amplitude');
+        title(['HEP Comparison EEG vs STN, Med: ', med]);
+        legend([h1 h2], {'STN', 'EEG'}, 'Location', 'northeastoutside');
+        set(gca, 'Position', [0.13 0.1 0.778 0.5]);
+        grid on;
+        box on;
+
+        gr2 = fullfile('E:', 'HeadHeart', '2_results', 'erp', 'clustering', [ 'Hierarchical-Clustering_SIGNIF_Comparison_STN_EEG_HEP_',char(med),'.png']);
+        exportgraphics(f2, gr2, "Resolution", 300)
+
+        %
+        % t_obs = zeros(1, nTime);
+        % for t = 1:nTime
+        %     [~, ~, ~, stats] = ttest(data_eeg(:,t), data_stn(:,t));
+        %     t_obs(t) = stats.tstat;
+        % end
+        % 
+        % nPerm = 1000;
+        % t_perm_max = zeros(1, nPerm);  % store max cluster t-stat per permutation
+        % 
+        % for p = 1:nPerm
+        %     % randomly flip condition per subject
+        %     flip = randi([0 1], nSubj, 1)*2 - 1;  % +1 or -1
+        %     perm_diff = ((data_eeg - data_stn) .* flip);  % flip signs
+        %     t_perm = zeros(1, nTime);
+        % 
+        %     for t = 1:nTime
+        %         [~, ~, ~, stats] = ttest(perm_diff(:,t), zeros(nSubj,1));
+        %         t_perm(t) = stats.tstat;
+        %     end
+        % 
+        %     % cluster-based: find contiguous t-values above threshold
+        %     thresh = tinv(0.975, nSubj-1);  % two-tailed alpha=0.05
+        %     clusters = bwconncomp(abs(t_perm) > thresh); % find contiguous supra-threshold
+        %     max_cluster_t = 0;
+        %     for c = 1:clusters.NumObjects
+        %         max_cluster_t = max(max_cluster_t, sum(t_perm(clusters.PixelIdxList{c})));
+        %     end
+        %     t_perm_max(p) = max_cluster_t;
+        % end
+        % 
+        % % threshold observed clusters
+        % thresh = tinv(0.975, nSubj-1);
+        % clusters = bwconncomp(abs(t_obs) > thresh);
+        % 
+        % sig_idx = false(1, nTime);
+        % for c = 1:clusters.NumObjects
+        %     cluster_t = sum(t_obs(clusters.PixelIdxList{c}));
+        %     % compare to permutation max cluster t
+        %     if cluster_t > prctile(t_perm_max, 95)  % cluster p < 0.05
+        %         sig_idx(clusters.PixelIdxList{c}) = true;
+        %     end
+        % end
+ 
+
     end
 end
 
@@ -828,12 +1161,12 @@ for iCond = 1:length(titles)
     % remove outliers
     switch thisTitle
         case 'medon'
-            rowsToRemove = []; % EEG 7,20 ALL 7, 20, 89, 97, 98, 104, 110
+            rowsToRemove = [7, 20, 89, 97, 98, 104, 110]; % EEG 7,20 ALL 7, 20, 89, 97, 98, 104, 110
             reshaped(rowsToRemove, :) = [];
             idxMap(rowsToRemove,:) = [];
             clusterTable(rowsToRemove,:) = [];
         case 'medoff'
-            rowsToRemove = [7,16]; % EEG 27, STN 16,7 ALL 27, 68,69, 70, 77 
+            rowsToRemove = [27, 68,69, 70, 77 ]; % EEG 27, STN 16,7 ALL 27, 68,69, 70, 77 
             reshaped(rowsToRemove, :) = [];
             idxMap(rowsToRemove,:) = [];
             clusterTable(rowsToRemove,:) = [];
