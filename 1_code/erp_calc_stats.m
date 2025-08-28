@@ -103,7 +103,7 @@ Fhp = 2;
 Flp = 30;
 FltPassDir='twopass'; % onepass  twopass
 
-steps = {'Plot Signif Clustering by Method'}; %'Plot Signif Clustering by Med', 'Plot Signif Clustering by Method', 'Plot Mean Clustering by Method', 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
+steps = {'Plot Signif Clustering by Med'}; %'Plot Signif Clustering by Med', 'Plot Signif Clustering by Method', 'Plot Mean Clustering by Method', 'Plot Mean Clustering by Med', ERP Group Cluster, ERP Group, 'Plot SS ERP', 'ERP stats', 'ERP SS Calc', ,'Clustering'
 
 % Define Time Window
 tWidth   = 0.9;
@@ -673,6 +673,8 @@ end
 if ismember('Plot Signif Clustering by Med', steps)
 
     chantags = {'EEG', 'STN', 'ALL'};
+    time_test = false;
+    peak_test = true;
 
     for s = 1:length(chantags)
         chantag = chantags{s};
@@ -726,8 +728,11 @@ if ismember('Plot Signif Clustering by Med', steps)
          nSubj_on = size(data_on_common,1);
          nSubj_off = size(data_off_common,1);
          nTime = size(data_on_common,2);
-         pvals = nan(1, nTime);
 
+
+         % Test over the entire time window
+         if time_test
+         pvals = nan(1, nTime);
          for t = 1:nTime
              %[~, pvals(t)] = ttest(data_on_common(:,t), data_off_common(:,t));
               pvals(t) = signrank(data_on_common(:,t), data_off_common(:,t));
@@ -737,9 +742,130 @@ if ismember('Plot Signif Clustering by Med', steps)
          % apply FDR correction across all time points
          pvals_fdr = mafdr(pvals, 'BHFDR', true);
          sig_timepoints = find(pvals_fdr < 0.05);
-        
+         end
+
+         % Define time window of interest
+         if peak_test
+             % --- PARAMETERS ---
+             peak_win = [0.1 0.6];  % time window in seconds after R-peak
+             time_idx = AVGECG.times >= peak_win(1) & AVGECG.times <= peak_win(2);
+
+              % add hemisphere info
+             Cluster.Map_Med_On.Hemisphere  = cellfun(@get_hemisphere, Cluster.Map_Med_On.Channel, 'UniformOutput', false);
+             Cluster.Map_Med_Off.Hemisphere = cellfun(@get_hemisphere, Cluster.Map_Med_Off.Channel, 'UniformOutput', false);
+
+             % --- SUBJECT-WISE ---
+             nSubj = numel(common_subs);   
+            
+             % find rows corresponding to each subject
+             idx_on = cell(nSubj,1);
+             idx_off = cell(nSubj,1);
+
+             for si = 1:nSubj
+                 idx_on{si}  = find(strcmp(Cluster.Map_Med_On.Subject, common_subs{si}));
+                 idx_off{si} = find(strcmp(Cluster.Map_Med_Off.Subject, common_subs{si}));
+             end
+
+             % data_on_common/off_common assumed subj × time
+             [peak_on_subj,  ~] = max(data_on_common(:,time_idx), [], 2);
+             [peak_off_subj, ~] = max(data_off_common(:,time_idx), [], 2);
+
+             [~,p_subj,~,stats_subj] = ttest(peak_on_subj, peak_off_subj);
+             fprintf('Paired t-test (subject-wise): t(%d)=%.3f, p=%.4f\n', ...
+                 stats_subj.df, stats_subj.tstat, p_subj);
+
+             % --- HEMISPHERE-WISE (Option A, inflated n) ---
+            
+             nTimeWin = sum(time_idx);  % only if you still need the window; otherwise can be 1 for peak
+             data_on_left  = nan(nSubj, 1);   % one value per hemisphere per subject
+             data_on_right = nan(nSubj, 1);
+             data_off_left  = nan(nSubj, 1);
+             data_off_right = nan(nSubj, 1);
+
+             for si = 1:nSubj
+                 hemi_on_sub  = Cluster.Map_Med_On.Hemisphere(idx_on{si});
+                 hemi_off_sub = Cluster.Map_Med_Off.Hemisphere(idx_off{si});
+
+                 left_idx_on  = strcmp(hemi_on_sub, 'L');
+                 right_idx_on = strcmp(hemi_on_sub, 'R');
+                 left_idx_off  = strcmp(hemi_off_sub, 'L');
+                 right_idx_off = strcmp(hemi_off_sub, 'R');
+
+                 % --- ON CONDITION ---
+                 if any(left_idx_on)
+                     % max per channel in time window → median across channels
+                     ch_peaks = max(raw_data_on(idx_on{si}(left_idx_on), time_idx), [], 2);
+                     data_on_left(si) = median(ch_peaks);
+                 end
+                 if any(right_idx_on)
+                     ch_peaks = max(raw_data_on(idx_on{si}(right_idx_on), time_idx), [], 2);
+                     data_on_right(si) = median(ch_peaks);
+                 end
+
+                 % --- OFF CONDITION ---
+                 if any(left_idx_off)
+                     ch_peaks = max(raw_data_off(idx_off{si}(left_idx_off), time_idx), [], 2);
+                     data_off_left(si) = median(ch_peaks);
+                 end
+                 if any(right_idx_off)
+                     ch_peaks = max(raw_data_off(idx_off{si}(right_idx_off), time_idx), [], 2);
+                     data_off_right(si) = median(ch_peaks);
+                 end
+             end
+
+             % concatenate across hemis
+             data_on_hemi_all  = [data_on_left; data_on_right];   % (2*nSubj) × time
+             data_off_hemi_all = [data_off_left; data_off_right];
+
+             
+             [~,p_hemi,~,stats_hemi] = ttest(data_on_hemi_all, data_off_hemi_all);
+             fprintf('Paired t-test (hemisphere-wise): t(%d)=%.3f, p=%.4f\n', ...
+                 stats_hemi.df, stats_hemi.tstat, p_hemi);
+
+             
+
+             % --- TWO-WAY REPEATED-MEASURES ANOVA (Option B, correct) ---            
+             % Peaks per subject & hemisphere
+             peak_on_left  = data_on_left;
+             peak_on_right = data_on_right;
+             peak_off_left  = data_off_left;
+             peak_off_right = data_off_right;
+
+             peak_on_avg  = nanmean([peak_on_left, peak_on_right], 2);
+             peak_off_avg = nanmean([peak_off_left, peak_off_right], 2);
+
+             [~,p_avg,~,stats_avg] = ttest(peak_on_avg, peak_off_avg);
+             fprintf('Paired t-test (averaged hemispheres): t(%d)=%.3f, p=%.4f\n', ...
+                 stats_avg.df, stats_avg.tstat, p_avg);
+
+
+             % Make a matrix: rows = subjects, columns = repeated measures
+             % Column order: On-Left, On-Right, Off-Left, Off-Right
+             PeakMatrix = [peak_on_left, peak_on_right, peak_off_left, peak_off_right];
+
+             % Define within-subject factors
+             Condition = [1 1 2 2]';   % 1=On, 2=Off
+             Hemisphere = [1 2 1 2]';  % 1=Left, 2=Right
+             Within = table(Condition, Hemisphere);
+
+             % Column names in PeakMatrix
+             VarNames = {'OnLeft','OnRight','OffLeft','OffRight'};
+
+             % Convert PeakMatrix to table
+             tbl = array2table(PeakMatrix, 'VariableNames', VarNames);
+
+             % Fit repeated measures model
+             rm = fitrm(tbl, 'OnLeft-OffRight ~ 1', 'WithinDesign', Within);
+
+             % Run ANOVA
+             ranovatbl = ranova(rm, 'WithinModel', 'Condition*Hemisphere');
+             disp(ranovatbl);
+         end
+
+
+
          f2 = figure; hold on;
-        set(f2,'Position',[1 59 1440 738]);
+         set(f2,'Position',[1 59 1440 738]);
         subplot(2,1,1)
         plot(AVGECG.times(31:end), mean(AVGECG.mean(31:end),1), 'Color', 'k'); hold on
         set(gca,'Position',[0.13 0.7 0.778 0.25])
@@ -811,6 +937,21 @@ if ismember('Plot Signif Clustering by Med', steps)
 
     end
 end
+
+function hemi = get_hemisphere(chan)
+    % Map channel name to hemisphere
+    leftCh  = {'F3','C3','P3','O1','T7','P7','L1','L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8','Fz','Cz'};   % extend as needed
+    rightCh = {'F4','C4','P4','O2','T8','P8', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8','Pz', 'Oz'};
+   
+    if any(strcmp(chan,leftCh))
+        hemi = 'L';
+    elseif any(strcmp(chan,rightCh))
+        hemi = 'R';
+    else
+        hemi = 'U'; % unknown
+    end
+end
+
 
 if ismember('Plot Mean Clustering by Method', steps)
 

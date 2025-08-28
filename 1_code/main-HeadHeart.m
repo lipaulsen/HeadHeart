@@ -18,7 +18,7 @@ close all
 % set the directory to best fit your path 
 
 % Define if using Windows or Mac
-windows = false; % if true then Windows if false then Mac
+windows = true; % if true then Windows if false then Mac
 
 if windows
     % Lisas Path Lab on Windows
@@ -34,8 +34,8 @@ end
 
 %% Analysis SetUp 
 
-subject_info = table2struct(readtable('/Volumes/LP3/HeadHeart/0_data/subject_info.xlsx')); 
-%subject_info = table2struct(readtable('E:\HeadHeart\0_data\subject_info.xlsx')); 
+%subject_info = table2struct(readtable('/Volumes/LP3/HeadHeart/0_data/subject_info.xlsx')); 
+subject_info = table2struct(readtable('E:\HeadHeart\0_data\subject_info.xlsx')); 
 
 % initialize subjects 
 % % be aware that for sub 45 and 60 and 'SG078', 'SG079', 'KS28' only MEDON is available
