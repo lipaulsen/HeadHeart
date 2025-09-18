@@ -197,16 +197,16 @@ HR_off = HR_off(maskOff);
 % Paired TTest MedOn vs. Med Off HRV
 [h_hrv, p_hrv, ci_hrv, stats_hrv] = ttest2(HRV_on, HRV_off, 'Tail','right' , Vartype='equal');
 cd_hrv = mean(HRV_on-HRV_off)/std(HRV_on-HRV_off);
-sprintf(['t(' num2str(stats_hrv.df) ')=' num2str(stats_hrv.tstat) ', p='  num2str(p_hrv) ', d=' num2str(cd_hrv)]) %', d=' num2str(cohens_d)])
+sprintf(['t(' num2str(stats_hrv.df) ')=' num2str(stats_hrv.tstat) ', p='  num2str(p_hrv), ' d=' num2str(cohens_d) ]) %', d=' num2str(cohens_d)])
  
 % Paired TTest MedOn vs. Med Off IBI
 [h_ibi, p_ibi, ci_ibi, stats_ibi] = ttest2(IBI_on, IBI_off, 'Tail', 'left', Vartype='equal');
-cd_ibi = mean(IBI_on-IBI_off)/std(IBI_on-IBI_off);
+cd_ibi = mean(IBI.MedOnSubMean-IBI.MedOffSubMean)/std(IBI.MedOnSubMean-IBI.MedOffSubMean);
 sprintf(['t(' num2str(stats_ibi.df) ')=' num2str(stats_ibi.tstat) ', p='  num2str(p_ibi) ', d=' num2str(cd_ibi)])
 
 % Paired TTest MedOn vs. Med Off HR
 [h_hr, p_hr, ci_hr, stats_hr] = ttest2(HR_on, HR_off, 'Tail', 'right', Vartype='equal');
-cd_hr = mean(HR_on-HR_off)/std(HR_on-HR_off);
+cd_hr = mean(HR.MedOnSubMean-HR.MedOffSubMean)/std(HR.MedOnSubMean-HR.MedOffSubMean);
 sprintf(['t(' num2str(stats_hr.df) ')=' num2str(stats_hr.tstat) ', p='  num2str(p_hr) ', d=' num2str(cd_hr)])
 
 %% Plot 
@@ -243,7 +243,7 @@ data = [HRV_on', HRV_off']*1000;
 face=[240/256, 130/256, 0; 30/256, 160/256, 200/256;];
 violin(data,'facecolor',face,'facealpha',0.5,'mc',[]);
 ylabel('HRV Length (in ms)');
-title(['HRV RMSSD: t(' num2str(stats_hrv.df) ')=' num2str(stats_hrv.tstat) ', p='  num2str(p_hrv) ', d=' num2str(cd_hrv)])  %', d=' num2str(cohens_d)
+title(['HRV RMSSD: t(' num2str(stats_hrv.df) ')=' num2str(stats_hrv.tstat) ', p='  num2str(p_hrv)])  %', d=' num2str(cohens_d)
 set(gca, 'XTick', []);
 
 for i = 1:size(data, 2)  % Loop through each group

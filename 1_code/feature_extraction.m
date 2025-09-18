@@ -102,10 +102,10 @@ end
 %=========================================================================
 
 % Define if plots are to be shown
-show_plots = true;
+show_plots = false;
 
 % Define feature extraction steps to perform
-steps = {'ECG Data'}; % 'Load Data', 'ECG Epoch', 'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
+steps = {'Feature Extraction ECG'}; % 'Load Data', 'ECG Epoch', 'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
 
 % Define folder variables
 preprocessed_name = 'preprocessed';  % preprocessed folder (inside derivatives)
@@ -116,7 +116,7 @@ feature_name = 'features';  % feature extraction folder (inside derivatives)
 window_length_hrv = 10;  % 10 samples window  % Length of the window for smoothing
 
 % Suppress excessive logging if using FieldTrip
-ft_defaults; % If using FieldTrip
+%ft_defaults; % If using FieldTrip
 
 % Downsample Parameters
 NewSR=300;
@@ -185,21 +185,17 @@ for sub = 1:numel(subjects)
     % Extract the subject
     subject = subjects{sub};
 
-    if ismember('Load Data', steps)
+    fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
+    pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
+    files = dir(pattern);
+    filename = fullfile(files(1).folder, files(1).name);
+    load(filename, 'SmrData');
+    % Load subject data
+    % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
+    % load(subject_data, 'SmrData');
 
-        fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
-        pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
-        files = dir(pattern);
-        filename = fullfile(files(1).folder, files(1).name);
-        load(filename, 'SmrData');
-        % Load subject data
-        % subject_data = fullfile(data_dir, preprocessed_name, medname, ['sub-', subject], [subject, '_preprocessed_', medname, '_Rest.mat']);
-        % load(subject_data, 'SmrData');
-
-        SR = SmrData.SR;
-        EventTms = SmrData.EvData.EvECGP_Cl;
-
-    end
+    SR = SmrData.SR;
+    EventTms = SmrData.EvData.EvECGP_Cl;
 
     % Define the path to subject feature folder
     subject_feature_folder = fullfile(data_dir, feature_name,  medname, sprintf('sub-%s', subject));
@@ -256,8 +252,6 @@ for sub = 1:numel(subjects)
                 warning("Failed to save the plot: %s", ME.message);
             end
         end
-
-
     end
 
     %% =============== 2. TIME FREQUENCY DECOMPOSITION EEG & LFP ==============
@@ -502,7 +496,8 @@ end
 % title('Mean RMSSD HRV with 95% Confidence Interval');
 
 if ismember('Feature Extraction ECG', steps)
-    save_path = fullfile('/Volumes/LP3/HeadHeart/0_data/features/avg', ['Averages_HRV-IBI-HR_Rest_nsub=', num2str(numel(subjects)),'.mat']); % med_name needs an alternative here
+
+    save_path = fullfile('E:\HeadHeart\0_data\features\avg', ['HRV-IBI-HR_Rest_', medname, '_nsub=', num2str(numel(subjects)),'.mat']); 
     save(save_path, 'HRV', 'IBI', 'HR');
 end
 
