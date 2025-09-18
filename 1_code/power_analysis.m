@@ -78,6 +78,7 @@ BandWidth=2; % BandWidth in Hz;
 Qfac     =2; % Attenuation in db(-Qfac)
 WaveletnCyc=6;
 WaveletgWidth=3;
+FltPassDir='twopass'; % onepass
 
 % Baseline und Epoch Parameter
 ChsCmxEvFrTm =[]; %

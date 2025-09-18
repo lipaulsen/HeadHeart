@@ -40,8 +40,8 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = false;
-MedOff = true;
+MedOn = true;
+MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -52,7 +52,7 @@ allsubs = true;
 % GOOD HEART STATUS
 % patients with arrithmyia have been excluded after their ECG was
 % investigated
-GoodHeart = 0;
+GoodHeart = 1;
 
 % get the channel info into the shape of cells
 AllSubsChansRaw = cellfun(@(x) strsplit(x, ', '), {subject_info.channels_raw}, 'UniformOutput', false);
@@ -102,10 +102,10 @@ end
 %=========================================================================
 
 % Define if plots are to be shown
-show_plots = false;
+show_plots = true;
 
 % Define feature extraction steps to perform
-steps = {'Load Data', 'ECG Epoch'}; %'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
+steps = {'ECG Data'}; % 'Load Data', 'ECG Epoch', 'Feature Extraction EEG','ECG Data', 'Feature Extraction ECG', 'Load Data',
 
 % Define folder variables
 preprocessed_name = 'preprocessed';  % preprocessed folder (inside derivatives)
@@ -156,8 +156,8 @@ baseline = true;
 baseline_win = [-0.3 -0.1]; % Baseline Time Window
 
 % Define TFR Time Window
-tWidth   = 0.9;
-tOffset  = 0.3;
+tWidth   = 0.8;%0.9
+tOffset  = 0.4;%0.3
 
 %% ============================ 1. LOAD DATA =============================
 disp("************* STARTING Feature Extraction  *************");
@@ -181,15 +181,13 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
-for sub = 4:numel(subjects)
+for sub = 1:numel(subjects)
     % Extract the subject
     subject = subjects{sub};
 
     if ismember('Load Data', steps)
 
         fprintf('Loading Data of  subject %s number %i of %i\n', subject, sub, numel(subjects));
-
-
         pattern = fullfile(data_dir, 'preproc', 'all', [subject, '_', preprocessed_name, '_', medname, '_BPReref_', '*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
@@ -319,15 +317,21 @@ for sub = 4:numel(subjects)
                     % My baseline is the time window -0.3 to -0.1 s
                     % before my Rpeak of every trial
 
-                    % Find the the indices for the basseline window
-                    bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
+                    % % Find the the indices for the basseline window
+                    % bidx = find(TmAxis' >= baseline_win(1) & TmAxis' <= baseline_win(2));
+                    % 
+                    % % for every trial calc the mean of the baseline win
+                    % % and subtract that from the entire epoch
+                    % for t = 1:nEvs
+                    %     baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
+                    %     EvData(t,:) = EvData(t,:)-baseline_mean;
+                    % end
 
-                    % for every trial calc the mean of the baseline win
-                    % and subtract that from the entire epoch
                     for t = 1:nEvs
-                        baseline_mean = mean(EvData(t, bidx(1):bidx(end)),2);
-                        EvData(t,:) = EvData(t,:)-baseline_mean;
+                        epoch_mean = mean(EvData(t,:), 2);   % average over all time points
+                        EvData(t,:) = EvData(t,:) - epoch_mean;
                     end
+
 
                 end
 
@@ -364,13 +368,13 @@ for sub = 4:numel(subjects)
                 colorbar;
 
                 if BPReref & BPRerefHi
-                    gr2 = fullfile( results_dir, 'power/2Hz/ss/BPRerefHi' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefHiTit, '.png']);
+                    gr2 = fullfile( results_dir, 'power/2Hz/ss/BPRerefHi' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefHiTit, '_EPOCH= -', num2str(tOffset), '-', num2str(tWidth),'.png']);
                 elseif BPReref & BPRerefLw
-                    gr2 = fullfile( results_dir, 'power/2Hz/ss/BPRerefLow' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefLwTit, '.png']);
+                    gr2 = fullfile( results_dir, 'power/2Hz/ss/BPRerefLw' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefLwTit, '_EPOCH= -', num2str(tOffset), '-', num2str(tWidth),'.png']);
                 elseif BPReref & BPRerefBest
-                    gr2 = fullfile( results_dir, 'power/2Hz/ss' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefBestTit, '.png']);
+                    gr2 = fullfile( results_dir, 'power/2Hz/ss' , ['POWER_', subject, '_', medname, '_', channel, '_', BPRerefBestTit, '_EPOCH= -', num2str(tOffset), '-', num2str(tWidth),'.png']);
                 else
-                    gr2 = fullfile( results_dir, 'power/2Hz/ss' , ['POWER_', subject, '_', medname, '_', channel, '.png']);
+                    gr2 = fullfile( results_dir, 'power/2Hz/ss' , ['POWER_', subject, '_', medname, '_', channel, '_EPOCH= -', num2str(tOffset), '-', num2str(tWidth),'.png']);
                 end
                 exportgraphics(f2, gr2, "Resolution", 300);
 
@@ -524,7 +528,7 @@ if ismember('ECG Data', steps)
         fprintf('Loading Data of subject %s number %i of %i\n', subject, s, numel(subjects));
 
         % Load the the cleaned ECG R Peaks Data
-        pattern = fullfile(data_dir, '/ecg/ss' ,[subject, '_EpochECGEvData_',  medname, '*']);
+        pattern = fullfile(data_dir, '/ecg/ss' ,[subject, '_EpochECGEvData_',  medname, '*', 'EP=-0.4*']);
         files = dir(pattern);
         filename = fullfile(files(1).folder, files(1).name);
         load(filename, 'EvECG');

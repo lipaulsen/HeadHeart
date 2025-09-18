@@ -103,8 +103,8 @@ show_plots = false;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Correlation Group ITC'}; %  'Plot Single Subject Power', 'Plot Power''Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
-
+steps = {'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster'}; %  'Correlation Group ITC', 'Plot Single Subject Power', 'Plot Power', 'Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
+%, 'Plot Single Subject Power', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster'
 % Define Time Window
 tWidth   = 0.9;
 tOffset  = 0.3;
@@ -144,9 +144,9 @@ disp("************* STARTING ITC *************");
 
 fprintf('Loading AVG ECG Data\n');
 if strcmp(medname, 'MedOn')
-    pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=11_', '*']);
+    pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=14_', '*']);
 elseif strcmp(medname, 'MedOff')
-    pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=7_', '*']);
+    pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=9_', '*']);
 end
 files = dir(pattern);
 filename = fullfile(files(1).folder, files(1).name);
@@ -973,7 +973,7 @@ end
 if ismember('Plot Power',steps)
     fprintf('Plot Power\n');
 
-    all_files = dir(fullfile(data_dir,'tfr', 'ss_chan', '*.mat'));
+    all_files = dir(fullfile(data_dir,'tfr', 'ss_chan', ['*' 'time=-0.4' '*.mat']));
     valid_idx = ~startsWith({all_files.name}, '._');
     all_files = all_files(valid_idx);
 
@@ -981,8 +981,8 @@ if ismember('Plot Power',steps)
     channel_names = strings(numel(all_files), 1);
     for i = 1:numel(all_files)
         fname = all_files(i).name;
-        parts = split(fname, '_');         % Example: 'sub01_LFP1.mat'
-        channel_names(i) = erase(parts{2}, '.mat');  % Get 'LFP1'
+        parts = split(fname, '_');         
+        channel_names(i) = erase(parts{2}, '.mat');  
     end
 
     mapped_channels = strings(size(channel_names));
@@ -1009,7 +1009,7 @@ if ismember('Plot Power',steps)
     POW_GroupAvg = struct();
 
     % Loop over channels
-    for ch = 11:numel(unique_channels)
+    for ch = 1:numel(unique_channels)
         ch_name = unique_channels(ch);
         fprintf('Processing channel: %s\n', ch_name);
 
@@ -1052,7 +1052,7 @@ if ismember('Plot Power',steps)
                 f9=figure;
                 set(f9,'Position',[1949 123 1023 785]);
                 subplot(2,1,1)
-                plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+                plot(times, AVGECG.mean', 'Color', 'k'); hold on %(31:end)
                 set(gca,'Position',[0.1300 0.5838 0.71 0.3])
                 xline(0, "--k", 'LineWidth', 2);
                 axis('tight')
@@ -1061,7 +1061,7 @@ if ismember('Plot Power',steps)
                 hold off
 
                 subplot(2,1,2)
-                imagesc(times(31:end), freqs, POW_allSubs_cell{s});axis xy;
+                imagesc(times, freqs, POW_allSubs_cell{s});axis xy; %(31:end)
                 xlabel('Time (s)');
                 ylabel('Frequency (Hz)');
                 colormap('parula');
@@ -1073,7 +1073,7 @@ if ismember('Plot Power',steps)
                 xline(0, "--k", 'LineWidth', 2);
                 title(sprintf('Power for %s in %s, med = %s', subj, ch_name,  medname));
 
-                gr9 = fullfile(results_dir, 'power', Hz_dir, 'ss' , ['POW_', char(subj), '_', char(ch_name), '_', medname,'.png']);
+                gr9 = fullfile(results_dir, 'power', Hz_dir, 'ss' , ['POW_', char(subj), '_', char(ch_name), '_', medname,'_EP=-0.4-0.4', '.png']);
                 exportgraphics(f9,gr9, 'Resolution', 300)
             end
         end
@@ -1200,7 +1200,7 @@ if ismember('Plot Power',steps)
             hold off
 
             subplot(2,1,2)
-            imagesc(times(31:end), freqs, POW_subavg);axis xy;
+            imagesc(times(31:end), freqs(63:end), POW_subavg(31:end,63:end));axis xy;
             xlabel('Time (s)');
             ylabel('Frequency (Hz)');
             colormap('parula');
@@ -1218,7 +1218,7 @@ if ismember('Plot Power',steps)
             % elseif BPReref & BPRerefLw
             %     gr7 = fullfile(results_dir, 'power', Hz_dir,  'group' , ['AvgPower_', all_channels{ch}, '_', BPRerefLwTit ,'_',medname, '.png']);
             % end
-            gr7 = fullfile(results_dir, 'power', Hz_dir, 'group' , ['AvgPOW_', char(ch_name), '_', medname, '_n=', num2str(nSubjects), '.png']);
+            gr7 = fullfile(results_dir, 'power', Hz_dir, 'group' , ['AvgPOW_', char(ch_name), '_', medname, '_n=', num2str(nSubjects), '_EP=-0.4-0.4_beta', '.png']);
             exportgraphics(f7,gr7, 'Resolution', 300)
         end
     end
@@ -1301,7 +1301,7 @@ if ismember('Plot Power',steps)
 
             % Save
             gr8 = fullfile(results_dir, 'power', Hz_dir, 'group', ...
-                ['ClusterAvgPOW_', clus_name, '_', medname, '.png']);
+                ['ClusterAvgPOW_', clus_name, '_', medname, '_EP=-0.4-0.4', '.png']);
             exportgraphics(f8, gr8, 'Resolution', 300);
         end
    
@@ -1445,13 +1445,13 @@ end
 if ismember('Group TFR Power Save', steps)
     fprintf('Load Data for Group TFR Power\n');
 
-    for s = 11:numel(subjects)
+    for s = 1:numel(subjects)
         subject = subjects(s);
         fprintf('Loading TFR Data for subject %s\n', subject);
 
         % TFR file pattern (Hilbert only, exclude non-BP reref files)
         filelist = dir(fullfile(data_dir, 'tfr', '2Hz', ...
-            [char(subject), '*', medname, '*', 'Freq=0.5', '*.mat']));
+            [char(subject), '*', medname, '*', 'Freq=0.5', '*', 'EP=-0.4' '*.mat']));
 
         PowerDataSub_cell = {};
         PowerLabels = strings(0, 1);
