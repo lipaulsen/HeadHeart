@@ -270,7 +270,7 @@ f3 = figure;
 data = [HR_on', HR_off'];
 face=[240/256, 130/256, 0; 30/256, 160/256, 200/256;];
 violin(data,'facecolor',face,'facealpha',0.5,'mc',[]);
-ylabel('HR Length (in ms)');
+ylabel('HR in beats per minute');
 title(['HR: t(' num2str(stats_hr.df) ')=' num2str(stats_hr.tstat) ', p='  num2str(p_hr) ', d=' num2str(cd_hr)])
 set(gca, 'XTick', []);
 
