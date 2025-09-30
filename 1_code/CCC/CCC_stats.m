@@ -1128,7 +1128,7 @@ if ismember('Parametric Stats CCC', steps)
     %% ---------------------- END USER INPUTS ----------------------
 
     % Add FieldTrip to path if needed (uncomment and set your path)
-    ft_defaults;
+    %ft_defaults;
 
     nPairs = numel(comps);
 
@@ -1159,15 +1159,15 @@ if ismember('Parametric Stats CCC', steps)
             SR = CCC.SR;
 
 
-            % validate size
-            if isempty(allPSI)
-                [nFreq, nTime] = size(psiMat);
-                allPSI = nan(nSubjects, nFreq, nTime, nPairs);
-            else
-                if any([nFreq, nTime] ~= size(psiMat))
-                    error('Dimension mismatch in file %s: expected [%d x %d], got [%d x %d].', fn, nFreq, nTime, size(psiMat,1), size(psiMat,2));
-                end
-            end
+            % % validate size
+            % if isempty(allPSI)
+            %     [nFreq, nTime] = size(psiMat);
+            %     allPSI = nan(nSubjects, nFreq, nTime, nPairs);
+            % else
+            %     if any([nFreq, nTime] ~= size(psiMat))
+            %         error('Dimension mismatch in file %s: expected [%d x %d], got [%d x %d].', fn, nFreq, nTime, size(psiMat,1), size(psiMat,2));
+            %     end
+            % end
 
             % clip to avoid exact 0 or 1 values before atanh
             epsv = 1e-6;
@@ -1180,80 +1180,117 @@ if ismember('Parametric Stats CCC', steps)
                 zMat = psiMat;
             end
 
+            if isempty(allPSI)
+                [nFreq, nTime] = size(zMat);
+                allPSI = nan(nSubjects, nFreq, nTime, nPairs); % subj x chan x freq x time x pair
+            else
+                % check consistent sizes (optional safety)
+                if any([nFreq, nTime] ~= size(zMat))
+                    error('Dimension mismatch for file %s', files_comp(s).name);
+                end
+            end
+
+            %%% CHANGE HERE: Store with dummy channel dimension
             allPSI(s,:,:,p) = zMat;
         end
     end
 
-    %% Prepare subject-level data according to pairMode
-    switch lower(pairMode)
-        case 'average'
-            % Average across channel pairs for each subject
-            subjMaps = squeeze(mean(allPSI,4)); % [nSubj x nFreq x nTime]
-            pairListToRun = {'averaged_pairs'};
-        case 'separate'
-            % keep all pairs separately
-            subjMapsAllPairs = allPSI; % [nSubj x nFreq x nTime x nPairs]
-            pairListToRun = comps;
-        otherwise
-            error('pairMode must be ''average'' or ''separate''');
-    end
+   [nSubj, nFreq, nTime, nPairs] = size(allPSI);
 
-    %% FieldTrip-style structure and stats
-    for p = 1:numel(pairListToRun)
-        if strcmpi(pairMode,'average')
-            powspctrm = subjMaps; % [nSubj x nFreq x nTime]
-            thisLabel = pairListToRun{p};
-        else
-            powspctrm = squeeze(subjMapsAllPairs(:,:,:,p));
-            thisLabel = pairListToRun{p};
-        end
+   pairStats = cell(nPairs,1);
 
-    % Build freq structure
-    freqData = [];
-    freqData.powspctrm = powspctrm; % subjects x freq x time
-    freqData.freq = freqs;
-    freqData.time = times;
-    freqData.dimord = 'subj_freq_time';
-    freqData.label = {'PSI'};
+   for p = 1:nPairs
+       fprintf('Running cluster test for pair %d of %d\n', p, nPairs);
 
-    % Create baseline zero dataset for comparison
-    freqDataZero = freqData;
-    freqDataZero.powspctrm = zeros(size(freqData.powspctrm));
+       % --------------------------------------------------
+       % 1) extract data for this pair [subjects x freq x time]
+       % --------------------------------------------------
+       data_p = squeeze(allPSI(:,:,:,p));  % size: [nSubj x nFreq x nTime]
 
-    % configuration for cluster-based permutation
-    cfg = [];
-    cfg.method = 'montecarlo';
-    cfg.statistic = 'depsamplesT';
-    cfg.correctm = 'cluster';
-    cfg.clusteralpha = clusterAlpha;
-    cfg.clusterstatistic = 'maxsum';
-    cfg.tail = 0;
-    cfg.clustertail = 0;
-    cfg.alpha = alpha;
-    cfg.numrandomization = nPerm;
+       % --------------------------------------------------
+       % 2) compute observed t-stat map across subjects
+       % --------------------------------------------------
+       mu = mean(data_p,1);            % mean over subjects
+       se = std(data_p,[],1) ./ sqrt(nSubj); % standard error
+       tmap = squeeze(mu ./ se);       % observed t-stat map [freq x time]
 
-    % design matrix for paired samples (data vs zero)
-    nSubj = size(powspctrm,1);
-    design = zeros(2, 2*nSubj);
-    design(1,:) = [1:nSubj 1:nSubj];
-    design(2,:) = [ones(1,nSubj) 2*ones(1,nSubj)];
+       % --------------------------------------------------
+       % 3) cluster thresholding
+       % --------------------------------------------------
+       df = nSubj - 1;
+       tcrit = tinv(1 - clusterAlpha/2, df); % two-sided threshold
+       sigMask = abs(tmap) > tcrit;          % logical mask of supra-threshold points
+       pvals = 2 * (1 - tcdf(abs(tmap), df));
+       pvals_pos = 1 - tcdf(tmap, df);
+       sigMask = pvals < 0.005;
 
-    cfg.design = design;
-    cfg.uvar = 1; % subject
-    cfg.ivar = 2; % condition (data vs zero)
+       pvec = pvals(:);  % flatten 2D [freq x time] matrix
+       [h, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvec, 0.05, 'pdep', 'yes');  % Benjamini-Hochberg
+       sigMaskFDR = reshape(h, size(pvals));
 
-    fprintf('Running cluster permutation for %s (pair %d of %d)\n', thisLabel, p, numel(pairListToRun));
-    stat = ft_freqstatistics(cfg, freqData, freqDataZero);
 
-    % save results
-    out.stat = stat;
-    out.meanMap = squeeze(mean(freqData.powspctrm,1));
-    out.powspctrm = freqData.powspctrm;
-    out.pairLabel = thisLabel;
+       % identify clusters using 2D connected components (freq x time)
+       CC = bwconncomp(sigMask, 4); % 4-connectivity: adjacent points
+       nClusters = CC.NumObjects;
+       clusterStats = zeros(1,nClusters);
+       for c = 1:nClusters
+           clusterStats(c) = sum(abs(tmap(CC.PixelIdxList{c}))); % cluster-level stat: sum of |t|
+       end
 
-    saveFile = fullfile(results_dir, ['cluster_stat_' thisLabel '.mat']);
-    save(saveFile, 'out');
-    fprintf('Saved results to %s\n', saveFile);
+       % --------------------------------------------------
+       % 4) permutation testing (sign-flip)
+       % --------------------------------------------------
+       maxClusterDist = zeros(1,nPerm);
+
+       for perm = 1:nPerm
+           % randomly flip the sign of each subject
+           flips = (rand(nSubj,1) > 0.5)*2 - 1;
+           permData = data_p .* reshape(flips, [nSubj 1 1]);
+
+           % compute permuted t-map
+           mu_perm = mean(permData,1);
+           se_perm = std(permData,[],1) ./ sqrt(nSubj);
+           tmap_perm = squeeze(mu_perm ./ se_perm);
+
+           % threshold
+           sigMask_perm = abs(tmap_perm) > tcrit;
+           CC_perm = bwconncomp(sigMask_perm, 4);
+
+           if CC_perm.NumObjects > 0
+               clusterVals = zeros(1, CC_perm.NumObjects);
+               for c = 1:CC_perm.NumObjects
+                   clusterVals(c) = sum(abs(tmap_perm(CC_perm.PixelIdxList{c})));
+               end
+               maxClusterDist(perm) = max(clusterVals);
+           else
+               maxClusterDist(perm) = 0;
+           end
+       end
+
+       % --------------------------------------------------
+       % 5) compute cluster-level p-values
+       % --------------------------------------------------
+       cluster_pvals = ones(1, nClusters);
+       for c = 1:nClusters
+           cluster_pvals(c) = mean(maxClusterDist >= clusterStats(c));
+       end
+
+       % significant clusters
+       sigClusters = find(cluster_pvals < alpha);
+       fprintf('Pair %d: found %d significant clusters\n', p, numel(sigClusters));
+
+       % --------------------------------------------------
+       % 6) store results
+       % --------------------------------------------------
+       pairStats{p}.clusters      = CC;
+       pairStats{p}.clusterStats  = clusterStats;
+       pairStats{p}.cluster_pvals = cluster_pvals;
+       pairStats{p}.sigClusters   = sigClusters;
+       pairStats{p}.T_obs         = tmap;
+       pairStats{p}.T_thresh      = tcrit;
+   end
+
+
 
     %% Plotting
     figure('Name', ['Cluster results - ' thisLabel], 'NumberTitle','off');
@@ -1282,7 +1319,7 @@ if ismember('Parametric Stats CCC', steps)
 end
 
 fprintf('All done.\n');
-end
+
 
 
 

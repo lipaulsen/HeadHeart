@@ -1128,7 +1128,7 @@ if ismember('Parametric Stats CCC', steps)
     %% ---------------------- END USER INPUTS ----------------------
 
     % Add FieldTrip to path if needed (uncomment and set your path)
-    ft_defaults;
+    %ft_defaults;
 
     nPairs = numel(comps);
 
@@ -1159,15 +1159,15 @@ if ismember('Parametric Stats CCC', steps)
             SR = CCC.SR;
 
 
-            % validate size
-            if isempty(allPSI)
-                [nFreq, nTime] = size(psiMat);
-                allPSI = nan(nSubjects, nFreq, nTime, nPairs);
-            else
-                if any([nFreq, nTime] ~= size(psiMat))
-                    error('Dimension mismatch in file %s: expected [%d x %d], got [%d x %d].', fn, nFreq, nTime, size(psiMat,1), size(psiMat,2));
-                end
-            end
+            % % validate size
+            % if isempty(allPSI)
+            %     [nFreq, nTime] = size(psiMat);
+            %     allPSI = nan(nSubjects, nFreq, nTime, nPairs);
+            % else
+            %     if any([nFreq, nTime] ~= size(psiMat))
+            %         error('Dimension mismatch in file %s: expected [%d x %d], got [%d x %d].', fn, nFreq, nTime, size(psiMat,1), size(psiMat,2));
+            %     end
+            % end
 
             % clip to avoid exact 0 or 1 values before atanh
             epsv = 1e-6;
@@ -1180,108 +1180,50 @@ if ismember('Parametric Stats CCC', steps)
                 zMat = psiMat;
             end
 
+            if isempty(allPSI)
+                [nFreq, nTime] = size(zMat);
+                allPSI = nan(nSubjects, nFreq, nTime, nPairs); % subj x chan x freq x time x pair
+            else
+                % check consistent sizes (optional safety)
+                if any([nFreq, nTime] ~= size(zMat))
+                    error('Dimension mismatch for file %s', files_comp(s).name);
+                end
+            end
+
+            %%% CHANGE HERE: Store with dummy channel dimension
             allPSI(s,:,:,p) = zMat;
         end
     end
 
-    %% Prepare subject-level data according to pairMode
-    switch lower(pairMode)
-        case 'average'
-            % Average across channel pairs for each subject
-            subjMaps = squeeze(mean(allPSI,4)); % [nSubj x nFreq x nTime]
-            pairListToRun = {'averaged_pairs'};
-        case 'separate'
-            % keep all pairs separately
-            subjMapsAllPairs = allPSI; % [nSubj x nFreq x nTime x nPairs]
-            pairListToRun = comps;
-        otherwise
-            error('pairMode must be ''average'' or ''separate''');
-    end
+   
 
-    %% FieldTrip-style structure and stats
-    for p = 1:numel(pairListToRun)
-        if strcmpi(pairMode,'average')
-            powspctrm = subjMaps; % [nSubj x nFreq x nTime]
-            thisLabel = pairListToRun{p};
-        else
-            powspctrm = squeeze(subjMapsAllPairs(:,:,:,p));
-            thisLabel = pairListToRun{p};
-        end
+   
 
-        % Build freq structure
-        freqData = [];
-        freqData.powspctrm = powspctrm; % subjects x freq x time
-        freqData.freq = freqs;
-        freqData.time = times;
-        freqData.dimord = 'subj_chan_freq_time';
-        freqData.powspctrm = reshape(powspctrm, [nSubj 1 nFreq nTime]); % add dummy chan dim
-        freqData.label = {'PSI'};
-        cfg.neighbours = [];
+    %% Plotting
+    figure('Name', ['Cluster results - ' thisLabel], 'NumberTitle','off');
+    imagesc(freqData.time, freqData.freq, out.meanMap);
+    axis xy; xlabel('Time (s)'); ylabel('Frequency (Hz)');
+    title(['Mean zPSI across subjects - ' thisLabel]);
+    colorbar;
+    hold on;
 
-        % Create baseline zero dataset for comparison
-        freqDataZero = freqData;
-        freqDataZero.powspctrm = zeros(size(freqData.powspctrm));
-
-        % configuration for cluster-based permutation
-        cfg = [];
-        cfg.method = 'montecarlo';
-        cfg.statistic = 'depsamplesT';
-        cfg.correctm = 'cluster';
-        cfg.clusteralpha = clusterAlpha;
-        cfg.clusterstatistic = 'maxsum';
-        cfg.tail = 0;
-        cfg.clustertail = 0;
-        cfg.alpha = alpha;
-        cfg.numrandomization = nPerm;
-
-        % design matrix for paired samples (data vs zero)
-        nSubj = size(powspctrm,1);
-        design = zeros(2, 2*nSubj);
-        design(1,:) = [1:nSubj 1:nSubj];
-        design(2,:) = [ones(1,nSubj) 2*ones(1,nSubj)];
-
-        cfg.design = design;
-        cfg.uvar = 1; % subject
-        cfg.ivar = 2; % condition (data vs zero)
-
-        fprintf('Running cluster permutation for %s (pair %d of %d)\n', thisLabel, p, numel(pairListToRun));
-        stat = ft_freqstatistics(cfg, freqData, freqDataZero);
-
-        % save results
-        out.stat = stat;
-        out.meanMap = squeeze(mean(freqData.powspctrm,1));
-        out.powspctrm = freqData.powspctrm;
-        out.pairLabel = thisLabel;
-
-        saveFile = fullfile(results_dir, ['cluster_stat_' thisLabel '.mat']);
-        save(saveFile, 'out');
-        fprintf('Saved results to %s\n', saveFile);
-
-        %% Plotting
-        figure('Name', ['Cluster results - ' thisLabel], 'NumberTitle','off');
-        imagesc(freqData.time, freqData.freq, out.meanMap);
-        axis xy; xlabel('Time (s)'); ylabel('Frequency (Hz)');
-        title(['Mean zPSI across subjects - ' thisLabel]);
-        colorbar;
-        hold on;
-
-        if isfield(stat,'posclusters') && ~isempty(stat.posclusters)
-            for c = 1:length(stat.posclusters)
-                if stat.posclusters(c).prob < alpha
-                    mask = stat.posclusterslabelmat == c;
-                    contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','k', 'LineWidth', 1.5);
-                end
-            end
-        end
-        if isfield(stat,'negclusters') && ~isempty(stat.negclusters)
-            for c = 1:length(stat.negclusters)
-                if stat.negclusters(c).prob < alpha
-                    mask = stat.negclusterslabelmat == c;
-                    contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','w', 'LineWidth', 1.5);
-                end
+    if isfield(stat,'posclusters') && ~isempty(stat.posclusters)
+        for c = 1:length(stat.posclusters)
+            if stat.posclusters(c).prob < alpha
+                mask = stat.posclusterslabelmat == c;
+                contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','k', 'LineWidth', 1.5);
             end
         end
     end
+    if isfield(stat,'negclusters') && ~isempty(stat.negclusters)
+        for c = 1:length(stat.negclusters)
+            if stat.negclusters(c).prob < alpha
+                mask = stat.negclusterslabelmat == c;
+                contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','w', 'LineWidth', 1.5);
+            end
+        end
+    end
+end
 
 fprintf('All done.\n');
 end
