@@ -1208,78 +1208,80 @@ if ismember('Parametric Stats CCC', steps)
             thisLabel = pairListToRun{p};
         end
 
-    % Build freq structure
-    freqData = [];
-    freqData.powspctrm = powspctrm; % subjects x freq x time
-    freqData.freq = freqs;
-    freqData.time = times;
-    freqData.dimord = 'subj_freq_time';
-    freqData.label = {'PSI'};
+        % Build freq structure
+        freqData = [];
+        freqData.powspctrm = powspctrm; % subjects x freq x time
+        freqData.freq = freqs;
+        freqData.time = times;
+        freqData.dimord = 'subj_chan_freq_time';
+        freqData.powspctrm = reshape(powspctrm, [nSubj 1 nFreq nTime]); % add dummy chan dim
+        freqData.label = {'PSI'};
+        cfg.neighbours = [];
 
-    % Create baseline zero dataset for comparison
-    freqDataZero = freqData;
-    freqDataZero.powspctrm = zeros(size(freqData.powspctrm));
+        % Create baseline zero dataset for comparison
+        freqDataZero = freqData;
+        freqDataZero.powspctrm = zeros(size(freqData.powspctrm));
 
-    % configuration for cluster-based permutation
-    cfg = [];
-    cfg.method = 'montecarlo';
-    cfg.statistic = 'depsamplesT';
-    cfg.correctm = 'cluster';
-    cfg.clusteralpha = clusterAlpha;
-    cfg.clusterstatistic = 'maxsum';
-    cfg.tail = 0;
-    cfg.clustertail = 0;
-    cfg.alpha = alpha;
-    cfg.numrandomization = nPerm;
+        % configuration for cluster-based permutation
+        cfg = [];
+        cfg.method = 'montecarlo';
+        cfg.statistic = 'depsamplesT';
+        cfg.correctm = 'cluster';
+        cfg.clusteralpha = clusterAlpha;
+        cfg.clusterstatistic = 'maxsum';
+        cfg.tail = 0;
+        cfg.clustertail = 0;
+        cfg.alpha = alpha;
+        cfg.numrandomization = nPerm;
 
-    % design matrix for paired samples (data vs zero)
-    nSubj = size(powspctrm,1);
-    design = zeros(2, 2*nSubj);
-    design(1,:) = [1:nSubj 1:nSubj];
-    design(2,:) = [ones(1,nSubj) 2*ones(1,nSubj)];
+        % design matrix for paired samples (data vs zero)
+        nSubj = size(powspctrm,1);
+        design = zeros(2, 2*nSubj);
+        design(1,:) = [1:nSubj 1:nSubj];
+        design(2,:) = [ones(1,nSubj) 2*ones(1,nSubj)];
 
-    cfg.design = design;
-    cfg.uvar = 1; % subject
-    cfg.ivar = 2; % condition (data vs zero)
+        cfg.design = design;
+        cfg.uvar = 1; % subject
+        cfg.ivar = 2; % condition (data vs zero)
 
-    fprintf('Running cluster permutation for %s (pair %d of %d)\n', thisLabel, p, numel(pairListToRun));
-    stat = ft_freqstatistics(cfg, freqData, freqDataZero);
+        fprintf('Running cluster permutation for %s (pair %d of %d)\n', thisLabel, p, numel(pairListToRun));
+        stat = ft_freqstatistics(cfg, freqData, freqDataZero);
 
-    % save results
-    out.stat = stat;
-    out.meanMap = squeeze(mean(freqData.powspctrm,1));
-    out.powspctrm = freqData.powspctrm;
-    out.pairLabel = thisLabel;
+        % save results
+        out.stat = stat;
+        out.meanMap = squeeze(mean(freqData.powspctrm,1));
+        out.powspctrm = freqData.powspctrm;
+        out.pairLabel = thisLabel;
 
-    saveFile = fullfile(results_dir, ['cluster_stat_' thisLabel '.mat']);
-    save(saveFile, 'out');
-    fprintf('Saved results to %s\n', saveFile);
+        saveFile = fullfile(results_dir, ['cluster_stat_' thisLabel '.mat']);
+        save(saveFile, 'out');
+        fprintf('Saved results to %s\n', saveFile);
 
-    %% Plotting
-    figure('Name', ['Cluster results - ' thisLabel], 'NumberTitle','off');
-    imagesc(freqData.time, freqData.freq, out.meanMap);
-    axis xy; xlabel('Time (s)'); ylabel('Frequency (Hz)');
-    title(['Mean zPSI across subjects - ' thisLabel]);
-    colorbar;
-    hold on;
+        %% Plotting
+        figure('Name', ['Cluster results - ' thisLabel], 'NumberTitle','off');
+        imagesc(freqData.time, freqData.freq, out.meanMap);
+        axis xy; xlabel('Time (s)'); ylabel('Frequency (Hz)');
+        title(['Mean zPSI across subjects - ' thisLabel]);
+        colorbar;
+        hold on;
 
-    if isfield(stat,'posclusters') && ~isempty(stat.posclusters)
-        for c = 1:length(stat.posclusters)
-            if stat.posclusters(c).prob < alpha
-                mask = stat.posclusterslabelmat == c;
-                contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','k', 'LineWidth', 1.5);
+        if isfield(stat,'posclusters') && ~isempty(stat.posclusters)
+            for c = 1:length(stat.posclusters)
+                if stat.posclusters(c).prob < alpha
+                    mask = stat.posclusterslabelmat == c;
+                    contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','k', 'LineWidth', 1.5);
+                end
+            end
+        end
+        if isfield(stat,'negclusters') && ~isempty(stat.negclusters)
+            for c = 1:length(stat.negclusters)
+                if stat.negclusters(c).prob < alpha
+                    mask = stat.negclusterslabelmat == c;
+                    contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','w', 'LineWidth', 1.5);
+                end
             end
         end
     end
-    if isfield(stat,'negclusters') && ~isempty(stat.negclusters)
-        for c = 1:length(stat.negclusters)
-            if stat.negclusters(c).prob < alpha
-                mask = stat.negclusterslabelmat == c;
-                contour(freqData.time, freqData.freq, mask, [1 1], 'LineColor','w', 'LineWidth', 1.5);
-            end
-        end
-    end
-end
 
 fprintf('All done.\n');
 end
