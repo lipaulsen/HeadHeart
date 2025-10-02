@@ -1155,6 +1155,7 @@ if ismember('Parametric Stats CCC', steps)
         for s = 1:nSubjects
             load(fullfile(files_comp(s).folder, files_comp(s).name), 'CCC');
             psiMat = CCC.CCC;  % [nFreqs x nTimes]
+            surrogatePSIMat = CCC.PermCcc; %[nSurr x nFreqs x nTimes]
             times = CCC.times;
             freqs = CCC.freqs;
             SR = CCC.SR;
@@ -1182,16 +1183,93 @@ if ismember('Parametric Stats CCC', steps)
 
             %%% CHANGE HERE: Store with dummy channel dimension
             allPSI(s,:,:,p) = zMat;
+            surrogatePSI(s,:,:,:,p) = surrogatePSIMat;
+            
+        end
+    end
+  
+    [nSubj, nFreq, nTime, nPairs] = size(allPSI);
+    nSurrogates = size(surrogatePSI,2);
+
+    for p = 1:nPairs
+        data_p = squeeze(allPSI(:,:,:,p));        % [nSub x nFreq x nTime]
+        meanObs = mean(data_p,1);                % mean across subjects
+        meanObs = squeeze(meanObs);              % [nFreq x nTime]
+        
+        surrogate_p = squeeze(surrogatePSI(:,:,:,:,p));  % [nSubj x nSurrogates x nFreq x nTime]
+        surrogate_p = squeeze(mean(surrogatePSI,1));  % mean across subjects[nSurrogates x nFreq x nTime]
+
+        % Compute percentile rank at each freq/time
+        percentileMap = nan(nFreq, nTime);
+        for f = 1:nFreq
+            for t = 1:nTime
+                percentileMap(f,t) = mean(surrogate_p(:,f,t) < meanObs(f,t));
+                % fraction of surrogates below observed
+            end
+        end
+
+        % Optional: define "empirical significance" at 95th percentile
+        sigMaskEmpirical = percentileMap >= 0.95;
+
+        % Plot
+        figure;
+        imagesc(times, freqs, meanObs);
+        axis xy; colorbar;
+        title(sprintf('Mean PSI - Pair %d (empirical percentile)', p));
+        hold on;
+        contour(times, freqs, sigMaskEmpirical, [1 1], 'LineColor','k', 'LineWidth',1.5);
+    end
+    
+nBoot = 1000;  % number of bootstrap resamples
+
+for p = 1:nPairs
+    fprintf('Processing pair %d of %d\n', p, nPairs);
+    
+    data_p = squeeze(allPSI(:,:,:,p)); % [nSub x nFreq x nTime]
+
+    % Compute mean across subjects
+    meanMap = mean(data_p,1);  % [1 x nFreq x nTime]
+    meanMap = squeeze(meanMap);
+
+    % Bootstrap CI
+    ciLow = nan(nFreq, nTime);
+    ciHigh = nan(nFreq, nTime);
+    
+    for f = 1:nFreq
+        for t = 1:nTime
+            bootSamples = nan(nBoot,1);
+            for b = 1:nBoot
+                idx = randsample(nSubj, nSubj, true);  % resample subjects with replacement
+                bootSamples(b) = mean(data_p(idx,f,t));
+            end
+            ciLow(f,t)  = prctile(bootSamples, 2.5);
+            ciHigh(f,t) = prctile(bootSamples, 97.5);
         end
     end
 
-    [nSubj, nFreq, nTime, nPairs] = size(allPSI);
+    % Plot mean + CI (example for visualization)
+    figure;
+    imagesc(times, freqs, meanMap);
+    axis xy;
+    colorbar;
+    title(sprintf('Mean PSI - Pair %d', p));
+    xlabel('Time');
+    ylabel('Frequency');
+
+    % Optional: overlay regions where CI does not cross zero
+    hold on;
+    sigMask = (ciLow > 0);  % robust positive PSI
+    contour(1:nTime, 1:nFreq, sigMask, [1 1], 'LineColor','k', 'LineWidth',1.5);
+end
+
 
     for p = 1:nPairs
     fprintf('Processing channel pair %d of %d...\n', p, nPairs);
     
     % Extract data for this pair: [sub x freq x time]
     data_p = squeeze(allPSI(:,:,:,p));
+
+
     
    
    % pairStats = cell(nPairs,1);
