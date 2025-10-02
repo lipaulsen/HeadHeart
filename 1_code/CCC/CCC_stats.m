@@ -111,6 +111,7 @@ CCCchans.Comp8 = {'STNl', 'F4'};
 CCCchans.Comp9 = {'STNr', 'C3'};
 CCCchans.Comp10 = {'STNr', 'F4'};
 comps = {'Comp1', 'Comp2', 'Comp3', 'Comp4', 'Comp5', 'Comp6', 'Comp7', 'Comp8', 'Comp9','Comp10'};
+comp_names = {'STNl - C3','STNl - F3','STNl - Pz', 'STNr - C4', 'STNr - F4', 'STNr - Pz', 'STNl - C4', 'STNl - F4','STNr - C3', 'STNr - F4'};
 
 Hz_dir = '2Hz';
 
@@ -1113,12 +1114,12 @@ if ismember('Parametric Stats CCC', steps)
     comps = fieldnames(CCCchans); 
 
     % Do you want to apply Fisher z-transform (recommended)? true/false
-    doFisherZ = true; % set false to skip atanh
+    doFisherZ = false; % set false to skip atanh
 
     % Permutation parameters
     nPerm = 1000;          % number of permutations for cluster test (increase if you can)
-    clusterAlpha = 0.05;   % cluster forming threshold
-    alpha = 0.05;          % test alpha level
+    clusterAlpha = 0.005;   % cluster forming threshold
+    alpha = 0.005;          % test alpha level
 
     % Whether to average across channel pairs or run each pair separately.
     % 'average' -> average PSI across ChanPairs for each subject
@@ -1128,7 +1129,7 @@ if ismember('Parametric Stats CCC', steps)
     %% ---------------------- END USER INPUTS ----------------------
 
     % Add FieldTrip to path if needed (uncomment and set your path)
-    %ft_defaults;
+    ft_defaults;
 
     nPairs = numel(comps);
 
@@ -1158,17 +1159,6 @@ if ismember('Parametric Stats CCC', steps)
             freqs = CCC.freqs;
             SR = CCC.SR;
 
-
-            % % validate size
-            % if isempty(allPSI)
-            %     [nFreq, nTime] = size(psiMat);
-            %     allPSI = nan(nSubjects, nFreq, nTime, nPairs);
-            % else
-            %     if any([nFreq, nTime] ~= size(psiMat))
-            %         error('Dimension mismatch in file %s: expected [%d x %d], got [%d x %d].', fn, nFreq, nTime, size(psiMat,1), size(psiMat,2));
-            %     end
-            % end
-
             % clip to avoid exact 0 or 1 values before atanh
             epsv = 1e-6;
             psiMat = min(max(psiMat, epsv), 1-epsv);
@@ -1195,38 +1185,96 @@ if ismember('Parametric Stats CCC', steps)
         end
     end
 
-   [nSubj, nFreq, nTime, nPairs] = size(allPSI);
+    [nSubj, nFreq, nTime, nPairs] = size(allPSI);
 
-   pairStats = cell(nPairs,1);
-
-   for p = 1:nPairs
-       fprintf('Running cluster test for pair %d of %d\n', p, nPairs);
-
-       % --------------------------------------------------
-       % 1) extract data for this pair [subjects x freq x time]
-       % --------------------------------------------------
-       data_p = squeeze(allPSI(:,:,:,p));  % size: [nSubj x nFreq x nTime]
-
-       % --------------------------------------------------
-       % 2) compute observed t-stat map across subjects
-       % --------------------------------------------------
-       mu = mean(data_p,1);            % mean over subjects
-       se = std(data_p,[],1) ./ sqrt(nSubj); % standard error
-       tmap = squeeze(mu ./ se);       % observed t-stat map [freq x time]
-
-       % --------------------------------------------------
-       % 3) cluster thresholding
-       % --------------------------------------------------
-       df = nSubj - 1;
-       tcrit = tinv(1 - clusterAlpha/2, df); % two-sided threshold
-       sigMask = abs(tmap) > tcrit;          % logical mask of supra-threshold points
-       pvals = 2 * (1 - tcdf(abs(tmap), df));
-       pvals_pos = 1 - tcdf(tmap, df);
-       sigMask = pvals < 0.005;
+    for p = 1:nPairs
+    fprintf('Processing channel pair %d of %d...\n', p, nPairs);
+    
+    % Extract data for this pair: [sub x freq x time]
+    data_p = squeeze(allPSI(:,:,:,p));
+    
+   
+   % pairStats = cell(nPairs,1);
+   % 
+   % for p = 1:nPairs
+   %     fprintf('Running cluster test for pair %d of %d\n', p, nPairs);
+   % 
+   %     % data extraction
+   %     data_p = squeeze(allPSI(:,:,:,p));  % size: [nSubj x nFreq x nTime]
+   % 
+   %     [nSubj, nFreq, nTime] = size(data_p);
+   % 
+   %     % preallocate
+   %     zmap   = nan(nFreq, nTime);   % signed-rank z-values
+   %     pvals  = nan(nFreq, nTime);   % raw p-values
+   % 
+   %     % loop over frequencies and times
+   %     for f = 1:nFreq
+   %         for t = 1:nTime
+   %             vec = squeeze(data_p(:,f,t));   % subjects at (freq,time)
+   %             try
+   %                 [p,~,stats] = signrank(vec, 0, 'method','approx');   % test median vs 0
+   %                 pvals(f,t) = p;
+   %                 if isfield(stats,'zval')
+   %                     zmap(f,t) = stats.zval;   % Wilcoxon z statistic
+   %                 else
+   %                     zmap(f,t) = NaN;
+   %                 end
+   %             catch
+   %                 % signrank can error if all values are identical
+   %                 pvals(f,t) = NaN;
+   %                 zmap(f,t) = NaN;
+   %             end
+   %         end
+   %     end
+       
+       % % ttest
+       % mu = mean(data_p,1);            % mean over subjects
+       % se = std(data_p,[],1) ./ sqrt(nSubj); % standard error
+       % tmap = squeeze(mu ./ se);       % observed t-stat map [freq x time]
+       % 
+       % % thresholding 
+       % 
+       % df = nSubj - 1;
+       % tcrit = tinv(1 - clusterAlpha/2, df); % two-sided threshold
+       % sigMask = abs(tmap) > tcrit;          % logical mask of supra-threshold points
+       % pvals = 2 * (1 - tcdf(abs(tmap), df));
+       % pvals_pos = 1 - tcdf(tmap, df);
+       % sigMask = pvals < 0.001;
 
        pvec = pvals(:);  % flatten 2D [freq x time] matrix
-       [h, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvec, 0.05, 'pdep', 'yes');  % Benjamini-Hochberg
+       [h, crit_p, adj_ci_cvrg, adj_p] = fdr_bh(pvec, 0.01, 'pdep', 'yes');  % Benjamini-Hochberg
        sigMaskFDR = reshape(h, size(pvals));
+
+       f5 = figure;
+       set(f5,'Position',[159 50 1122 774.5000]);
+
+       % Upper subplot
+       subplot(2,1,1)
+       plot(times(31:end), AVGECG.mean(31:end)', 'Color', 'k'); hold on
+       set(gca,'Position',[0.1300 0.5838 0.71 0.3])
+       xline(0, "--k", 'LineWidth', 2);
+       axis('tight')
+       title(sprintf('Average ECG over all subjects, med: %s', medname))
+       ylabel('Amplitude')
+       hold off
+
+       % Lower subplot
+       subplot(2,1,2)
+       imagesc(times, freqs, squeeze(mu)); %axis xy;
+       colormap('parula');
+       col = colorbar;
+       col.Label.String = 'CCC Values'; % Add title to colorbar
+       clims = clim;
+       hold on;
+       contour(times, freqs, sigMaskFDR, 1, 'linecolor', 'k', 'linewidth', 1.5);
+       xline(0, "--k", 'LineWidth', 2);
+       clim(clims);
+       title(sprintf('CCC %s - %s FDR corrected, med: %s, p<0.001', chanA, chanB, medname))
+       xlabel('Time (s)') % Add x-label
+       ylabel('Frequencies (Hz)') % Add y-label
+       hold off
+
 
 
        % identify clusters using 2D connected components (freq x time)
