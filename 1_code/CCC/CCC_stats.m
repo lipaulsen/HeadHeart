@@ -35,8 +35,8 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = true;
-MedOff = false;
+MedOn = false;
+MedOff = true;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -95,7 +95,7 @@ end
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Parametric Stats CCC'}; % 'Group CCC Load Chan', 'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power', 'Plot SubAvg PermStats'
+steps = {'Calc Single Subject CCC'}; % 'Parametric Stats CCC', 'Group CCC Load Chan', 'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power', 'Plot SubAvg PermStats'
 
 % ipsilateral
 CCCchans.Comp1 = {'STNl', 'C3'};
@@ -131,7 +131,7 @@ permstats = true;
 numPerms = 1000;
 surrogate = true;
 trials = false;
-plots = true;
+plots = false;
 CCC = [];
 signif_thresh = 0.05;
 
@@ -144,8 +144,8 @@ end
 
 % Use BPReref Data
 BPReref = true; BPRerefTit = 'BPReref';
-BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
-BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
+BPRerefHi = false; BPRerefHiTit = 'BPRerefHi';
+BPRerefLw = true; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
 % Flag if only EEG, STN or all channels
@@ -177,7 +177,7 @@ if ismember ('Calc Single Subject CCC', steps)
     % ZScoresAll = zeros(nSub, numel(channels), 141, 271);
     % PValAll = zeros(nSub, numel(channels), 141, 271);
 
-    for sub = 12:numel(subjects)
+    for sub = 1:numel(subjects)
 
         % Extract the subject
         subject = subjects{sub};
@@ -270,11 +270,11 @@ if ismember ('Calc Single Subject CCC', steps)
             [FrsTmPsiTrial]=Get_PSI_ByTrials(TFR.(chan2).phase,TFR.(chan1).phase,SR,tCircMean);
 
             % Scale the CCC to the relative CCC of the channel
-            meanFrsTmCcc = mean(mean(FrsTmPsiTrial,1),2);
-            relFrsTmCcc = FrsTmPsiTrial/meanFrsTmCcc;
+            % meanFrsTmCcc = mean(mean(FrsTmPsiTrial,1),2);
+            % relFrsTmCcc = FrsTmPsiTrial/meanFrsTmCcc;
 
-            CccAll(sub,c1,:,:) = FrsTmPsiTrial; % SubjectxChannelxFreqxTime
-            RelCccAll(sub,c1,:,:) = relFrsTmCcc;
+            %CccAll(sub,c1,:,:) = FrsTmPsiTrial; % SubjectxChannelxFreqxTime
+            %RelCccAll(sub,c1,:,:) = relFrsTmCcc;
 
 
             % % --- Input: Phase data from two channels
@@ -348,6 +348,32 @@ if ismember ('Calc Single Subject CCC', steps)
                 %exportgraphics(f1,gr1, 'Resolution', 300)
                 exportgraphics(f1, outputPDF1, 'Append', true);
             end
+
+            % Save CCC MAtrix of all Subjects and all Channels
+            CCC.SR = SR;
+            CCC.times = times;
+            CCC.freqs = freqs;
+            CCC.CCC = FrsTmPsiTrial; %FreqxTime
+
+            if BPRerefHi & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan', [subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefHiTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif BPRerefLw & onlystn
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname , '_OnlySTN_BP=', BPRerefLwTit, '_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif onlyeeg
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_OnlyEEG_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif allchans & BPRerefHi
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefHiTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif allchans & BPRerefLw
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=', BPRerefLwTit,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            elseif allchans
+                save_path = fullfile(data_dir, 'ccc', 'ss_chan',[subject, '_', channel1, '_', channel2, '_CCC_', medname ,'_BP=NONE','_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), '_HP=', num2str(freqs(1)) ,'.mat']);
+            else
+                save_path = fullfile(data_dir, 'ccc','ss_chan', [subject,'_', channel1, '_', channel2, '_CCC_', medname ,'_time=', num2str(times(1)),'-', num2str(times(end)),'_DS=', num2str(SR), 'HPF=', num2str(freqs(1)), '_HP=',  num2str(freqs(1)) ,'.mat']);
+            end
+            save(save_path, 'CCC', '-v7.3');
+            fprintf('Saved CCC Data for sub %s and channels %s %s to: %s\n', subject, channel1, channel2, save_path);
+
+            clear FrsTmPsiTrial
         end
 
         %% ==================== PERMUTATION ===========================
@@ -575,6 +601,7 @@ if ismember ('Calc Single Subject CCC', steps)
         clear RelCccSub
         clear PermCccData
         clear PermCccAllChan
+        clear TFR SmrData
     end
 
     % if permstats

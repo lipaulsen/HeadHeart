@@ -594,7 +594,7 @@ if ismember('Group Load TTest by med', steps)
 
     save_dta = true;
 
-    pro = {'Load', 'TTest Clus'}; %'Change and Save',  'TTest SC',
+    pro = {'Load', 'TTest SC', 'TTest Clus'}; %'Change and Save',  'TTest SC',
 
     allChannels = unique([FltSubsOnlyEEG{:}]);% get unique channel names across all subjects
     allChannels = {allChannels{:}, 'STNl', 'STNr'};
@@ -771,7 +771,7 @@ if ismember('Group Load TTest by med', steps)
         EEG_clusters.Frontal = ["F3", "F4"];
         EEG_clusters.Central = ["C3", "C4"];
         EEG_clusters.Parietal = ["P3", "P4"];
-        %EEG_clusters.STN = ["STNl", "STNr"];
+        EEG_clusters.STN = ["STNl", "STNr"];
 
         regionNames = fieldnames(EEG_clusters);
 
@@ -784,13 +784,12 @@ if ismember('Group Load TTest by med', steps)
 
             eeg_condition = cellfun(@(x) any(contains(x, theseChans)), {subject_info.EEG});
             med_condition = [subject_info.MedOn] & [subject_info.MedOff];
-            idx = med_condition %& eeg_condition;
+            idx = med_condition & eeg_condition;
             subjectIDs = {subject_info(idx).ID};
             MedOnItcDataSlice = MedOnItcDta(idx,:,:,chanIdx);
             if sum(eeg_condition) == 14
-                 MedOffItcDataSlice = MedOffItcDta(1:8,:,:,chanIdx);
+                MedOffItcDataSlice = MedOffItcDta(1:8,:,:,chanIdx);
                 MedOnItcDataSlice = MedOnItcDataSlice(1:8,:,:,:);
-                % MedOffItcDataSlice = MedOffItcDta(:,:,:,chanIdx);
             elseif sum(eeg_condition) < 14
                 MedOffItcDataSlice = MedOffItcDta(idx,:,:,chanIdx);
             end
