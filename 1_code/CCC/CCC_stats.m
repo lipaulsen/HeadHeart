@@ -35,8 +35,8 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = false;
-MedOff = true;
+MedOn = true;
+MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -95,7 +95,7 @@ end
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Calc Single Subject CCC'}; % 'Parametric Stats CCC', 'Group CCC Load Chan', 'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power', 'Plot SubAvg PermStats'
+steps = {'Group Load TTest by med'}; % 'Parametric Stats CCC', 'Group CCC Load Chan', 'PermStats', 'Calc Single Subject CCC', 'Plot SubAvg CCC', 'Plot Power', 'Plot SubAvg PermStats'
 
 % ipsilateral
 CCCchans.Comp1 = {'STNl', 'C3'};
@@ -640,6 +640,282 @@ if ismember ('Calc Single Subject CCC', steps)
     % save(save_path, 'CCC', '-v7.3');
     % fprintf('Saved CCC Data for all subs and channels to: %s\n', save_path);
 end
+
+%% ----------------- Group Load & TTest by med (CCC/PSI) -----------------
+if ismember('Group Load TTest by med', steps)
+
+    save_dta = true;
+
+    pro = {'Load', 'TTest SC'}; % options: , 'TTest SC', 'TTest Clus', 'Change and Save'
+
+    %subject, '_', channel1, '_', channel2, '_CCC_', medname ,
+    % Build list of all possible pairs (you can also set this manually)
+    % Option A: use a predefined list:
+    % allPairs = {'LSTN-C3','RSTN-C3','F3-P3', ...};
+    % Option B: auto-detect from file names in ccc folder:
+    ccc_dir = fullfile(data_dir, 'ccc', 'ss_chan');
+    files_all = dir(fullfile(ccc_dir, '*.mat'));
+    valid_idx = ~startsWith({files_all.name}, '._');
+    files_all = files_all(valid_idx);
+    allPairs = {};
+    for ff = 1:numel(files_all)
+        parts = split(files_all(ff).name, '_');
+        % heuristic: parts might be [subj pair1 pair2 med ...]. Adapt if needed.
+        if numel(parts) >= 3
+            pairname = strcat(parts{2}, '_', parts{3}); % e.g. LSTN_RSTN
+            allPairs{end+1} = pairname;
+        end
+    end
+    allPairs = unique(allPairs);
+
+    %% -------------------- Change and Save: gather per-pair files --------------------
+    if ismember('Change and Save', pro)
+
+        % Preallocate container when we know sizes (will be lazy-initialized)
+        % allCCC will be [nSubjects x nFreq x nTime x nPairs]
+        allCCC = [];
+
+        for p = 1:numel(allPairs)
+            pairname = allPairs{p};
+            fprintf('Processing pair: %s\n', pairname);
+
+            for s = 1:numel(subjects)
+                subject = subjects(s);
+                fprintf('Processing subject: %s %i/%i\n', subject, s, numel(subjects));
+
+                use_hi_L = false;
+                use_hi_R = false;
+
+                if contains(pairname, 'STNl')
+                    use_hi_L = subject_info(s).ITC_BPReref_L;
+                    if use_hi_L == 1; expected_L = 'BPRerefHi'; else expected_L = 'BPRerefLow'; end
+                elseif contains(pairname, 'STNr')
+                    use_hi_R = subject_info(s).ITC_BPReref_R;
+                    if use_hi_R == 1; expected_R = 'BPRerefHi'; else expected_R = 'BPRerefLow'; end
+                end
+
+                % --- Find file matching subject, channel, medication, and reref --
+                if use_hi_L == 1 || use_hi_R == 1
+                    filelist = dir(fullfile(ccc_dir, [char(subject), '*', pairname, '*', medname, '*BPRerefHi', '*.mat']));
+                elseif use_hi_L == 0 || use_hi_R == 0
+                    filelist = dir(fullfile(ccc_dir, [char(subject), '*', pairname,  '*',medname, '*BPRerefLow', '*.mat']));
+                end
+
+                if isempty(filelist)
+                    warning('No CCC file found for %s / %s. skipping subject.', subject, pairname);
+                    continue;
+                end
+
+                % load the CCC variable (adjust variable name if different)
+                load(fullfile(filelist(1).folder, filelist(1).name), 'CCC', '-mat');
+
+                cccMat = CCC.CCC;         % [nFreq x nTime]
+                freqs = CCC.freqs;       % optional
+                times = CCC.times;       % optional
+
+                % initialize allCCC on first successful file
+                if isempty(allCCC)
+                    [nFreq, nTime] = size(cccMat);
+                    allCCC = nan(numel(subjects), nFreq, nTime, numel(allPairs));
+                end
+
+                % store subject data for this pair
+                allCCC(s,:,:,p) = squeeze(cccMat);
+            end
+
+            %% Save pairwise data for med
+            if save_dta
+                out_fname = sprintf('%s_AllSubs_CCC_%s.mat', pairname, medname);
+                out_path = fullfile(data_dir, 'ccc', 'group_pair', out_fname);
+
+                AllSubOnePairCCC = squeeze(allCCC(:,:,:,p)); % [sub x freq x time]
+                if ~exist(fullfile(data_dir, 'ccc', 'group_pair'),'dir')
+                    mkdir(fullfile(data_dir, 'ccc', 'group_pair'));
+                end
+                save(out_path, 'AllSubOnePairCCC', 'freqs', 'times');
+                fprintf('Saved %s\n', out_path);
+            end
+        end
+    end
+
+    %% -------------------- Load group pair files --------------------
+    if ismember('Load', pro)
+        % Load the Single Pair data of MedOn and MedOff to big matrices
+        % Output: MedOffCccDta and MedOnCccDta with dims [sub x freq x time x pair]
+        MedOffCccDta = [];
+        MedOnCccDta  = [];
+        for p = 1:numel(allPairs)
+            pairname = allPairs{p};
+            fprintf('Loading pair: %s\n', pairname);
+
+            filelist = dir(fullfile(data_dir, 'ccc', 'group_pair', [pairname, '*_AllSubs_CCC_*.mat']));
+            if numel(filelist) < 2
+                warning('Expected two files (MedOff/MedOn) for %s but found %d. Skipping.', pairname, numel(filelist));
+                continue;
+            end
+
+            % find which is Off/On by filename containing medname or MedOff/MedOn convention
+            % Simple approach: load both and assign by substring
+            tmp1 = load(fullfile(filelist(1).folder, filelist(1).name), 'AllSubOnePairCCC', 'freqs', 'times');
+            tmp2 = load(fullfile(filelist(2).folder, filelist(2).name), 'AllSubOnePairCCC', 'freqs', 'times');
+
+            % assign based on medname appearing in filename
+            if contains(filelist(1).name, 'MedOff') || ~contains(filelist(1).name, 'MedOn') && contains(filelist(2).name, 'MedOn')
+                MedOffCccDta(:,:,:,p) = tmp1.AllSubOnePairCCC;
+                MedOnCccDta(:,:,:,p)  = tmp2.AllSubOnePairCCC;
+            else
+                MedOffCccDta(:,:,:,p) = tmp2.AllSubOnePairCCC;
+                MedOnCccDta(:,:,:,p)  = tmp1.AllSubOnePairCCC;
+            end
+
+            % % set freqs/times if not already defined
+            % if ~exist('freqs','var') && isfield(tmp1,'freqs'); freqs = tmp1.freqs; end
+            % if ~exist('times','var') && isfield(tmp1,'times'); times = tmp1.times; end
+        end
+    end
+
+    %% -------------------- Single-channel (pair) paired t-test --------------------
+    if ismember('TTest SC', pro)
+        fprintf('Calculating paired t-test for each CCC pair\n');
+
+        for p = 1:numel(allPairs)
+            pairname = allPairs{p};
+            fprintf('Processing pair: %s\n', pairname);
+
+            % Extract per-pair matrices
+            MedOffCccSC = squeeze(MedOffCccDta(:,:,:,p)); % [sub x freq x time]
+            MedOnCccSC  = squeeze(MedOnCccDta(:,:,:,p));
+
+            % select subjects that have both MedOn and MedOff
+            idx_on = [subject_info.MedOn] & [subject_info.MedOff];
+            idx_on(14) = 0;
+            MedOn = MedOnCccSC(idx_on,:,:);
+            idx_off = [true(1,8) false];
+            MedOff = MedOffCccSC(idx_off,:,:);
+
+            % optional manual row deletions (adapt to your dataset if needed)
+            % if p <= 10; MedOn(9,:,:) = []; MedOff(9,:,:) = []; end
+
+            [nSubj, nFreq, nTime] = size(MedOn);
+
+            tvals = nan(nFreq, nTime);
+            pvals = nan(nFreq, nTime);
+
+            for f = 1:nFreq
+                for t = 1:nTime
+                    % paired t-test across subjects at each TF point
+                    [~, pval, ~, stats] = ttest(squeeze(MedOn(:,f,t)), squeeze(MedOff(:,f,t)));
+                    tvals(f,t) = stats.tstat;
+                    pvals(f,t) = pval;
+                end
+            end
+
+            % FDR correction (BH)
+            [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
+            sig_mask = pvals < 0.05;
+
+            % Plotting: mean difference and significant mask
+            meanDiff = squeeze(mean(MedOn - MedOff, 1, 'omitnan')); % [freq x time]
+            particals = split(pairname, '_');
+            chan1 = particals{1};
+            chan2 = particals{2};
+
+            f5 = figure('Name', sprintf('CCC %s MedOn - MedOff', pairname));
+            set(f5,'Position',[159 50 1122 774.5000]);
+
+            % Upper subplot
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end), 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            title(sprintf('Average ECG over all subjects'))
+            ylabel('Amplitude')
+            hold off
+
+            subplot(2,1,2)
+            imagesc(times(31:end), freqs(9:end), meanDiff(9:end,31:end)); axis xy;
+            colormap('parula');
+            col = colorbar;
+            col.Label.String = 'Difference in CCC Values'; % Add title to colorbar
+            clims = clim;
+            hold on;
+            contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
+            xline(0, "--k", 'LineWidth', 2);
+            clim(clims);
+            title(sprintf('CCC Difference %s - %s in MedOn - MedOff, df=%i, p<%.4g', chan1, chan2, stats.df, signif_thresh))
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            hold off
+
+            % save figure
+            gr5 = fullfile(results_dir, 'ccc', 'group_med', ['CCC_', pairname, '_MedOn-MedOff_TTest_p0.05.png']);
+            exportgraphics(f5,gr5, 'Resolution', 300)
+
+        end
+    end
+
+    %% -------------------- Cluster-level test across pairs or regions --------------------
+    if ismember('TTest Clus', pro)
+        % Example: perform regional cluster test by combining a set of pairs.
+        % Here we demonstrate a simple region average approach similar to ITC ROI.
+        % Define regions as groups of pairnames if relevant:
+        CCC_regions = struct();
+        % Example: CCC_regions.STN = ["LSTN_C3", "RSTN_C3"]; % adapt to your pair naming
+        % CCC_regions.FrontalPairs = ["F3_C3", "F4_C4"]; % example
+
+        regionNames = fieldnames(CCC_regions);
+        for r = 1:numel(regionNames)
+            regName = regionNames{r};
+            thesePairs = CCC_regions.(regName);
+
+            % find indices
+            [~, pairIdx] = ismember(thesePairs, allPairs);
+            pairIdx = pairIdx(pairIdx>0);
+
+            % select subset of subjects with MedOn & MedOff
+            idx = [subject_info.MedOn] & [subject_info.MedOff];
+
+            MedOnSubset  = MedOnCccDta(idx,:,:,pairIdx);   % [sub x freq x time x pairs]
+            MedOffSubset = MedOffCccDta(idx,:,:,pairIdx);
+
+            % average across pairs
+            MedOn_reg  = squeeze(mean(MedOnSubset, 4, 'omitnan'));  % [sub x freq x time]
+            MedOff_reg = squeeze(mean(MedOffSubset, 4, 'omitnan'));
+
+            % paired t-test per TF point
+            [nSubj, nFreq, nTime] = size(MedOn_reg);
+            tvals = nan(nFreq, nTime);
+            pvals = nan(nFreq, nTime);
+            for f = 1:nFreq
+                for t = 1:nTime
+                    [~, pval, ~, stats] = ttest(squeeze(MedOn_reg(:,f,t)), squeeze(MedOff_reg(:,f,t)));
+                    tvals(f,t) = stats.tstat;
+                    pvals(f,t) = pval;
+                end
+            end
+
+            % FDR & plotting as above
+            [~, ~, ~, p_fdr] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
+            sig_mask = p_fdr < 0.05;
+            meanDiff = squeeze(mean(MedOn_reg - MedOff_reg,1,'omitnan'));
+
+            figure; imagesc(times, freqs, meanDiff); axis xy; hold on;
+            contour(times, freqs, sig_mask, 1, 'k', 'LineWidth', 1.5);
+            title(sprintf('CCC Region %s MedOn - MedOff', regName));
+            hold off;
+        end
+    end
+
+end
+
+
+
+
+
+
 
 if ismember('Group CCC Load Chan', steps)
 
