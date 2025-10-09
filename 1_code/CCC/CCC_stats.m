@@ -109,7 +109,7 @@ CCCchans.Comp6 = {'STNr', 'Pz'};
 CCCchans.Comp7 = {'STNl', 'C4'};
 CCCchans.Comp8 = {'STNl', 'F4'};
 CCCchans.Comp9 = {'STNr', 'C3'};
-CCCchans.Comp10 = {'STNr', 'F4'};
+CCCchans.Comp10 = {'STNr', 'F3'};
 comps = {'Comp1', 'Comp2', 'Comp3', 'Comp4', 'Comp5', 'Comp6', 'Comp7', 'Comp8', 'Comp9','Comp10'};
 comp_names = {'STNl - C3','STNl - F3','STNl - Pz', 'STNr - C4', 'STNr - F4', 'STNr - Pz', 'STNl - C4', 'STNl - F4','STNr - C3', 'STNr - F4'};
 
@@ -144,8 +144,8 @@ end
 
 % Use BPReref Data
 BPReref = true; BPRerefTit = 'BPReref';
-BPRerefHi = false; BPRerefHiTit = 'BPRerefHi';
-BPRerefLw = true; BPRerefLwTit = 'BPRerefLow';
+BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
+BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
 % Flag if only EEG, STN or all channels
@@ -246,7 +246,7 @@ if ismember ('Calc Single Subject CCC', steps)
         end
 
         %% GET PSI / CCC By Trials
-        for c1 = 1:numel(fieldnames(CCCchans))
+        for c1 = 10:numel(fieldnames(CCCchans))
             comp = comps{c1};
             channel1 = CCCchans.(comp){1};
             channel2 = CCCchans.(comp){2};
@@ -646,7 +646,7 @@ if ismember('Group Load TTest by med', steps)
 
     save_dta = true;
 
-    pro = {'Load', 'TTest SC'}; % options: , 'TTest SC', 'TTest Clus', 'Change and Save'
+    pro = { 'Change and Save', 'Load', 'TTest SC'}; % options: , 'TTest SC', 'TTest Clus', 'Change and Save'
 
     %subject, '_', channel1, '_', channel2, '_CCC_', medname ,
     % Build list of all possible pairs (you can also set this manually)
@@ -675,7 +675,7 @@ if ismember('Group Load TTest by med', steps)
         % allCCC will be [nSubjects x nFreq x nTime x nPairs]
         allCCC = [];
 
-        for p = 1:numel(allPairs)
+        for p = 8%1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Processing pair: %s\n', pairname);
 
@@ -744,7 +744,7 @@ if ismember('Group Load TTest by med', steps)
         % Output: MedOffCccDta and MedOnCccDta with dims [sub x freq x time x pair]
         MedOffCccDta = [];
         MedOnCccDta  = [];
-        for p = 1:numel(allPairs)
+        for p = 8%1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Loading pair: %s\n', pairname);
 
@@ -778,7 +778,7 @@ if ismember('Group Load TTest by med', steps)
     if ismember('TTest SC', pro)
         fprintf('Calculating paired t-test for each CCC pair\n');
 
-        for p = 1:numel(allPairs)
+        for p = 8%1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Processing pair: %s\n', pairname);
 
