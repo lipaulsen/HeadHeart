@@ -61,12 +61,41 @@ end
 %=========================================================================
 %% Parameters
 
+% Downsample Parameters
+NewSR=300;
+stfr=0.5;   enfr=30; dfr=0.2;
+Frqs=stfr:dfr:enfr;
+if NewSR < 2*enfr; NewSR=(enfr+2)*2; end
+
+% Flag if only EEG, STN or all channels
+allchans = true;
+onlyeeg = false;
+onlystn = false;
+
+
+% Hilbert TFR Parameters
+BandWidth=2; % BandWidth in Hz;
+Qfac     =2; % Attenuation in db(-Qfac)
+WaveletnCyc=6;
+WaveletgWidth=3;
+FltPassDir='twopass'; % onepass
+
+% Baseline und Epoch Parameter
+ChsCmxEvFrTm =[]; %
+baseline_win = [-0.3 -0.1]; % Baseline Time Window
+
+% Define TFR Time Window
+tWidth   = 0.8;
+tOffset  = 0.4;
+
 % Generating MedName
 if MedOn == true
     medname = 'MedOn';
 elseif MedOff == true
     medname = 'MedOff';
 end
+
+Fhp = 2;
 
 % Use BPReref Data
 BPReref = true; BPRerefTit = 'BPReref';
@@ -81,13 +110,13 @@ steps = {'Group TFR Power Save'};
 if ismember('Group TFR Power Save', steps)
     fprintf('Load Data for Group TFR Power\n');
 
-    for s = 9:numel(subjects)
+    for s = 1:numel(subjects)
         subject = subjects(s);
         fprintf('Loading TFR Data for subject %s\n', subject);
 
         % TFR file pattern (Hilbert only, exclude non-BP reref files)
         filelist = dir(fullfile(data_dir, 'tfr', '2Hz', ...
-             [char(subject), '*', medname, '*', 'BPReref', '*', 'Freq=0.5', '*', 'EP=-0.3' '*.mat']));
+            [char(subject), '*', medname, '*', 'Freq=0.5', '*', 'EP=-0.4' '*.mat']));
 
         PowerDataSub_cell = {};
         PowerLabels = strings(0, 1);
@@ -157,7 +186,6 @@ if ismember('Group TFR Power Save', steps)
                 label_combined = strcat(string(BPkey));
                 PowerLabels = [PowerLabels; label_combined];
             end
-            clear TFR
         end
 
         % Save per-channel files
@@ -165,8 +193,8 @@ if ismember('Group TFR Power Save', steps)
             ch_name = PowerChannels{c};
             pow_mat = PowerDataSub_cell{c};  % [freq x time]
 
-            out_fname = sprintf('%s_%s_Power_%s_time=-0.3-0.6_DS=300_HP=2Hz.mat', ...
-                char(subject), ch_name, medname);
+            out_fname = sprintf('%s_%s_Power_MedOn_time=-0.3-0.6_DS=300_HP=2Hz.mat', ...
+                char(subject), ch_name);
             out_path = fullfile(data_dir, 'tfr', 'ss_chan', out_fname);
 
             POW = pow_mat;
@@ -285,6 +313,4 @@ if ismember('Plot Power',steps)
                 exportgraphics(f9,gr9, 'Resolution', 300)
             end
         end
-    end
-end
 
