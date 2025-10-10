@@ -4,8 +4,8 @@
 %%
 % MEDICATION
 % only one can be true at all times
-MedOn = true;
-MedOff = false;
+MedOn = false;
+MedOff = true;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -74,14 +74,31 @@ BPRerefHi = true; BPRerefHiTit = 'BPRerefHi';
 BPRerefLw = false; BPRerefLwTit = 'BPRerefLow';
 BPRerefBest = false; BPRerefBestTit = 'BPRerefBest';
 
-steps = {'Group TFR Power Save'};
+allChannels = unique([FltSubsOnlyEEG{:}]);% get unique channel names across all subjects
+allChannels = {allChannels{:}, 'STNl', 'STNr'};
+
+steps = { 'Load', 'TTest SC'}; %'Group TFR Power Save', 'Change and Save'
+
+signif_thresh = 0.05;
+
+disp("************* STARTING ITC *************");
+
+fprintf('Loading AVG ECG Data\n');
+% if strcmp(medname, 'MedOn')
+    pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_MedOn_n=11_', '*']);
+% elseif strcmp(medname, 'MedOff')
+%      pattern = fullfile(data_dir, 'ecg', ['ECG-AVG_', medname, '_n=7_', '*']);
+% end
+files = dir(pattern);
+filename = fullfile(files(1).folder, files(1).name);
+load(filename, 'AVGECG');
 
 %% Loop
 
 if ismember('Group TFR Power Save', steps)
     fprintf('Load Data for Group TFR Power\n');
 
-    for s = 9:numel(subjects)
+    for s = 1:numel(subjects)
         subject = subjects(s);
         fprintf('Loading TFR Data for subject %s\n', subject);
 
@@ -177,6 +194,245 @@ if ismember('Group TFR Power Save', steps)
     end
 end
 
+if ismember('Change and Save', steps)
+
+        % Preallocate using first file to get sizes
+      
+        allPOW = [];  % will become [subjects × freqs × time × channels]
+
+        for c = 1:numel(allChannels)
+            chans = allChannels{c};
+            fprintf('Processing channel: %s\n', chans);
+
+            for s = 1:numel(subjects)
+                subject = subjects(s);
+                fprintf('Processing subject: %s %i/%i\n', subject, s, numel(subjects));
+                channels = FltSubsChansStn{s};  % channels for this subject
+
+                if strcmp(chans, 'STNl')
+                    chan = channels(startsWith(channels, 'L'));
+                elseif strcmp(chans, 'STNr')
+                    chan = channels(startsWith(channels, 'R'));
+                else 
+                    chan = chans;
+                end
+
+                filelist = dir(fullfile(data_dir, 'tfr', 'ss_chan', [char(subject), '*', char(chan), '*', medname, '*', 'time=-0.3', '*.mat']));
+
+                if isempty(filelist)
+                    warning('No file was found --> code will proceed');
+                    continue
+                end
+
+                % Load ITC
+                load(fullfile(filelist(1).folder, filelist(1).name), 'POW', 'times', 'freqs', '-mat');
+
+                % Preallocate after first file
+                if isempty(allPOW)
+                    nFreq = size(POW,1);
+                    nTime = size(POW,2);
+                    allPOW = nan(numel(subjects), nFreq, nTime, numel(allChannels));
+                end
+
+                % Store data
+                allPOW(s,:,:,c) = squeeze(POW);
+            end
+
+            %% Save channelwise data for med
+            if strcmp(allChannels{c}, 'STNl'); chan = 'STNl'; end
+            if strcmp(allChannels{c}, 'STNr'); chan = 'STNr'; end
+
+            % create save path
+            out_fname = sprintf('%s_AllSubs_POW_%s_time=-0.3-0.6_DS=300_HP=0.5.mat', char(chan), medname);
+            out_path = fullfile(data_dir, 'tfr' ,'group_chan', out_fname);
+
+            % Extract per-channel data
+            AllSubOneChanPOW = squeeze(allPOW(:,:,:,c));
+
+            % Save to file (use -v7.3 for large arrays)
+            save(out_path, 'AllSubOneChanPOW', 'freqs', 'times');
+        end
+end
+
+if ismember('Load', steps)
+    % Load the Single Channel data of MedOn and Med Off to a big matrix
+    for c = 1:numel(allChannels)
+        chan = allChannels{c};
+        fprintf('Processing channel: %s\n', chan);
+
+        filelist = dir(fullfile(data_dir, 'tfr', 'group_chan', [chan, '*.mat']));
+        load(fullfile(filelist(1).folder, filelist(1).name), 'AllSubOneChanPOW', 'times', 'freqs', '-mat');
+        MedOffPowDta(:,:,:,c) = AllSubOneChanPOW;
+        load(fullfile(filelist(2).folder, filelist(2).name), 'AllSubOneChanPOW', 'times', 'freqs', '-mat');
+        MedOnPowDta(:,:,:,c) = AllSubOneChanPOW;
+    end
+    if ismember('TTest SC', steps)
+        fprintf('Calculating TStats for each Channel by Medication\n');
+        for c = 1:numel(allChannels)
+            chan = allChannels{c};
+            fprintf('Processing channel: %s\n', chan);
+
+            MedOffPowDataSC = squeeze(MedOffPowDta(:,:,:,c));
+            MedOnPowDataSC = squeeze(MedOnPowDta(:,:,:,c));
+
+            % Med On and Med of have different NSub so use subs that are the
+            % same (within-subject design)
+            idx = [subject_info.MedOn] & [subject_info.MedOff];
+            subjectIDs = {subject_info(idx).ID};
+            MedOnPowDataSC = MedOnPowDataSC(idx,:,:);
+            if c <= 10; MedOnPowDataSC(9,:,:) = []; MedOffPowDataSC(9,:,:) = []; end
+
+            % --- Paired t-test at each (freq, time) ---
+            for f = 1:numel(freqs)
+                for t = 1:numel(times)
+                    [~, p, ~, stats] = ttest(squeeze(MedOnPowDataSC(:,f,t)), squeeze(MedOffPowDataSC(:,f,t)));
+                    tvals(f,t) = stats.tstat;
+                    pvals(f,t) = p;
+                end
+            end
+
+            % --- Multiple comparisons correction (FDR) ---
+            [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
+
+            % --- Significance mask ---
+            sig_mask = pvals < 0.05;
+
+            % sig_mask = pvals < 0.05 / numel(pvals);
+
+            % --- Plot results ---
+
+            % Diff TFR Medon - Med Off Data
+            meanDiffMedPow = squeeze(mean(MedOnPowDataSC - MedOffPowDataSC,1));
+
+            f5 = figure;
+            set(f5,'Position',[159 50 1122 774.5000]);
+
+            % Upper subplot
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end), 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            title(sprintf('Average ECG over all subjects'))
+            ylabel('Amplitude')
+            hold off
+
+            % Lower subplot
+            subplot(2,1,2)
+            imagesc(times(31:end), freqs(9:end), meanDiffMedPow(9:end,31:end)); axis xy;
+            colormap('parula');
+            col = colorbar;
+            col.Label.String = 'Difference in Power'; % Add title to colorbar
+            clims = clim;
+            hold on;
+            contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
+            xline(0, "--k", 'LineWidth', 2);
+            clim(clims);
+            title(sprintf('Power Difference %s MedOn - MedOff, df=%i, p<%.4g', chan, stats.df, signif_thresh))
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            hold off
+
+            gr5 = fullfile(results_dir, 'power', '2Hz', 'group_med', ['POW_', char(chan), '_MedOn-MedOff_TTest_p0.05.png']);
+            exportgraphics(f5,gr5, 'Resolution', 300)
+
+
+        end
+    end
+    if ismember('TTest Clus', steps)
+
+        % Define EEG channel clusters
+        EEG_clusters = struct();
+        EEG_clusters.Frontal = ["F3", "F4"];
+        EEG_clusters.Central = ["C3", "C4"];
+        EEG_clusters.Parietal = ["P3", "P4"];
+        %EEG_clusters.STN = ["STNl", "STNr"];
+
+        regionNames = fieldnames(EEG_clusters);
+
+        for r = 1:numel(regionNames)
+            regName = regionNames{r};
+            theseChans = EEG_clusters.(regName);
+
+            % Find indices of those channels
+            [~, chanIdx] = ismember(theseChans, allChannels);
+
+            eeg_condition = cellfun(@(x) any(contains(x, theseChans)), {subject_info.EEG});
+            med_condition = [subject_info.MedOn] & [subject_info.MedOff];
+            idx = med_condition %& eeg_condition;
+            subjectIDs = {subject_info(idx).ID};
+            MedOnItcDataSlice = MedOnItcDta(idx,:,:,chanIdx);
+            if sum(eeg_condition) == 14
+                MedOffItcDataSlice = MedOffItcDta(1:8,:,:,chanIdx);
+                MedOnItcDataSlice = MedOnItcDataSlice(1:8,:,:,:);
+                % MedOffItcDataSlice = MedOffItcDta(:,:,:,chanIdx);
+            elseif sum(eeg_condition) < 14
+                MedOffItcDataSlice = MedOffItcDta(idx,:,:,chanIdx);
+            end
+
+            % Average over channels
+            ITC_ON_reg  = squeeze(mean(MedOnItcDataSlice(:,:,:,:), 4));
+            ITC_OFF_reg = squeeze(mean(MedOffItcDataSlice(:,:,:,:), 4));
+
+            % --- t-test across subjects ---
+            [nSubj, nFreq, nTime] = size(ITC_ON_reg);
+            tvals = nan(nFreq, nTime);
+            pvals = nan(nFreq, nTime);
+
+            for f = 1:nFreq
+                for t = 1:nTime
+                    [~, p, ~, stats] = ttest(squeeze(ITC_ON_reg(:,f,t)), squeeze(ITC_OFF_reg(:,f,t)));
+                    tvals(f,t) = stats.tstat;
+                    pvals(f,t) = p;
+                end
+            end
+
+            % --- FDR correction ---
+            [~, ~, ~, p_fdr] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
+            sig_mask = pvals < 0.05;
+
+            % --- Plot region map ---
+
+            % Diff TFR Medon - Med Off Data
+            meanDiffMedItc = squeeze(mean(ITC_ON_reg - ITC_OFF_reg,1, 'omitnan'));
+
+            f6 = figure;
+            set(f6,'Position',[159 50 1122 774.5000]);
+
+            % Upper subplot
+            subplot(2,1,1)
+            plot(times(31:end), AVGECG.mean(31:end), 'Color', 'k'); hold on
+            set(gca,'Position',[0.1300 0.5838 0.73 0.3])
+            xline(0, "--k", 'LineWidth', 2);
+            axis('tight')
+            title(sprintf('Average ECG over all subjects'))
+            ylabel('Amplitude')
+            hold off
+
+            % Lower subplot
+            subplot(2,1,2)
+            imagesc(times(31:end), freqs(9:end), meanDiffMedItc(9:end,31:end)); axis xy;
+            colormap('parula');
+            col = colorbar;
+            col.Label.String = 'Difference in ITC Values'; % Add title to colorbar
+            clims = clim;
+            hold on;
+            contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
+            xline(0, "--k", 'LineWidth', 2);
+            clim(clims);
+            title(sprintf('ITC Difference %s MedOn - MedOff, df=%i, p<%.4g', regName, stats.df, signif_thresh))
+            xlabel('Time (s)') % Add x-label
+            ylabel('Frequencies (Hz)') % Add y-label
+            hold off
+
+            gr6 = fullfile(results_dir, 'itc', '2Hz', 'group_med', ['ITC_', regName, '_MedOn-MedOff_TTest_p0.05.png']);
+            exportgraphics(f6,gr6, 'Resolution', 300)
+        end
+    end
+end
+
 
 if ismember('Plot Power',steps)
     fprintf('Plot Power\n');
@@ -233,7 +489,7 @@ if ismember('Plot Power',steps)
         % Get matching files
         files_ch = all_files(match_indices);
 
-        % Load all subjects' ITC data for this channel
+        % Load all subjects' POW data for this channel
         POW_allSubs_cell = {};
         for f = 1:numel(files_ch)
             load(fullfile(files_ch(f).folder, files_ch(f).name), 'POW', 'freqs', 'times');

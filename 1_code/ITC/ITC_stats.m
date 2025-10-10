@@ -40,8 +40,8 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = true;
-MedOff = false;
+MedOn = false;
+MedOff = true;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -594,7 +594,7 @@ if ismember('Group Load TTest by med', steps)
 
     save_dta = true;
 
-    pro = {'Load', 'TTest Clus'}; %'Change and Save',  'TTest SC',
+    pro = {'Load', 'Extract and Plot Peak'}; %'Change and Save',  'TTest SC', 'TTest Clus'
 
     allChannels = unique([FltSubsOnlyEEG{:}]);% get unique channel names across all subjects
     allChannels = {allChannels{:}, 'STNl', 'STNr'};
@@ -604,7 +604,7 @@ if ismember('Group Load TTest by med', steps)
         % Preallocate using first file to get sizes
         allITC = [];  % will become [subjects × freqs × time × channels]
 
-        for c = 11:numel(allChannels)
+        for c = 1:numel(allChannels)
             chans = allChannels{c};
             fprintf('Processing channel: %s\n', chans);
 
@@ -617,6 +617,8 @@ if ismember('Group Load TTest by med', steps)
                     chan = channels(startsWith(channels, 'L'));
                 elseif strcmp(chans, 'STNr')
                     chan = channels(startsWith(channels, 'R'));
+                else
+                    chan = chans; 
                 end
 
                 % --- Decide BPReref for STN channels ---
@@ -690,9 +692,132 @@ if ismember('Group Load TTest by med', steps)
             MedOnItcDta(:,:,:,c) = AllSubOneChanITC;
         end
     end
+
+    if ismember('Extract and Plot Peak', pro)
+
+        peak_win = [0.1 0.6];  % time window in seconds after R-peak
+        time_idx = times >= peak_win(1) & times <= peak_win(2);
+        times_win = times(time_idx);
+
+        % Extract Peak ITC Value, Time and Freq from Med Off
+        for s = 1:size(MedOffItcDta,1) 
+            medoffsubjects = string({subject_info([subject_info.MedOff] == 1).ID});
+            medoffsubject = medoffsubjects{s}; 
+            for c = 1:size(MedOffItcDta,4)
+                chan = allChannels{c};
+                ItcMatMedOff = squeeze(MedOffItcDta(s,:,:,c));
+
+                % Find global maximum in that window
+                subMatMedOff = ItcMatMedOff(:, time_idx);
+                [peakVal, linIdx] = max(subMatMedOff(:));
+                [f_idx_local, t_idx_local] = ind2sub(size(subMatMedOff), linIdx);
+
+                peakItcValMedOff(s,c)  = peakVal;
+                peakItcFreqMedOff(s,c) = freqs(f_idx_local);  % all freqs included
+                peakItcTimeMedOff(s,c) = times_win(t_idx_local);
+            end
+        end
+
+          % Extract Peak ITC Value, Time and Freq from MedOn
+        for s = 1:size(MedOnItcDta,1) 
+            medonsubjects = string({subject_info([subject_info.MedOn] == 1).ID});
+            medonsubject = medonsubjects{s}; 
+            for c = 1:size(MedOnItcDta,4)
+                chan = allChannels{c};
+                ItcMatMedOn = squeeze(MedOnItcDta(s,:,:,c));
+
+                % Find global maximum in that window
+                subMat = ItcMatMedOn(:, time_idx);
+                [peakVal, linIdx] = max(subMat(:));
+                [f_idx_local, t_idx_local] = ind2sub(size(subMat), linIdx);
+
+                peakItcValMedOn(s,c)  = peakVal;
+                peakItcFreqMedOn(s,c) = freqs(f_idx_local);  % all freqs included
+                peakItcTimeMedOn(s,c) = times_win(t_idx_local);
+
+            end
+        end
+
+        f7 = figure;
+        hold on;
+        grid on;
+        box on;
+
+        % Flatten matrices for plotting (subjects × channels → one long vector)
+        x_off = peakItcTimeMedOff(:);
+        y_off = peakItcFreqMedOff(:);
+        z_off = peakItcValMedOff(:);
+
+        x_on = peakItcTimeMedOn(:);
+        y_on = peakItcFreqMedOn(:);
+        z_on = peakItcValMedOn(:);
+
+        % Plot MedOff in blue, MedOn in red
+        scatter3(x_off, y_off, z_off, 50, 'b', 'filled', 'MarkerFaceAlpha', 0.6);
+        scatter3(x_on, y_on, z_on, 50, 'r', 'filled', 'MarkerFaceAlpha', 0.6);
+
+        % Labels and legend
+        xlabel('Time (s)', 'FontSize', 12);
+        ylabel('Frequency (Hz)', 'FontSize', 12);
+        zlabel('Peak ITC Value', 'FontSize', 12);
+        legend({'Med Off', 'Med On'}, 'Location', 'best');
+        title('3D Scatter of Peak ITC (Med Off vs Med On)', 'FontSize', 14);
+        view(135, 25);
+
+        gr7 =  fullfile(results_dir, 'itc', '2Hz', 'group_med', ['ITC_Scatter', char(chan), '_MedOn-MedOff_TTest_p0.05.png']);
+        exportgraphics(f7,gr7, 'Resolution', 300)
+
+        nCh = size(MedOnItcDta, 4);
+        nEEG = nCh - 2;   % all but last two are EEG
+        nSTN = 2;         % last two channels are STN
+
+        medications = {'MedOff', 'MedOn'};
+        colors = struct('EEG', [0.2 0.6 1], 'STN', [1 0.4 0.2]);  % blue vs orange
+
+        for m = 1:2
+            f7 = figure;
+            hold on;
+            grid on;
+            box on;
+
+            % Select the correct data set
+            if strcmp(medications{m}, 'MedOff')
+                x = peakItcTimeMedOff;
+                y = peakItcFreqMedOff;
+                z = peakItcValMedOff;
+            else
+                x = peakItcTimeMedOn;
+                y = peakItcFreqMedOn;
+                z = peakItcValMedOn;
+            end
+
+            % EEG channels
+            scatter3(x(:,1:nEEG), y(:,1:nEEG), z(:,1:nEEG), ...
+                60, colors.EEG, 'filled', 'MarkerFaceAlpha', 0.7, ...
+                'DisplayName', 'EEG');
+
+            % STN channels
+            scatter3(x(:,nEEG+1:end), y(:,nEEG+1:end), z(:,nEEG+1:end), ...
+                60, colors.STN, 'filled', 'MarkerFaceAlpha', 0.7, ...
+                'DisplayName', 'STN');
+
+            % Labels and legend
+            xlabel('Time (s)', 'FontSize', 12);
+            ylabel('Frequency (Hz)', 'FontSize', 12);
+            zlabel('Peak ITC Value', 'FontSize', 12);
+            title(['3D Scatter of Peak ITC (' medications{m} ')'], 'FontSize', 14);
+            legend('show', 'Location', 'best');
+            view(135, 25);
+
+            gr7 =  fullfile(results_dir, 'itc', '2Hz', 'group_med', ['ITC_Scatter_EEG-STN_', medications{m}, '_TTest_p0.05.png']);
+            exportgraphics(f7,gr7, 'Resolution', 300)
+        end
+
+    end
+
     if ismember('TTest SC', pro)
         fprintf('Calculating TStats for each Channel by Medication\n');
-        for c = 11:numel(allChannels)
+        for c = 1:numel(allChannels)
             chan = allChannels{c};
             fprintf('Processing channel: %s\n', chan);
 
@@ -760,8 +885,6 @@ if ismember('Group Load TTest by med', steps)
 
             gr5 = fullfile(results_dir, 'itc', '2Hz', 'group_med', ['ITC_', char(chan), '_MedOn-MedOff_TTest_p0.05.png']);
             exportgraphics(f5,gr5, 'Resolution', 300)
-
-
         end
     end
     if ismember('TTest Clus', pro)
@@ -784,7 +907,7 @@ if ismember('Group Load TTest by med', steps)
 
             eeg_condition = cellfun(@(x) any(contains(x, theseChans)), {subject_info.EEG});
             med_condition = [subject_info.MedOn] & [subject_info.MedOff];
-            idx = med_condition %& eeg_condition;
+            idx = med_condition & eeg_condition;
             subjectIDs = {subject_info(idx).ID};
             MedOnItcDataSlice = MedOnItcDta(idx,:,:,chanIdx);
             if sum(eeg_condition) == 14

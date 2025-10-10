@@ -675,7 +675,7 @@ if ismember('Group Load TTest by med', steps)
         % allCCC will be [nSubjects x nFreq x nTime x nPairs]
         allCCC = [];
 
-        for p = 8%1:numel(allPairs)
+        for p = 1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Processing pair: %s\n', pairname);
 
