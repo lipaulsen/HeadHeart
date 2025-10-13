@@ -837,18 +837,18 @@ if ismember('Group Load TTest by med', steps)
                     [~, p, ~, stats] = ttest(squeeze(MedOnItcDataSC(:,f,t)), squeeze(MedOffItcDataSC(:,f,t)));
                     tvals(f,t) = stats.tstat;
                     pvals(f,t) = p;
-                    CohensD(f,t) = stats.tstat / sqrt(stats.df);
+                    CohensD(f,t) = stats.tstat / sqrt(8);
                 end
             end
 
             % --- Multiple comparisons correction (FDR) ---
-            % [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
-            % p_fdr = reshape(p_fdr, size(pvals));
+            [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
 
             % --- Significance mask ---
             sig_mask = pvals < 0.05;
 
-            sig_Tvals = tvals(sig_mask);
+            sig_Tvals = Tvals(sig_mask);
             sig_Dvals = CohensD(sig_mask);
             mean_t = mean(sig_Tvals, 'omitnan');
             mean_d = mean(sig_Dvals, 'omitnan');
@@ -886,7 +886,7 @@ if ismember('Group Load TTest by med', steps)
             contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
             xline(0, "--k", 'LineWidth', 2);
             clim(clims);
-            title(sprintf('ITC Difference %s MedOn - MedOff, t(%i)=%.4g, p<%.4g, d=%.4g', chan, stats.df, mean_t, signif_thresh, mean_d))
+            title(sprintf('ITC Difference %s MedOn - MedOff, t(%i)=%., p<%.4g, t', chan, stats.df, signif_thresh))
             xlabel('Time (s)') % Add x-label
             ylabel('Frequencies (Hz)') % Add y-label
             hold off
@@ -940,20 +940,13 @@ if ismember('Group Load TTest by med', steps)
                     [~, p, ~, stats] = ttest(squeeze(ITC_ON_reg(:,f,t)), squeeze(ITC_OFF_reg(:,f,t)));
                     tvals(f,t) = stats.tstat;
                     pvals(f,t) = p;
-                    CohensD(f,t) = stats.tstat / sqrt(stats.df);
                 end
             end
 
             % --- FDR correction ---
-            % [~, ~, ~, p_fdr] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
-            % p_fdr = reshape(p_fdr, size(pvals));
+            [~, ~, ~, p_fdr] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            p_fdr = reshape(p_fdr, size(pvals));
             sig_mask = pvals < 0.05;
-            sig_Tvals = tvals(sig_mask);
-            sig_Dvals = CohensD(sig_mask);
-            mean_t = mean(sig_Tvals, 'omitnan');
-            mean_d = mean(sig_Dvals, 'omitnan');
-            max_t  = max(sig_Tvals);
-            max_d  = max(sig_Dvals);
 
             % --- Plot region map ---
 
@@ -984,7 +977,7 @@ if ismember('Group Load TTest by med', steps)
             contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
             xline(0, "--k", 'LineWidth', 2);
             clim(clims);
-            title(sprintf('ITC Difference %s MedOn - MedOff, t(%i)=%.4g, p<%.4g, d=%.4g', regName, stats.df,  mean_t, signif_thresh, mean_d))
+            title(sprintf('ITC Difference %s MedOn - MedOff, df=%i, p<%.4g', regName, stats.df, signif_thresh))
             xlabel('Time (s)') % Add x-label
             ylabel('Frequencies (Hz)') % Add y-label
             hold off
