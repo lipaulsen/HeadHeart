@@ -336,7 +336,7 @@ if ismember('Load', steps)
             contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
             xline(0, "--k", 'LineWidth', 2);
             clim(clims);
-            title(sprintf('Power Difference %s MedOn - MedOff, t(%i)=%.4g, p<%.4g, d=%.4g', chan , stats.df,  mean_t, signif_thresh, mean_d))
+            title(sprintf('Power Difference %s MedOn - MedOff, t(%i)=%.4g, p<%.4g, d=%.4g', , stats.df,  mean_t, signif_thresh, mean_d))
             xlabel('Time (s)') % Add x-label
             ylabel('Frequencies (Hz)') % Add y-label
             hold off

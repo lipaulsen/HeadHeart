@@ -646,7 +646,7 @@ if ismember('Group Load TTest by med', steps)
 
     save_dta = true;
 
-    pro = { 'Change and Save', 'Load', 'TTest SC'}; % options: , 'TTest SC', 'TTest Clus', 'Change and Save'
+    pro = {  'Load', 'TTest SC'}; % options: , 'TTest SC', 'TTest Clus', 'Change and Save'
 
     %subject, '_', channel1, '_', channel2, '_CCC_', medname ,
     % Build list of all possible pairs (you can also set this manually)
@@ -744,7 +744,7 @@ if ismember('Group Load TTest by med', steps)
         % Output: MedOffCccDta and MedOnCccDta with dims [sub x freq x time x pair]
         MedOffCccDta = [];
         MedOnCccDta  = [];
-        for p = 8%1:numel(allPairs)
+        for p = 1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Loading pair: %s\n', pairname);
 
@@ -778,7 +778,7 @@ if ismember('Group Load TTest by med', steps)
     if ismember('TTest SC', pro)
         fprintf('Calculating paired t-test for each CCC pair\n');
 
-        for p = 8%1:numel(allPairs)
+        for p = 1:numel(allPairs)
             pairname = allPairs{p};
             fprintf('Processing pair: %s\n', pairname);
 
@@ -807,13 +807,20 @@ if ismember('Group Load TTest by med', steps)
                     [~, pval, ~, stats] = ttest(squeeze(MedOn(:,f,t)), squeeze(MedOff(:,f,t)));
                     tvals(f,t) = stats.tstat;
                     pvals(f,t) = pval;
+                    CohensD(f,t) = stats.tstat / sqrt(stats.df);
                 end
             end
 
             % FDR correction (BH)
-            [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
-            p_fdr = reshape(p_fdr, size(pvals));
+            % [p_fdr, crit_p] = fdr_bh(pvals(:), 0.05, 'pdep', 'yes');
+            % p_fdr = reshape(p_fdr, size(pvals));
             sig_mask = pvals < 0.05;
+            sig_Tvals = tvals(sig_mask);
+            sig_Dvals = CohensD(sig_mask);
+            mean_t = mean(sig_Tvals, 'omitnan');
+            mean_d = mean(sig_Dvals, 'omitnan');
+            max_t  = max(sig_Tvals);
+            max_d  = max(sig_Dvals);
 
             % Plotting: mean difference and significant mask
             meanDiff = squeeze(mean(MedOn - MedOff, 1, 'omitnan')); % [freq x time]
@@ -844,7 +851,7 @@ if ismember('Group Load TTest by med', steps)
             contour(times(31:end), freqs(9:end), sig_mask(9:end,31:end), 1, 'linecolor', 'k', 'linewidth', 1.5);
             xline(0, "--k", 'LineWidth', 2);
             clim(clims);
-            title(sprintf('CCC Difference %s - %s in MedOn - MedOff, df=%i, p<%.4g', chan1, chan2, stats.df, signif_thresh))
+            title(sprintf('CCC Difference %s - %s in MedOn - MedOff,  t(%i)=%.4g, p<%.4g, d=%.4g', chan1, chan2, stats.df,  mean_t, signif_thresh, mean_d))
             xlabel('Time (s)') % Add x-label
             ylabel('Frequencies (Hz)') % Add y-label
             hold off
