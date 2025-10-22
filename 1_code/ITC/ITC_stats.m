@@ -40,8 +40,8 @@
 
 % MEDICATION
 % only one can be true at all times
-MedOn = false;
-MedOff = true;
+MedOn = true;
+MedOff = false;
 
 % SUBJECT STATUS
 % only one can be true at all times
@@ -103,7 +103,7 @@ show_plots = false;
 baseline = true;
 
 % Define feature extraction steps to perform
-steps = {'Group Load TTest by med'}; %  'Correlation Group ITC', 'Plot Single Subject Power', 'Plot Power', 'Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
+steps = {'Correlation Group ITC'}; %  'Correlation Group ITC', 'Plot Single Subject Power', 'Plot Power', 'Group TFR Power Save', 'Group ITC Load Chan', 'Plot SubAvg PermStats', 'Plot ITC Group Cluster', 'Group ITC Save', 'Group ITC' 'Plot SubAvg PermStats', 'Calc Single Subject ITC', 'Plot SubAvg ITC', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster',
 %, 'Plot Single Subject Power', 'Plot Power', 'Plot Plow Single Channels',
 %'Plot Power Cluster', 'Plot Power', 'Plot Plow Single Channels', 'Plot Power Cluster'
 % Define Time Window
@@ -1977,16 +1977,11 @@ end
 
 if ismember('Correlation Group ITC', steps)
 
-    % === Define TF window ===
-    tf_time_win = [0.1, 0.25];     % seconds
-    tf_freq_win = [2, 4];          % Hz
-
-    freq_idx = find(freqs >= tf_freq_win(1) & freqs <= tf_freq_win(2));
-    time_idx = find(times >= tf_time_win(1) & times <= tf_time_win(2));
-
+  
     % === Load all data ===
     all_files = dir(fullfile(data_dir, 'itc', 'ss_chan', '*.mat'));
     pow_files = dir(fullfile(data_dir, 'tfr', 'ss_chan', '*.mat'));
+    hep_files = dir(fullfile(data_dir, 'erp', 'group', 'clustering', '*ON_OFF*.mat'));
     valid_idx = ~startsWith({all_files.name}, '._');
     valid_idx_pow = ~startsWith({pow_files.name}, '._');
     pow_files = pow_files(valid_idx_pow);
@@ -2000,10 +1995,59 @@ if ismember('Correlation Group ITC', steps)
     eeg_pow_files = pow_files(~is_lfp_pow);
     lfp_pow_files = pow_files(is_lfp_pow);
 
+      % === Define TF window ===
+    tf_time_win = [0.1, 0.25];     % seconds
+    tf_freq_win = [2, 4];          % 
+
+    times = AVGECG.times;
+
+    freq_idx = find(freqs >= tf_freq_win(1) & freqs <= tf_freq_win(2));
+    time_idx = find(times >= tf_time_win(1) & times <= tf_time_win(2));
+
+
     [Itc_eeg, Power_eeg, Subs_eeg] = process_type(eeg_itc_files, eeg_pow_files, 'EEG', freq_idx, time_idx);
     [Itc_lfp, Power_lfp, Subs_lfp] = process_type(lfp_itc_files, lfp_pow_files, 'LFP', freq_idx, time_idx);
-    [Itc_all, Power_all, Subs_all] = process_type(all_files, pow_files, 'ALL', freq_idx, time_idx);
+    [Itc_all, Power_all, Subs_all, Itc_peak_time_Idx, Itc_peak_freq_Idx] = process_type(all_files, pow_files, 'ALL', freq_idx, time_idx);
+    
+    % load HEP 
+   
+    fname = hep_files(1).name;
+    fpath = fullfile(hep_files(1).folder, fname);
+    load(fpath, 'data_on');
+    hep_all = data_on;
+    fname = hep_files(2).name;
+    fpath = fullfile(hep_files(2).folder, fname);
+    load(fpath, 'data_on');
+    hep_eeg = data_on;
+    fname = hep_files(3).name;
+    fpath = fullfile(hep_files(3).folder, fname);
+    load(fpath, 'data_on');
+    hep_lfp = data_on;
 
+    [hep_all, hep_all_idx] = max(hep_all(:,time_idx),[],2);
+    hep_peak_times = times(time_idx(hep_all_idx))';
+    hep_eeg = hep_eeg(:,time_idx);
+    hep_lfp = hep_lfp(:,time_idx);
+
+    subjects = unique(Subs_all);
+    for s = 1:numel(subjects)
+        subject = subjects{s};
+        sub_idx = strcmp(subject, Subs_all);
+        Itc_all_sub(s) = mean(Itc_all(sub_idx));
+        itc_all_peak_times(s) = times(time_idx(mean(int32(Itc_peak_time_Idx(sub_idx)), 'native')));
+    end
+
+    [rval, pval] = corr(hep_peak_times(:), itc_all_peak_times(:), 'type', 'Spearman');
+    fprintf('Spearman Correlation: r = %.3f, p = %.6f\n', rval, pval);
+
+    figure;
+    scatter(hep_peak_times, itc_all_peak_times, 60, 'filled', 'MarkerFaceAlpha', 0.6); hold on;
+    lsline;  % regression line
+
+    xlabel('HEP Peak Time');
+    ylabel('ITC Peak');
+    title(sprintf('Correlation r = %.2f, p = %.4f', rval, pval));
+    
     [rval_eeg, pval_eeg, z_itc_eeg, z_pow_eeg] = analyze_itc_power_corr(Itc_eeg, Power_eeg, Subs_eeg, 'Type', 'EEG', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_EEG_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
     [rval_lfp, pval_lfp, z_itc_lfp, z_pow_lfp] = analyze_itc_power_corr(Itc_lfp, Power_lfp, Subs_lfp, 'Type', 'LFP', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_LFP_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
     [rval_all, pval_all, z_itc_all, z_pow_all] = analyze_itc_power_corr(Itc_all, Power_all, Subs_all, 'Type', 'ALL', 'Kind', 'Spearman', 'SavePath', '/Volumes/LP3/HeadHeart/0_data/itc/corr', 'SaveName', sprintf('ITC-POW_SpearmanCorr_ALL_fregs=%d-%dHz_time=%.1g-%.1gsec.png', tf_freq_win(1), tf_freq_win(2), tf_time_win(1), tf_time_win(2)));
@@ -2046,10 +2090,12 @@ if ismember('Correlation Group ITC', steps)
 end
 
 
-function [Itc_vals, Power_vals, Subject_ids] = process_type(file_list, pow_list, type_label, freq_idx, time_idx)
+function [Itc_vals, Power_vals, Subject_ids, Itc_peak_time_Idx, Itc_peak_freq_Idx] = process_type(file_list, pow_list, type_label, freq_idx, time_idx)
     Itc_vals = [];
     Power_vals = [];
     Subject_ids = [];
+    Itc_peak_time_Idx = [];
+    Itc_peak_freq_Idx = [];
 
     for i = 1:numel(file_list)
         fname = file_list(i).name;
@@ -2057,8 +2103,11 @@ function [Itc_vals, Power_vals, Subject_ids] = process_type(file_list, pow_list,
         load(fpath, 'ItcDataCh');
         
         % ITC
-        mean_itc = mean(ItcDataCh(freq_idx, time_idx), 'all');
+        [mean_itc, itc_idx] = max(ItcDataCh(freq_idx, time_idx),[], 'all');
         Itc_vals(end+1) = mean_itc;
+        [f_rel, t_rel] = ind2sub(size(ItcDataCh(freq_idx, time_idx)), itc_idx);
+        Itc_peak_time_Idx(end+1) = t_rel;
+        Itc_peak_freq_Idx(end+1) = f_rel;
 
         parts = split(fname, '_');
         Subject_ids{end+1} = parts{1};  % assumes format: Subject_XX_L.mat etc.
@@ -2076,19 +2125,6 @@ function [Itc_vals, Power_vals, Subject_ids] = process_type(file_list, pow_list,
 end
 
 function [rval, pval, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_vals, Subject_ids, varargin)
-% ANALYZE_ITC_POWER_CORR Z-scores ITC and Power within subjects,
-% calculates Pearson correlation, (optionally Bayesian), and plots results.
-%
-% Usage:
-%   [r, p, z_itc, z_pow] = analyze_itc_power_corr(Itc_vals, Power_vals, Subject_ids);
-%
-% Optional:
-%   'PlotTitle', 'My Title'
-%   'DoBayes', true
-%   'SavePath'  : folder to save figure (e.g., 'results/')
-%   'SaveName'  : optional filename (e.g., 'lfp_corr_plot.png'). If omitted, uses title.
-%
-% Requires BayesFactor toolbox (https://github.com/klabhub/bayesFactor)
 
     % Parse optional inputs
     p = inputParser;
